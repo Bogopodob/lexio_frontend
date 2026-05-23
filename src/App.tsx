@@ -1,10 +1,6 @@
-import { Routes, Route } from 'react-router-dom'
 import { motion } from 'framer-motion'
-import Home from './pages/Home'
-import Profile from './pages/Profile'
-import Stats from './pages/Stats'
-import Settings from './pages/Settings'
-import TabBar from './components/TabBar'
+import Router from '@/router'
+import TabBar from '@/components/TabBar'
 
 export default function App() {
   return (
@@ -26,12 +22,7 @@ export default function App() {
       />
 
       <div className="phone-frame page-container">
-        <Routes>
-          <Route path="/" element={<Home />} />
-          <Route path="/profile" element={<Profile />} />
-          <Route path="/stats" element={<Stats />} />
-          <Route path="/settings" element={<Settings />} />
-        </Routes>
+        <Router />
       </div>
 
       <TabBar />
