@@ -1,10 +1,12 @@
 import { motion } from 'framer-motion'
+import { FontAwesomeIcon } from '@fortawesome/react-fontawesome'
+import { faUtensils, faPlane, faFaceSmile, faBriefcase, faCircle, faLocationDot, faStar, faFire } from '@fortawesome/free-solid-svg-icons'
 
 const topicCards = [
-  { emoji: '🍽️', title: 'Еда', count: '48 слов', tone: 'topic-card--mint' },
-  { emoji: '✈️', title: 'Путешествия', count: '52 слова', tone: 'topic-card--sky' },
-  { emoji: '💭', title: 'Эмоции', count: '36 слов', tone: 'topic-card--rose' },
-  { emoji: '💼', title: 'Работа', count: '44 слова', tone: 'topic-card--sand' },
+  { icon: faUtensils, title: 'Еда', count: '48 слов', tone: 'topic-card--mint' },
+  { icon: faPlane, title: 'Путешествия', count: '52 слова', tone: 'topic-card--sky' },
+  { icon: faFaceSmile, title: 'Эмоции', count: '36 слов', tone: 'topic-card--rose' },
+  { icon: faBriefcase, title: 'Работа', count: '44 слова', tone: 'topic-card--sand' },
 ]
 
 const grammarCards = [
@@ -15,9 +17,9 @@ const grammarCards = [
 ]
 
 const phraseCards = [
-  { label: 'РЕСТОРАН', accent: 'phrase-card__label--mint', icon: '◌', title: 'Can I have the bill, please?', translation: 'Можно счёт, пожалуйста?' },
-  { label: 'ГОРОД', accent: 'phrase-card__label--blue', icon: '⌁', title: 'Where is the nearest metro?', translation: 'Где ближайшее метро?' },
-  { label: 'ОТЕЛЬ', accent: 'phrase-card__label--pink', icon: '✦', title: "I'd like to check in", translation: 'Я хочу заселиться.' },
+  { label: 'РЕСТОРАН', accent: 'phrase-card__label--mint', icon: faCircle, title: 'Can I have the bill, please?', translation: 'Можно счёт, пожалуйста?' },
+  { label: 'ГОРОД', accent: 'phrase-card__label--blue', icon: faLocationDot, title: 'Where is the nearest metro?', translation: 'Где ближайшее метро?' },
+  { label: 'ОТЕЛЬ', accent: 'phrase-card__label--pink', icon: faStar, title: "I'd like to check in", translation: 'Я хочу заселиться.' },
 ]
 
 const fadeUp = {
@@ -71,7 +73,7 @@ export default function Home() {
           whileHover={{ scale: 1.03, rotate: -1 }}
           whileTap={{ scale: 0.98 }}
         >
-          <span className="streak-badge__fire">✦</span>
+          <span className="streak-badge__fire"><FontAwesomeIcon icon={faFire} /></span>
           7 дней подряд
         </motion.div>
       </motion.header>
@@ -122,7 +124,7 @@ export default function Home() {
               whileHover={{ y: -5, rotate: index % 2 === 0 ? -1 : 1 }}
               whileTap={{ scale: 0.98 }}
             >
-              <span className="topic-card__emoji">{card.emoji}</span>
+              <span className="topic-card__emoji"><FontAwesomeIcon icon={card.icon} /></span>
               <h4>{card.title}</h4>
               <p>{card.count}</p>
             </motion.article>
@@ -185,7 +187,7 @@ export default function Home() {
               transition={{ delay: 0.34 + index * 0.08, duration: 0.5 }}
               whileHover={{ y: -5 }}
             >
-              <div className="phrase-card__icon">{card.icon}</div>
+              <div className="phrase-card__icon"><FontAwesomeIcon icon={card.icon} /></div>
               <p className={`phrase-card__label ${card.accent}`}>{card.label}</p>
               <h4>{card.title}</h4>
               <p className="phrase-card__translation">{card.translation}</p>

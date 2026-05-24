@@ -1,4 +1,6 @@
 import { motion } from 'framer-motion'
+import { FontAwesomeIcon } from '@fortawesome/react-fontawesome'
+import { faBook, faClock, faFire, faBullseye } from '@fortawesome/free-solid-svg-icons'
 
 export default function Stats() {
   return (
@@ -17,22 +19,22 @@ export default function Stats() {
 
       <div className="stats-grid">
         <div className="stats-card">
-          <span className="stats-card__icon">📖</span>
+          <span className="stats-card__icon"><FontAwesomeIcon icon={faBook} /></span>
           <strong>142</strong>
           <span>слов изучено</span>
         </div>
         <div className="stats-card">
-          <span className="stats-card__icon">⏱</span>
+          <span className="stats-card__icon"><FontAwesomeIcon icon={faClock} /></span>
           <strong>18 мин</strong>
           <span>сегодня</span>
         </div>
         <div className="stats-card">
-          <span className="stats-card__icon">🔥</span>
+          <span className="stats-card__icon"><FontAwesomeIcon icon={faFire} /></span>
           <strong>7 дней</strong>
           <span>серия</span>
         </div>
         <div className="stats-card">
-          <span className="stats-card__icon">🎯</span>
+          <span className="stats-card__icon"><FontAwesomeIcon icon={faBullseye} /></span>
           <strong>92%</strong>
           <span>точность</span>
         </div>

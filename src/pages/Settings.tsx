@@ -1,4 +1,6 @@
 import { motion } from 'framer-motion'
+import { FontAwesomeIcon } from '@fortawesome/react-fontawesome'
+import { faCircle } from '@fortawesome/free-solid-svg-icons'
 
 export default function Settings() {
   return (
@@ -40,11 +42,11 @@ export default function Settings() {
           <h3>Прочее</h3>
           <div className="settings-row">
             <span>Тёмная тема</span>
-            <span className="settings-row__toggle">●</span>
+            <span className="settings-row__toggle"><FontAwesomeIcon icon={faCircle} /></span>
           </div>
           <div className="settings-row">
             <span>Звук</span>
-            <span className="settings-row__toggle">●</span>
+            <span className="settings-row__toggle"><FontAwesomeIcon icon={faCircle} /></span>
           </div>
         </div>
       </div>

@@ -1,4 +1,13 @@
 import { motion } from 'framer-motion'
+import { FontAwesomeIcon } from '@fortawesome/react-fontawesome'
+import { faUser, faFire, faDumbbell, faBullseye, faStar } from '@fortawesome/free-solid-svg-icons'
+
+const achievements = [
+  { icon: faFire, text: '3 дня подряд' },
+  { icon: faDumbbell, text: '50 слов' },
+  { icon: faBullseye, text: 'Первый урок' },
+  { icon: faStar, text: 'Цель 5 дней' },
+]
 
 export default function Profile() {
   return (
@@ -17,7 +26,7 @@ export default function Profile() {
 
       <div className="profile-card">
         <div className="profile-card__avatar">
-          <span>👤</span>
+          <FontAwesomeIcon icon={faUser} />
         </div>
         <h2 className="profile-card__name">Алексей</h2>
         <p className="profile-card__email">aleksey@example.com</p>
@@ -43,8 +52,10 @@ export default function Profile() {
           <h3>Достижения</h3>
         </div>
         <div className="achievement-grid">
-          {['🔥 3 дня подряд', '💪 50 слов', '🎯 Первый урок', '⭐️ Цель 5 дней'].map((a) => (
-            <div key={a} className="achievement-badge">{a}</div>
+          {achievements.map((a) => (
+            <div key={a.text} className="achievement-badge">
+              <FontAwesomeIcon icon={a.icon} /> {a.text}
+            </div>
           ))}
         </div>
       </div>
