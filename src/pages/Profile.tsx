@@ -18,7 +18,8 @@ import {
   faComments,
   faGraduationCap,
 } from '@fortawesome/free-solid-svg-icons'
-import { useState } from 'react'
+import { useState, useRef } from 'react'
+import { createPortal } from 'react-dom'
 
 const achievements = [
   { icon: faFire, title: '3 дня подряд', desc: 'Серия', condition: 'Учи 3 дня без пропуска', total: 3, current: 3, progress: 100, rarity: 'common', color: '#ff9d5c', reward: '+50 XP' },
@@ -37,7 +38,9 @@ const achievements = [
 
 function AchievementsBlock({ items }: { items: typeof achievements }) {
   const [filter, setFilter] = useState<'all' | 'done' | 'progress'>('all')
-  const [selected, setSelected] = useState<(typeof achievements)[number] | null>(items[0] ?? null)
+  const [hovered, setHovered] = useState<(typeof achievements)[number] | null>(null)
+  const [pos, setPos] = useState({ x: 0, y: 0 })
+  const hoverTimeout = useRef<number | null>(null)
 
   const filtered = items.filter((a) => {
     if (filter === 'done') return a.progress === 100
@@ -45,6 +48,17 @@ function AchievementsBlock({ items }: { items: typeof achievements }) {
     return true
   })
   const doneCount = items.filter((a) => a.progress === 100).length
+
+  const onEnter = (a: (typeof achievements)[number], e: React.MouseEvent) => {
+    if (hoverTimeout.current) window.clearTimeout(hoverTimeout.current)
+    const rect = (e.currentTarget as HTMLElement).getBoundingClientRect()
+    setPos({ x: rect.left + rect.width / 2, y: rect.top })
+    setHovered(a)
+  }
+  const onLeave = () => {
+    if (hoverTimeout.current) window.clearTimeout(hoverTimeout.current)
+    hoverTimeout.current = window.setTimeout(() => setHovered(null), 80) as unknown as number
+  }
 
   return (
     <div className="rounded-[20px] border border-white/[0.06] bg-[#171717] overflow-hidden">
@@ -71,24 +85,29 @@ function AchievementsBlock({ items }: { items: typeof achievements }) {
         </div>
       </div>
 
-      {/* полка с 3D бейджами — горизонтальный скролл, выдерживает сколько угодно */}
       <div className="mt-4 px-5">
-        <div className="flex gap-3 overflow-x-auto pb-3 -mx-1 px-1 snap-x snap-mandatory scrollbar-thin scrollbar-track-transparent scrollbar-thumb-white/10 hover:scrollbar-thumb-white/20" style={{ scrollbarWidth: 'thin' }}>
+        <div className="flex gap-3 overflow-x-auto pb-4 -mx-1 px-1 snap-x snap-mandatory scrollbar-thin scrollbar-track-transparent scrollbar-thumb-white/10" style={{ scrollbarWidth: 'thin' }}>
           {filtered.map((a) => {
-            const isActive = selected?.title === a.title
             const pct = a.progress
             const circumference = 2 * Math.PI * 26
             const dashOffset = circumference * (1 - pct / 100)
+            const isCommon = a.rarity === 'common'
             return (
-              <button
+              <div
                 key={a.title}
-                onClick={() => setSelected(a)}
-                className={`group relative flex-none w-[148px] snap-start rounded-[20px] border p-3 pt-4 flex flex-col items-center gap-2 text-center transition-all duration-200 ${isActive ? 'bg-white text-black border-white shadow-[0_12px_32px_rgba(255,255,255,0.10)] scale-[1.02]' : 'bg-white/[0.03] border-white/[0.06] hover:bg-white/[0.06] hover:border-white/[0.10] hover:-translate-y-0.5'}`}
+                onMouseEnter={(e) => onEnter(a, e)}
+                onMouseLeave={onLeave}
+                onMouseMove={(e) => onEnter(a, e)}
+                className="group relative flex-none w-[148px] snap-start rounded-[20px] border p-3 pt-4 flex flex-col items-center gap-2 text-center transition-all duration-200 cursor-default hover:-translate-y-0.5 hover:shadow-[0_8px_24px_rgba(0,0,0,0.12)]"
+                style={{
+                  background: isCommon ? 'rgba(255,255,255,0.06)' : 'rgba(255,255,255,0.03)',
+                  borderColor: isCommon ? 'rgba(255,255,255,0.10)' : 'rgba(255,255,255,0.06)',
+                }}
               >
-                <span className={`absolute top-2 right-2 px-1.5 py-0.5 rounded-full text-[10px] font-black uppercase tracking-wide border ${a.rarity === 'common' ? 'bg-black/5 border-black/5 text-black/40' : a.rarity === 'rare' ? 'bg-[#5B74FF]/10 border-[#5B74FF]/20 text-[#5B74FF]' : a.rarity === 'epic' ? 'bg-[#a78bfa]/10 border-[#a78bfa]/20 text-[#a78bfa]' : 'bg-[#f43f5e]/10 border-[#f43f5e]/20 text-[#f43f5e]'} ${isActive ? '!bg-black/5 !border-black/10 !text-black/60' : ''}`}>{a.rarity}</span>
+                <span className={`absolute top-2 right-2 px-1.5 py-0.5 rounded-full text-[10px] font-black uppercase tracking-wide border ${a.rarity === 'common' ? 'bg-white/10 border-white/15 text-white/70' : a.rarity === 'rare' ? 'bg-[#5B74FF]/15 border-[#5B74FF]/25 text-[#8b9bff]' : a.rarity === 'epic' ? 'bg-[#a78bfa]/15 border-[#a78bfa]/25 text-[#a78bfa]' : 'bg-[#f43f5e]/15 border-[#f43f5e]/25 text-[#f43f5e]'}`}>{a.rarity}</span>
                 <div className="relative w-[72px] h-[72px] grid place-items-center">
                   <svg viewBox="0 0 64 64" className="absolute inset-0 w-full h-full -rotate-90">
-                    <circle cx="32" cy="32" r="26" fill="none" stroke={isActive ? 'rgba(0,0,0,0.08)' : 'rgba(255,255,255,0.08)'} strokeWidth="5" />
+                    <circle cx="32" cy="32" r="26" fill="none" stroke="rgba(255,255,255,0.08)" strokeWidth="5" />
                     <motion.circle
                       cx="32"
                       cy="32"
@@ -98,54 +117,60 @@ function AchievementsBlock({ items }: { items: typeof achievements }) {
                       strokeWidth="5"
                       strokeLinecap="round"
                       initial={{ strokeDashoffset: circumference }}
-                      animate={{ strokeDashoffset: dashOffset }}
+                      whileInView={{ strokeDashoffset: dashOffset }}
+                      viewport={{ once: true }}
                       transition={{ duration: 0.9, ease: 'easeOut' }}
                       style={{ strokeDasharray: circumference }}
-                      opacity={isActive ? 1 : 0.95}
                     />
                   </svg>
-                  <span className={`w-10 h-10 rounded-xl grid place-items-center border text-[16px] ${isActive ? 'bg-black/[0.04] border-black/10' : ''}`} style={{ background: isActive ? 'rgba(0,0,0,0.04)' : `${a.color}14`, borderColor: isActive ? 'rgba(0,0,0,0.08)' : `${a.color}22`, color: isActive ? '#111' : a.color }}>
+                  <span className="w-10 h-10 rounded-xl grid place-items-center border text-[16px] shadow-sm" style={{ background: `${a.color}18`, borderColor: `${a.color}30`, color: isCommon ? '#fff' : a.color, boxShadow: `0 0 12px ${a.color}18` }}>
                     <FontAwesomeIcon icon={a.icon} />
                   </span>
-                  <span className="absolute -bottom-1 left-1/2 -translate-x-1/2 px-1.5 py-0.5 rounded-full text-[10px] font-black tabular-nums border shadow-sm" style={{ background: isActive ? '#111' : a.color, color: isActive ? '#fff' : '#000', borderColor: isActive ? '#111' : 'rgba(255,255,255,0.9)' }}>{pct}%</span>
+                  <span className="absolute -bottom-1 left-1/2 -translate-x-1/2 px-1.5 py-0.5 rounded-full text-[10px] font-black tabular-nums border shadow-sm whitespace-nowrap" style={{ background: a.color, color: '#000', borderColor: 'rgba(255,255,255,0.9)' }}>{pct}%</span>
                 </div>
-                <span className={`text-[12px] font-black leading-tight line-clamp-1 mt-1 ${isActive ? 'text-black' : 'text-white'}`}>{a.title}</span>
-                <span className={`text-[11px] leading-none line-clamp-1 ${isActive ? 'text-black/60' : 'opacity-40'}`}>{a.desc}</span>
-                {a.progress === 100 ? <span className="mt-1 text-[10px] font-black text-[#5AD4B5]">✓ Получено</span> : <span className="mt-1 text-[10px] font-bold opacity-40">{a.total - a.current} осталось</span>}
-              </button>
+                <span className="text-[12px] font-black leading-tight line-clamp-1 mt-1 text-white">{a.title}</span>
+                <span className="text-[11px] leading-none text-white/50 line-clamp-1">{a.desc}</span>
+                <span className="mt-1 text-[10px] font-bold px-2 py-0.5 rounded-full border" style={{ background: `${a.color}12`, borderColor: `${a.color}20`, color: a.color }}>{a.total - a.current === 0 ? 'Готово' : `${a.total - a.current} осталось`}</span>
+              </div>
             )
           })}
         </div>
       </div>
 
-      {/* деталка выбранного — без ховера, всегда видно за что и сколько осталось */}
-      {selected && (
-        <motion.div key={selected.title} initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} className="mx-5 mb-5 mt-1 rounded-2xl bg-[#0f0f0f] border border-white/[0.06] p-4 flex flex-col sm:flex-row gap-4">
-          <div className="flex gap-3 flex-1 min-w-0">
-            <span className="w-10 h-10 rounded-xl grid place-items-center shrink-0 border" style={{ background: `${selected.color}14`, borderColor: `${selected.color}22`, color: selected.color }}>
-              <FontAwesomeIcon icon={selected.icon} />
-            </span>
-            <div className="min-w-0 flex-1">
-              <div className="text-[14px] font-black leading-none flex flex-wrap items-center gap-2">
-                {selected.title} <span className="px-1.5 py-0.5 rounded-full bg-white/[0.06] border border-white/[0.06] text-[11px] font-bold opacity-60">{selected.rarity}</span>
-              </div>
-              <div className="text-xs opacity-50 mt-1">{selected.condition} • <span style={{ color: selected.color }} className="font-bold">{selected.reward}</span></div>
-              <div className="flex items-center gap-2 mt-2.5">
-                <div className="flex-1 h-1.5 rounded-full bg-white/[0.06] overflow-hidden max-w-[220px]">
-                  <motion.div initial={{ width: 0 }} animate={{ width: `${selected.progress}%` }} transition={{ duration: 0.6 }} className="h-full rounded-full" style={{ background: selected.color }} />
+      {hovered &&
+        createPortal(
+          <div className="fixed z-[80] pointer-events-none -translate-x-1/2 -translate-y-full" style={{ left: pos.x, top: pos.y - 10 }}>
+            <div className="w-[280px] rounded-2xl border border-white/[0.10] bg-[#1e1e1e] shadow-[0_20px_60px_rgba(0,0,0,0.55)] p-4 pointer-events-auto">
+              <div className="flex items-center gap-3">
+                <span className="w-10 h-10 rounded-xl grid place-items-center border shrink-0" style={{ background: `${hovered.color}16`, borderColor: `${hovered.color}28`, color: hovered.color }}>
+                  <FontAwesomeIcon icon={hovered.icon} />
+                </span>
+                <div className="flex-1 min-w-0">
+                  <div className="text-[13px] font-black leading-none flex items-center gap-1.5">
+                    {hovered.title}
+                    <span className={`px-1.5 py-0.5 rounded-full text-[10px] font-black uppercase tracking-wide border ${hovered.rarity === 'common' ? 'bg-white/[0.08] border-white/[0.12] text-white/70' : hovered.rarity === 'rare' ? 'bg-[#5B74FF]/15 border-[#5B74FF]/30 text-[#8b9bff]' : hovered.rarity === 'epic' ? 'bg-[#a78bfa]/15 border-[#a78bfa]/30 text-[#a78bfa]' : 'bg-[#f43f5e]/15 border-[#f43f5e]/30 text-[#f43f5e]'}`}>{hovered.rarity}</span>
+                  </div>
+                  <div className="text-xs text-white/60 mt-1">{hovered.desc}</div>
                 </div>
-                <span className="text-xs font-black tabular-nums" style={{ color: selected.color }}>{selected.progress}%</span>
+              </div>
+              <div className="mt-3 rounded-xl bg-white/[0.04] border border-white/[0.06] p-3">
+                <div className="text-[11px] font-bold text-white/80">За что:</div>
+                <div className="text-[13px] leading-snug mt-1 text-white/90">{hovered.condition}</div>
+                <div className="flex items-center justify-between mt-3">
+                  <span className="text-[11px] font-bold text-white/50">Прогресс</span>
+                  <span className="text-xs font-black" style={{ color: hovered.color }}>{hovered.current}/{hovered.total} • {hovered.progress}%</span>
+                </div>
+                <div className="h-1.5 rounded-full bg-white/[0.08] overflow-hidden mt-1.5">
+                  <div className="h-full rounded-full" style={{ width: `${hovered.progress}%`, background: hovered.color }} />
+                </div>
+                <div className="text-[12px] mt-2 font-bold" style={{ color: hovered.progress === 100 ? hovered.color : 'rgba(255,255,255,0.9)' }}>
+                  {hovered.progress === 100 ? `✓ Получено • ${hovered.reward}` : `Осталось: ${hovered.total - hovered.current} • ${100 - hovered.progress}% • Награда: ${hovered.reward}`}
+                </div>
               </div>
             </div>
-          </div>
-          <div className="sm:w-[140px] shrink-0 rounded-xl bg-white/[0.03] border border-white/[0.04] p-3 flex flex-col justify-center gap-1">
-            <div className="text-[11px] font-bold opacity-40 uppercase tracking-wide">Прогресс</div>
-            <div className="text-sm font-black tabular-nums" style={{ color: selected.progress === 100 ? selected.color : 'white' }}>{selected.current} / {selected.total}</div>
-            <div className="text-xs font-bold" style={{ color: selected.progress === 100 ? selected.color : 'rgba(255,255,255,0.5)' }}>{selected.progress === 100 ? `✓ Получено` : `Осталось ${selected.total - selected.current} • ${100 - selected.progress}%`}</div>
-            <div className="text-[11px] opacity-30">{selected.progress === 100 ? 'Награда получена' : `До награды ${selected.reward}`}</div>
-          </div>
-        </motion.div>
-      )}
+          </div>,
+          document.body,
+        )}
     </div>
   )
 }
