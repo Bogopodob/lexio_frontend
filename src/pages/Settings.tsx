@@ -78,7 +78,7 @@ export default function Settings() {
             const isActive = active === s.id
             return (
               <button key={s.id} onClick={() => scrollTo(s.id)} className={`settings-row !py-2.5 w-full text-left ${isActive ? 'opacity-100' : 'opacity-60 hover:opacity-100'}`}>
-                <span className="flex items-center gap-2.5"><span className={`w-7 h-7 rounded-lg grid place-items-center text-xs ${isActive ? 'bg-white text-black' : 'bg-white/[0.06] border border-white/[0.06]'}`}><FontAwesomeIcon icon={s.icon} /></span> {s.label}</span>
+                <span className="flex items-center gap-2.5"><span className={`w-7 h-7 rounded-lg grid place-items-center text-xs border ${isActive ? 'bg-[#5AD4B5]/15 border-[#5AD4B5]/30 text-[#5AD4B5]' : 'bg-white/[0.06] border border-white/[0.06] text-white/60'}`}><FontAwesomeIcon icon={s.icon} /></span> {s.label}</span>
                 {isActive && <span className="w-1.5 h-1.5 rounded-full bg-[#5AD4B5] animate-pulse" />}
               </button>
             )
@@ -94,10 +94,10 @@ export default function Settings() {
                 { id: 'es', name: 'Español', sub: 'Испанский' },
                 { id: 'de', name: 'Deutsch', sub: 'Немецкий' },
               ].map((l) => (
-                <button key={l.id} onClick={() => setLang(l.id as never)} className={`p-3 rounded-xl border text-left transition-all ${lang === l.id ? 'bg-white text-black border-white' : 'bg-white/[0.03] border-white/[0.06] hover:bg-white/[0.06]'}`}>
+                <button key={l.id} onClick={() => setLang(l.id as never)} className={`p-3 rounded-xl border text-left transition-all ${lang === l.id ? 'bg-[#5AD4B5]/10 border-[#5AD4B5]/30 text-[#5AD4B5]' : 'bg-white/[0.03] border-white/[0.06] hover:bg-white/[0.06] text-white'}`}>
                   <div className="text-sm font-black">{l.name}</div>
-                  <div className={`text-xs ${lang === l.id ? 'opacity-60' : 'opacity-40'}`}>{l.sub}</div>
-                  <div className="text-[11px] opacity-50 mt-1">Русский → {l.name}</div>
+                  <div className={`text-xs ${lang === l.id ? 'opacity-80' : 'opacity-40'}`}>{l.sub}</div>
+                  <div className={`text-[11px] mt-1 ${lang === l.id ? 'opacity-70' : 'opacity-50'}`}>Русский → {l.name}</div>
                 </button>
               ))}
             </div>
@@ -130,15 +130,15 @@ export default function Settings() {
           <div ref={(el) => { refs.current['appearance'] = el }} id="appearance" className="settings-group !mb-0 scroll-mt-4">
             <h3><FontAwesomeIcon icon={faPalette} className="mr-2 opacity-60" /> Внешний вид</h3>
             <div className="grid grid-cols-2 gap-3">
-              <button onClick={() => theme !== 'dark' && toggleTheme()} className={`p-3 rounded-xl border text-left flex items-center gap-3 ${theme === 'dark' ? 'bg-white text-black border-white' : 'bg-white/[0.03] border-white/[0.06] opacity-60'}`}>
-                <span className="w-8 h-8 rounded-lg bg-black text-white grid place-items-center"><FontAwesomeIcon icon={faMoon} /></span>
+              <button onClick={() => theme !== 'dark' && toggleTheme()} className={`p-3 rounded-xl border text-left flex items-center gap-3 ${theme === 'dark' ? 'bg-[#5AD4B5]/10 border-[#5AD4B5]/30 text-[#5AD4B5]' : 'bg-white/[0.03] border-white/[0.06] opacity-60 hover:opacity-100'}`}>
+                <span className={`w-8 h-8 rounded-lg grid place-items-center ${theme === 'dark' ? 'bg-[#5AD4B5] text-black' : 'bg-black text-white'}`}><FontAwesomeIcon icon={faMoon} /></span>
                 <span><span className="block text-sm font-bold leading-none">Тёмная</span><span className="block text-xs opacity-60">по умолчанию</span></span>
-                {theme === 'dark' && <span className="ml-auto w-2 h-2 rounded-full bg-[#5AD4B5]" />}
+                {theme === 'dark' && <span className="ml-auto w-2 h-2 rounded-full bg-[#5AD4B5] animate-pulse" />}
               </button>
-              <button onClick={() => theme !== 'light' && toggleTheme()} className={`p-3 rounded-xl border text-left flex items-center gap-3 ${theme === 'light' ? 'bg-white text-black border-white shadow' : 'bg-white/[0.03] border-white/[0.06] opacity-60'}`}>
-                <span className="w-8 h-8 rounded-lg bg-white border border-black/10 text-black grid place-items-center"><FontAwesomeIcon icon={faSun} /></span>
+              <button onClick={() => theme !== 'light' && toggleTheme()} className={`p-3 rounded-xl border text-left flex items-center gap-3 ${theme === 'light' ? 'bg-[#5AD4B5]/10 border-[#5AD4B5]/30 text-[#5AD4B5]' : 'bg-white/[0.03] border-white/[0.06] opacity-60 hover:opacity-100'}`}>
+                <span className={`w-8 h-8 rounded-lg grid place-items-center ${theme === 'light' ? 'bg-[#5AD4B5] text-black' : 'bg-white border border-black/10 text-black'}`}><FontAwesomeIcon icon={faSun} /></span>
                 <span><span className="block text-sm font-bold leading-none">Светлая</span><span className="block text-xs opacity-60">скоро</span></span>
-                {theme === 'light' && <span className="ml-auto w-2 h-2 rounded-full bg-[#5AD4B5]" />}
+                {theme === 'light' && <span className="ml-auto w-2 h-2 rounded-full bg-[#5AD4B5] animate-pulse" />}
               </button>
             </div>
             <div className="settings-row">
@@ -159,8 +159,8 @@ export default function Settings() {
             <div className="settings-row">
               <span>Озвучка</span>
               <span className="flex gap-1 p-1 rounded-full bg-black/20 border border-white/[0.04]">
-                <button onClick={() => setVoice('female')} className={`px-3 py-1 rounded-full text-xs font-bold ${voice === 'female' ? 'bg-white text-black' : 'text-white/60'}`}>Женский</button>
-                <button onClick={() => setVoice('male')} className={`px-3 py-1 rounded-full text-xs font-bold ${voice === 'male' ? 'bg-white text-black' : 'text-white/60'}`}>Мужской</button>
+                <button onClick={() => setVoice('female')} className={`px-3 py-1 rounded-full text-xs font-bold border ${voice === 'female' ? 'bg-[#5AD4B5] text-black border-[#5AD4B5]' : 'bg-transparent border-transparent text-white/60 hover:text-white'}`}>Женский</button>
+                <button onClick={() => setVoice('male')} className={`px-3 py-1 rounded-full text-xs font-bold border ${voice === 'male' ? 'bg-[#5AD4B5] text-black border-[#5AD4B5]' : 'bg-transparent border-transparent text-white/60 hover:text-white'}`}>Мужской</button>
               </span>
             </div>
             <div className="settings-row">
