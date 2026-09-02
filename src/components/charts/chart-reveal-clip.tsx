@@ -1,4 +1,3 @@
-// @ts-nocheck
 "use client";
 
 import type { Transition } from "motion/react";

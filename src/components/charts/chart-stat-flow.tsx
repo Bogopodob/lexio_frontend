@@ -1,4 +1,3 @@
-// @ts-nocheck
 "use client";
 
 import NumberFlow from "@number-flow/react";

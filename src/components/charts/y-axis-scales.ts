@@ -1,4 +1,3 @@
-// @ts-nocheck
 import { scaleLinear } from "@visx/scale";
 import type { LineConfig } from "./chart-context";
 

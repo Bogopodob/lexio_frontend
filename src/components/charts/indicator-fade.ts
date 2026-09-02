@@ -1,4 +1,3 @@
-// @ts-nocheck
 export type IndicatorFadeEdges = "both" | "none" | "top" | "bottom";
 
 export interface VerticalFadeSides {

@@ -1,4 +1,3 @@
-// @ts-nocheck
 export const shortDateFmt = new Intl.DateTimeFormat("en-US", {
   month: "short",
   day: "numeric",

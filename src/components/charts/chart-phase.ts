@@ -1,4 +1,3 @@
-// @ts-nocheck
 export type ChartStatus = "loading" | "ready";
 
 /** Loading animation style: the default traveling pulse, or a diagonal

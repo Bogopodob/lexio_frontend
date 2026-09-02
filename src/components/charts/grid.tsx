@@ -1,4 +1,3 @@
-// @ts-nocheck
 "use client";
 
 import { GridColumns, GridRows } from "@visx/grid";

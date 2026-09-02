@@ -1,4 +1,3 @@
-// @ts-nocheck
 export const BAR_DEPTH_MAX_PX = 7;
 /** The side parallelogram's back edge lifts by `depth * this ratio`, giving a
  * subtle head-on perspective slope. */

@@ -1,4 +1,3 @@
-// @ts-nocheck
 import type { Transition } from "motion/react";
 import { DEFAULT_CHART_ENTER_TRANSITION } from "./animation";
 

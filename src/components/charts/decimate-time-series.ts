@@ -1,4 +1,3 @@
-// @ts-nocheck
 export function decimateTimeSeries<T extends Record<string, unknown>>(
   data: T[],
   maxPoints: number,

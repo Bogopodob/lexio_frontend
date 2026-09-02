@@ -1,4 +1,3 @@
-// @ts-nocheck
 export function filterDataByXDomain(
   data: Record<string, unknown>[],
   xDomain: [Date, Date],

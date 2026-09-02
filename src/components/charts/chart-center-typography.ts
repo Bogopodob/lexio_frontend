@@ -1,4 +1,3 @@
-// @ts-nocheck
 export const chartCenterContainerClassName =
   "@container/chart-center size-full min-w-0";
 

@@ -1,4 +1,3 @@
-// @ts-nocheck
 const DEFAULT_SKELETON_DATA_KEY = "value";
 const DEFAULT_SKELETON_POINT_COUNT = 7;
 

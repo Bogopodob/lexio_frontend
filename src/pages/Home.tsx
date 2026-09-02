@@ -69,13 +69,19 @@ const fadeUp = {
 }
 
 function ProgressRing({ value }: { value: number }) {
-  const radius = 26
+  const radius = 28
   const circumference = 2 * Math.PI * radius
   const dashOffset = circumference * (1 - value)
   return (
-    <motion.div className="progress-ring" aria-hidden="true" whileHover={{ scale: 1.06 }}>
-      <svg viewBox="0 0 72 72">
-        <circle className="progress-ring__track" cx="36" cy="36" r={radius} />
+    <motion.div
+      className="progress-ring !w-[72px] !h-[72px] !rounded-full !overflow-hidden !bg-[#1e1e1e] !border !border-[#262626]"
+      aria-hidden="true"
+      whileHover={{ scale: 1.06 }}
+      style={{ width: 72, height: 72, borderRadius: 999 }}
+    >
+      <svg viewBox="0 0 72 72" className="absolute inset-0 w-full h-full">
+        <circle cx="36" cy="36" r={32} fill="#1e1e1e" />
+        <circle className="progress-ring__track" cx="36" cy="36" r={radius} stroke="#2a2a2a" strokeWidth={6} fill="none" />
         <motion.circle
           className="progress-ring__value"
           cx="36"
@@ -84,11 +90,11 @@ function ProgressRing({ value }: { value: number }) {
           initial={{ strokeDashoffset: circumference }}
           animate={{ strokeDashoffset: dashOffset }}
           transition={{ duration: 1.1, ease: 'easeOut', delay: 0.2 }}
-          style={{ strokeDasharray: circumference }}
+          style={{ strokeDasharray: circumference, strokeWidth: 6 }}
         />
       </svg>
-      <span>
-        <CountUp to={12} duration={1.2} />
+      <span className="relative z-10 flex items-center justify-center w-full h-full text-[15px] font-black tracking-tight tabular-nums">
+        <CountUp to={12} duration={1.2} className="tabular-nums leading-none" />
       </span>
     </motion.div>
   )
@@ -137,11 +143,11 @@ export default function Home() {
         </motion.div>
       </motion.header>
 
-      {/* HERO — 2026 minimal, без “2010” градиентов */}
+      {/* HERO — 2026 minimal, без прозрачных краёв */}
       <motion.section variants={fadeUp} transition={{ duration: 0.55 }} className="mt-5 relative">
-        <SpotlightCard spotlightColor={'rgba(90, 212, 181, 0.10)' as unknown as `rgba(${number}, ${number}, ${number}, ${number})`} className="!p-0 !bg-transparent !border-0 !overflow-visible">
-          <div className="relative rounded-[24px] border border-white/[0.06] bg-[#171717] p-5 sm:p-6 flex flex-col lg:flex-row lg:items-center gap-5 overflow-hidden">
-            <div className="absolute -right-12 -top-12 w-40 h-40 rounded-full bg-[#5AD4B5]/[0.06] blur-2xl pointer-events-none" />
+        <SpotlightCard spotlightColor={'rgba(90, 212, 181, 0.10)' as unknown as `rgba(${number}, ${number}, ${number}, ${number})`} className="!p-0 !bg-transparent !border-0 !rounded-[24px] !overflow-hidden">
+          <div className="relative rounded-[24px] border border-[#262626] bg-[#171717] p-5 sm:p-6 flex flex-col lg:flex-row lg:items-center gap-5 overflow-hidden">
+            <div className="absolute right-0 top-0 w-64 h-64 rounded-full bg-[#5AD4B5]/[0.04] blur-3xl pointer-events-none" />
             <div className="flex gap-4 items-center flex-1 min-w-0">
               <ProgressRing value={0.6} />
               <div className="min-w-0">

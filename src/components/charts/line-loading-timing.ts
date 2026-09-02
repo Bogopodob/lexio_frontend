@@ -1,4 +1,3 @@
-// @ts-nocheck
 export const LINE_LOADING_PULSE_CYCLE_S = 2.2;
 
 /** Idle gap before the loading line pulse restarts (milliseconds). */

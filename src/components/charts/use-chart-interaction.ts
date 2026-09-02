@@ -1,4 +1,3 @@
-// @ts-nocheck
 "use client";
 
 import { localPoint } from "@visx/event";

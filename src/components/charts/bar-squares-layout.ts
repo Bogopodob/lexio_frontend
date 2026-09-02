@@ -1,4 +1,3 @@
-// @ts-nocheck
 export interface SquareColumnLayout {
   /** Number of squares in the column */
   count: number;

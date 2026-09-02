@@ -1,4 +1,3 @@
-// @ts-nocheck
 import type { Transition } from "motion/react";
 
 /** Default clip-reveal easing for cartesian charts. */

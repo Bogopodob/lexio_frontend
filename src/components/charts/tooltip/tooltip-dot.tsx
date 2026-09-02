@@ -1,4 +1,3 @@
-// @ts-nocheck
 "use client";
 
 import { motion, useSpring, useTransform } from "motion/react";

@@ -1,4 +1,3 @@
-// @ts-nocheck
 import { scaleLinear } from "@visx/scale";
 import type { LineConfig } from "./chart-context";
 import { type ChartPhase, Y_DOMAIN_TWEEN_SKIP_THRESHOLD } from "./chart-phase";

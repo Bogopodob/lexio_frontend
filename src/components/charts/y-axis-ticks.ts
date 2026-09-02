@@ -1,4 +1,3 @@
-// @ts-nocheck
 export const Y_AXIS_DEFAULT_TICK_COUNT = 5;
 
 /** Minimum valid `numTicks` for `scale.ticks()` — values ≤ 0 yield no ticks. */
