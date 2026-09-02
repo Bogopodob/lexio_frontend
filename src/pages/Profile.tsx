@@ -6,12 +6,12 @@ import {
   faBullseye,
   faStar,
   faTrophy,
+  faBook,
   faLocationDot,
   faLanguage,
   faHeart,
   faRocket,
   faUsers,
-  faPen,
   faCrown,
 } from '@fortawesome/free-solid-svg-icons'
 import SpotlightCard from '@/components/SpotlightCard'
@@ -153,12 +153,26 @@ export default function Profile() {
             ))}
           </div>
         </div>
-        <div className="rounded-[20px] border border-white/[0.06] bg-[#171717] p-5 flex flex-col">
-          <h3 className="text-[14px] font-black tracking-tight flex items-center gap-2"><FontAwesomeIcon icon={faPen} className="text-[#F08AB4]" /> Заметка себе</h3>
-          <p className="text-[13px] leading-relaxed opacity-60 mt-3 flex-1">“Не гонись за 100% — говори каждый день, даже с ошибками. Через месяц оглянешься и удивишься.”</p>
-          <div className="mt-4 flex gap-2">
-            <span className="px-3 py-1.5 rounded-full bg-[#F08AB4]/10 border border-[#F08AB4]/20 text-[#F08AB4] text-xs font-bold">#мотивация</span>
-            <span className="px-3 py-1.5 rounded-full bg-white/[0.06] border border-white/[0.06] text-xs font-semibold opacity-60">сохранено • сегодня</span>
+        <div className="rounded-[20px] border border-white/[0.06] bg-[#171717] p-5">
+          <h3 className="text-[14px] font-black tracking-tight flex items-center gap-2"><FontAwesomeIcon icon={faRocket} className="text-[#5AD4B5]" /> Быстрый старт</h3>
+          <p className="text-xs opacity-40 mt-1">что сделать за 5 минут</p>
+          <div className="mt-4 grid gap-2.5">
+            {[
+              { title: 'Повторить 12 слов', sub: 'слабые • 2 мин', icon: faBook, color: '#5AD4B5' },
+              { title: '5 новых слов', sub: 'тема Еда • 3 мин', icon: faStar, color: '#5B74FF' },
+              { title: 'Диалог 3 мин', sub: 'кафе • голосом', icon: faUsers, color: '#F08AB4' },
+            ].map((a) => (
+              <button key={a.title} type="button" className="w-full flex items-center gap-3 rounded-xl bg-white/[0.03] border border-white/[0.04] p-3 text-left hover:bg-white/[0.06] hover:border-white/[0.08] transition-colors group">
+                <span className="w-9 h-9 rounded-xl grid place-items-center border shrink-0 transition-colors" style={{ background: `${a.color}14`, borderColor: `${a.color}22`, color: a.color }}>
+                  <FontAwesomeIcon icon={a.icon} />
+                </span>
+                <span className="flex-1 min-w-0">
+                  <span className="block text-[13px] font-bold leading-none">{a.title}</span>
+                  <span className="block text-xs opacity-50">{a.sub}</span>
+                </span>
+                <span className="w-6 h-6 rounded-full bg-white text-black grid place-items-center text-[10px] opacity-0 group-hover:opacity-100 translate-x-1 group-hover:translate-x-0 transition-all">→</span>
+              </button>
+            ))}
           </div>
         </div>
       </div>
