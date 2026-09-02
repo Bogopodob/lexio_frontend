@@ -7,23 +7,20 @@ import {
   faStar,
   faTrophy,
   faBook,
-  faChartLine,
-  faClock,
+  faLocationDot,
+  faLanguage,
+  faHeart,
+  faRocket,
+  faCalendar,
+  faUsers,
+  faQuoteLeft,
   faPen,
-  faMedal,
   faCrown,
-  faBolt,
 } from '@fortawesome/free-solid-svg-icons'
-import CountUp from '@/components/CountUp'
 import SpotlightCard from '@/components/SpotlightCard'
-import { AreaChart } from '@/components/charts/area-chart'
-import { Area } from '@/components/charts/area'
-import { Grid } from '@/components/charts/grid'
-import { XAxis } from '@/components/charts/x-axis'
-import { ChartTooltip } from '@/components/charts/tooltip'
 
 const achievements = [
-  { icon: faFire, title: '3 дня подряд', desc: 'Серия без пропусков', progress: 100, rarity: 'common', color: '#ff9d5c' },
+  { icon: faFire, title: '3 дня подряд', desc: 'Серия', progress: 100, rarity: 'common', color: '#ff9d5c' },
   { icon: faDumbbell, title: '50 слов', desc: 'Первый словарь', progress: 100, rarity: 'common', color: '#5AD4B5' },
   { icon: faBullseye, title: 'Первый урок', desc: 'Старт дан', progress: 100, rarity: 'common', color: '#5B74FF' },
   { icon: faStar, title: 'Цель 5 дней', desc: 'Неделя фокуса', progress: 60, rarity: 'rare', color: '#F5C16A' },
@@ -31,28 +28,15 @@ const achievements = [
   { icon: faCrown, title: 'Полиглот', desc: '500 слов', progress: 28, rarity: 'epic', color: '#a78bfa' },
 ]
 
-const topics = [
-  { name: 'Еда', total: 48, done: 18, color: '#5AD4B5' },
-  { name: 'Путешествия', total: 52, done: 9, color: '#5B74FF' },
-  { name: 'Эмоции', total: 36, done: 14, color: '#F08AB4' },
-  { name: 'Работа', total: 44, done: 7, color: '#DB9F3A' },
-]
-
-const history = Array.from({ length: 14 }, (_, i) => {
-  const d = new Date()
-  d.setDate(d.getDate() - (13 - i))
-  return { date: d, words: 2 + (d.getDate() % 7) + Math.floor(Math.random() * 4) }
-})
-
 export default function Profile() {
   return (
     <motion.div initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.36 }} className="w-full flex flex-col gap-5">
-      {/* hero */}
+      {/* hero — personal */}
       <div className="relative overflow-hidden rounded-[24px] border border-white/[0.06] bg-[#171717] p-0">
         <div className="absolute -right-20 -top-20 w-72 h-72 rounded-full bg-[#5AD4B5]/[0.06] blur-3xl pointer-events-none" />
         <div className="absolute inset-0 opacity-[0.03]" style={{ backgroundImage: `radial-gradient(circle at 1px 1px, white 1px, transparent 0)`, backgroundSize: '18px 18px' }} />
-        <div className="relative p-6 sm:p-7 flex flex-col lg:flex-row gap-6">
-          <div className="flex gap-4 flex-1 min-w-0">
+        <div className="relative p-6 sm:p-7">
+          <div className="flex gap-4">
             <div className="relative shrink-0">
               <div className="w-[84px] h-[84px] rounded-[20px] bg-gradient-to-br from-[#5AD4B5] to-[#5B74FF] p-[2px] shadow-[0_12px_32px_rgba(91,116,255,0.22)]">
                 <div className="w-full h-full rounded-[18px] bg-[#0f0f0f] grid place-items-center text-[28px]">А</div>
@@ -61,157 +45,140 @@ export default function Profile() {
             </div>
             <div className="min-w-0 flex-1">
               <div className="flex flex-wrap items-center gap-2">
-                <h1 className="text-[24px] sm:text-[28px] font-black tracking-tight leading-none">Алексей</h1>
-                <span className="px-2.5 py-1 rounded-full bg-white text-black text-[11px] font-black tracking-wide">PRO</span>
-                <span className="px-2.5 py-1 rounded-full bg-white/[0.06] border border-white/[0.08] text-white/70 text-xs font-semibold flex items-center gap-1.5">
-                  <FontAwesomeIcon icon={faFire} className="text-[#ff9d5c]" /> 7 дней
+                <h1 className="text-[26px] sm:text-[30px] font-black tracking-tight leading-none">Алексей</h1>
+                <span className="px-2.5 py-1 rounded-full bg-white text-black text-[11px] font-black">PRO</span>
+                <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-white/[0.06] border border-white/[0.08] text-white/60 text-xs font-medium">
+                  <FontAwesomeIcon icon={faLocationDot} className="opacity-60" /> Москва • 24 года
                 </span>
               </div>
-              <p className="text-white/50 text-[13px] mt-1 truncate">aleksey@example.com • учит английский 3 мес.</p>
-              <div className="flex flex-wrap gap-2 mt-3">
-                <span className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-white/[0.06] border border-white/[0.06] text-xs font-semibold">
-                  <FontAwesomeIcon icon={faBook} className="opacity-60" /> 142 слова
-                </span>
-                <span className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-[#5AD4B5]/10 border border-[#5AD4B5]/20 text-[#5AD4B5] text-xs font-bold">
-                  <FontAwesomeIcon icon={faClock} /> 18 мин сегодня
-                </span>
-                <span className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-white/[0.06] border border-white/[0.06] text-xs font-semibold">
-                  <FontAwesomeIcon icon={faBullseye} className="text-[#5B74FF]" /> 92% точность
-                </span>
+              <p className="text-white/60 text-[13px] mt-1.5 leading-relaxed max-w-[52ch]">Учу английский для путешествий и работы. Люблю кофе, кино и разговоры на кухне. Цель — свободно говорить к лету.</p>
+              <div className="flex flex-wrap gap-1.5 mt-3">
+                <span className="px-2.5 py-1 rounded-full bg-[#5AD4B5]/10 border border-[#5AD4B5]/20 text-[#5AD4B5] text-xs font-bold">✈️ Путешествия</span>
+                <span className="px-2.5 py-1 rounded-full bg-[#5B74FF]/10 border border-[#5B74FF]/20 text-[#8b9bff] text-xs font-bold">💼 Работа</span>
+                <span className="px-2.5 py-1 rounded-full bg-white/[0.06] border border-white/[0.06] text-white/60 text-xs font-semibold">🎬 Кино</span>
+                <span className="px-2.5 py-1 rounded-full bg-white/[0.06] border border-white/[0.06] text-white/60 text-xs font-semibold">☕ Кофе</span>
               </div>
             </div>
           </div>
-          <div className="flex lg:flex-col gap-3 lg:w-[260px] shrink-0">
-            <div className="flex-1 rounded-2xl bg-white/[0.04] border border-white/[0.06] p-4">
-              <div className="text-[11px] tracking-[0.08em] uppercase font-bold opacity-40">Уровень</div>
-              <div className="text-[22px] font-black mt-1">A2 • База</div>
-              <div className="text-xs opacity-50">Следующий B1 — ещё 58 слов</div>
-              <div className="h-1.5 rounded-full bg-white/[0.06] overflow-hidden mt-3">
-                <motion.div initial={{ width: 0 }} animate={{ width: '42%' }} transition={{ duration: 0.9, ease: 'easeOut' }} className="h-full bg-[#5AD4B5]" />
-              </div>
+
+          <div className="mt-5 grid grid-cols-3 gap-2.5">
+            <div className="rounded-2xl bg-white/[0.04] border border-white/[0.06] p-3.5">
+              <div className="text-[11px] tracking-[0.08em] uppercase font-bold opacity-40 flex items-center gap-1.5"><FontAwesomeIcon icon={faLanguage} /> Языки</div>
+              <div className="text-sm font-bold mt-1">Русский → English</div>
+              <div className="text-xs opacity-50">с нуля • 3 мес.</div>
             </div>
-            <div className="hidden sm:flex flex-1 rounded-2xl bg-[#5AD4B5] p-4 text-black flex-col justify-center">
-              <div className="text-[11px] tracking-[0.08em] uppercase font-black opacity-60">Дневная цель</div>
-              <div className="text-[22px] font-black leading-none mt-1">12 / 20</div>
-              <div className="text-xs font-semibold opacity-70">слов сегодня</div>
+            <div className="rounded-2xl bg-white/[0.04] border border-white/[0.06] p-3.5">
+              <div className="text-[11px] tracking-[0.08em] uppercase font-bold opacity-40 flex items-center gap-1.5"><FontAwesomeIcon icon={faHeart} className="text-[#F08AB4]" /> Интересы</div>
+              <div className="text-sm font-bold mt-1">Еда и эмоции</div>
+              <div className="text-xs opacity-50">любимые темы</div>
+            </div>
+            <div className="rounded-2xl bg-[#5AD4B5] p-3.5 text-black">
+              <div className="text-[11px] tracking-[0.08em] uppercase font-black opacity-60 flex items-center gap-1"><FontAwesomeIcon icon={faRocket} /> Цель</div>
+              <div className="text-sm font-black mt-1">B1 к июню</div>
+              <div className="text-xs font-semibold opacity-60">ещё 58 слов</div>
             </div>
           </div>
         </div>
       </div>
 
-      {/* stats */}
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
-        {[
-          { label: 'Всего слов', value: 142, sub: '+6 за неделю', icon: faBook, color: '#5AD4B5' },
-          { label: 'Минут', value: 18, sub: 'сегодня', icon: faClock, color: '#5B74FF', suffix: 'м' },
-          { label: 'Серия', value: 7, sub: 'дней', icon: faFire, color: '#ff9d5c' },
-          { label: 'Точность', value: 92, sub: '% верно', icon: faBullseye, color: '#F08AB4', suffix: '%' },
-        ].map((s) => (
-          <div key={s.label} className="rounded-[18px] border border-white/[0.06] bg-[#171717] p-4 flex flex-col gap-2">
-            <div className="flex items-center justify-between">
-              <span className="w-8 h-8 rounded-xl bg-white/[0.06] border border-white/[0.06] grid place-items-center text-white/70">
-                <FontAwesomeIcon icon={s.icon} />
-              </span>
-              <span className="text-[10px] font-bold tracking-widest uppercase px-2 py-1 rounded-full bg-white/[0.06] border border-white/[0.06] opacity-60">{s.sub}</span>
-            </div>
-            <div className="text-[26px] font-black tracking-tight tabular-nums" style={{ color: s.color }}>
-              <CountUp to={s.value} duration={0.9} />{s.suffix || ''}
-            </div>
-            <div className="text-xs font-bold tracking-wide opacity-40 uppercase">{s.label}</div>
+      <div className="grid grid-cols-1 lg:grid-cols-[1.1fr_1fr] gap-4">
+        {/* about */}
+        <div className="rounded-[20px] border border-white/[0.06] bg-[#171717] p-5">
+          <h3 className="text-[14px] font-black tracking-tight flex items-center gap-2"><FontAwesomeIcon icon={faBook} className="text-[#5AD4B5]" /> О себе</h3>
+          <p className="text-[13px] leading-relaxed opacity-70 mt-3">Привет! Я Алексей — учу английский, чтобы уверенно заказывать капучино в Риме и вести стендапы на работе. За 3 месяца выучил 142 слова, но главное — не бросаю. Каждый день по 15 минут.</p>
+          <div className="mt-4 rounded-2xl bg-[#0f0f0f] border border-white/[0.06] p-4 flex gap-3">
+            <span className="w-8 h-8 rounded-full bg-[#5AD4B5]/15 border border-[#5AD4B5]/20 grid place-items-center text-[#5AD4B5] shrink-0"><FontAwesomeIcon icon={faQuoteLeft} /></span>
+            <p className="text-[13px] leading-relaxed italic opacity-80">“Язык — это не про идеальную грамматику, а про смелость говорить. Ошибки — это прогресс.”</p>
           </div>
-        ))}
-      </div>
+          <div className="mt-4 flex flex-wrap gap-2">
+            <span className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-white/[0.06] border border-white/[0.06] text-xs font-semibold"><FontAwesomeIcon icon={faCalendar} className="opacity-50" /> с янв 2026</span>
+            <span className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-white/[0.06] border border-white/[0.06] text-xs font-semibold"><FontAwesomeIcon icon={faUsers} className="opacity-50" /> 3 друга учат вместе</span>
+          </div>
+        </div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-[1.2fr_1fr] gap-4">
-        {/* topics */}
+        {/* goals */}
         <div className="rounded-[20px] border border-white/[0.06] bg-[#171717] p-5">
           <div className="flex items-center justify-between">
-            <h3 className="text-[14px] font-black tracking-tight flex items-center gap-2"><FontAwesomeIcon icon={faBook} className="text-[#5AD4B5]" /> Прогресс по темам</h3>
-            <span className="text-[11px] opacity-40 font-mono">4 темы</span>
+            <h3 className="text-[14px] font-black tracking-tight flex items-center gap-2"><FontAwesomeIcon icon={faBullseye} className="text-[#5B74FF]" /> Цели на месяц</h3>
+            <span className="text-[11px] opacity-40 font-bold">май • 2026</span>
           </div>
           <div className="mt-4 grid gap-3">
-            {topics.map((t) => {
-              const pct = Math.round((t.done / t.total) * 100)
-              return (
-                <div key={t.name} className="group flex items-center gap-3 rounded-xl px-2 py-1.5 -mx-2 hover:bg-white/[0.04] transition-colors">
-                  <span className="w-2.5 h-2.5 rounded-full shrink-0" style={{ background: t.color, boxShadow: `0 0 8px ${t.color}66` }} />
-                  <span className="text-[13px] font-semibold w-[110px] truncate">{t.name}</span>
-                  <div className="flex-1 h-1.5 rounded-full bg-white/[0.06] overflow-hidden max-w-[180px]">
-                    <motion.div initial={{ width: 0 }} animate={{ width: `${pct}%` }} transition={{ duration: 0.7 }} className="h-full rounded-full" style={{ background: t.color }} />
-                  </div>
-                  <span className="text-xs font-bold tabular-nums w-10 text-right" style={{ color: t.color }}>{pct}%</span>
-                  <span className="text-xs opacity-40 font-mono w-[68px] text-right hidden sm:block">{t.done}/{t.total}</span>
+            {[
+              { title: 'Заговорить в кафе', desc: 'Заказать еду без пауз', progress: 68, color: '#5AD4B5' },
+              { title: '20 фраз для путешествий', desc: 'Аэропорт, отель, город', progress: 42, color: '#5B74FF' },
+              { title: 'Серия 14 дней', desc: 'Не пропускать', progress: 50, color: '#F5C16A' },
+            ].map((g) => (
+              <div key={g.title} className="rounded-xl bg-white/[0.03] border border-white/[0.04] p-3.5">
+                <div className="flex items-center justify-between">
+                  <span className="text-[13px] font-bold">{g.title}</span>
+                  <span className="text-xs font-black" style={{ color: g.color }}>{g.progress}%</span>
                 </div>
-              )
-            })}
-          </div>
-        </div>
-
-        {/* achievements */}
-        <div className="rounded-[20px] border border-white/[0.06] bg-[#171717] p-5">
-          <div className="flex items-center justify-between">
-            <h3 className="text-[14px] font-black tracking-tight flex items-center gap-2"><FontAwesomeIcon icon={faTrophy} className="text-[#F5C16A]" /> Достижения</h3>
-            <span className="text-[11px] opacity-40 font-bold">6 • {achievements.filter((a) => a.progress === 100).length} получено</span>
-          </div>
-          <div className="mt-4 grid grid-cols-3 gap-2.5">
-            {achievements.map((a) => (
-              <SpotlightCard key={a.title} spotlightColor={`${a.color}22` as unknown as `rgba(${number}, ${number}, ${number}, ${number})`} className="!p-0 !bg-transparent !border-0">
-                <div className={`relative rounded-2xl border p-3 flex flex-col items-center gap-2 text-center h-[118px] justify-center overflow-hidden ${a.progress === 100 ? 'bg-white/[0.04] border-white/[0.06]' : 'bg-[#0f0f0f] border-white/[0.04] opacity-80'}`}>
-                  {a.rarity === 'epic' && <span className="absolute top-1.5 right-1.5 w-1.5 h-1.5 rounded-full bg-[#a78bfa] shadow-[0_0_8px_#a78bfa]" />}
-                  <span className="w-9 h-9 rounded-xl grid place-items-center text-[15px] border" style={{ background: `${a.color}14`, borderColor: `${a.color}22`, color: a.color }}>
-                    <FontAwesomeIcon icon={a.icon} />
-                  </span>
-                  <span className="text-[12px] font-bold leading-tight">{a.title}</span>
-                  <span className="text-[11px] opacity-40 leading-none">{a.desc}</span>
-                  {a.progress < 100 && (
-                    <div className="w-full h-1 rounded-full bg-white/[0.06] overflow-hidden mt-1">
-                      <div className="h-full rounded-full" style={{ width: `${a.progress}%`, background: a.color }} />
-                    </div>
-                  )}
-                  {a.progress === 100 && <FontAwesomeIcon icon={faStar} className="text-[#F5C16A] text-[10px]" />}
+                <div className="text-xs opacity-50">{g.desc}</div>
+                <div className="h-1.5 rounded-full bg-white/[0.06] overflow-hidden mt-2.5">
+                  <motion.div initial={{ width: 0 }} whileInView={{ width: `${g.progress}%` }} viewport={{ once: true }} transition={{ duration: 0.8 }} className="h-full rounded-full" style={{ background: g.color }} />
                 </div>
-              </SpotlightCard>
+              </div>
             ))}
           </div>
         </div>
       </div>
 
-      {/* history */}
+      {/* achievements — keep but more personal */}
       <div className="rounded-[20px] border border-white/[0.06] bg-[#171717] p-5">
         <div className="flex items-center justify-between">
-          <h3 className="text-[14px] font-black tracking-tight flex items-center gap-2"><FontAwesomeIcon icon={faChartLine} className="text-[#5B74FF]" /> История • 14 дней</h3>
-          <span className="text-[11px] opacity-40">слов / день</span>
+          <h3 className="text-[14px] font-black tracking-tight flex items-center gap-2"><FontAwesomeIcon icon={faTrophy} className="text-[#F5C16A]" /> Достижения</h3>
+          <span className="text-[11px] opacity-40 font-bold">6 • {achievements.filter((a) => a.progress === 100).length} получено</span>
         </div>
-        <div className="h-[200px] mt-3">
-          <AreaChart data={history as unknown as Record<string, unknown>[]} xDataKey="date" aspectRatio="3 / 1">
-            <Grid horizontal numTicksRows={3} stroke="rgba(255,255,255,0.06)" />
-            <Area dataKey="words" fill="var(--chart-line-primary)" fillOpacity={0.18} strokeWidth={2} />
-            <XAxis />
-            <ChartTooltip />
-          </AreaChart>
+        <div className="mt-4 grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-2.5">
+          {achievements.map((a) => (
+            <SpotlightCard key={a.title} spotlightColor={`${a.color}18` as unknown as `rgba(${number}, ${number}, ${number}, ${number})`} className="!p-0 !bg-transparent !border-0">
+              <div className={`relative rounded-2xl border p-3 flex flex-col items-center gap-1.5 text-center h-[112px] justify-center overflow-hidden ${a.progress === 100 ? 'bg-white/[0.04] border-white/[0.06]' : 'bg-[#0f0f0f] border-white/[0.04] opacity-75'}`}>
+                {a.rarity === 'epic' && <span className="absolute top-1.5 right-1.5 w-1.5 h-1.5 rounded-full bg-[#a78bfa] shadow-[0_0_8px_#a78bfa]" />}
+                <span className="w-8 h-8 rounded-xl grid place-items-center text-[14px] border" style={{ background: `${a.color}14`, borderColor: `${a.color}22`, color: a.color }}>
+                  <FontAwesomeIcon icon={a.icon} />
+                </span>
+                <span className="text-[11px] font-bold leading-tight">{a.title}</span>
+                <span className="text-[10px] opacity-40 leading-none">{a.desc}</span>
+                {a.progress < 100 ? (
+                  <div className="w-full h-1 rounded-full bg-white/[0.06] overflow-hidden mt-1">
+                    <div className="h-full rounded-full" style={{ width: `${a.progress}%`, background: a.color }} />
+                  </div>
+                ) : (
+                  <FontAwesomeIcon icon={faStar} className="text-[#F5C16A] text-[10px] mt-1" />
+                )}
+              </div>
+            </SpotlightCard>
+          ))}
         </div>
       </div>
 
-      <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-        <div className="rounded-2xl border border-white/[0.06] bg-[#171717] p-4 flex items-center gap-3">
-          <span className="w-10 h-10 rounded-xl bg-[#5AD4B5]/10 border border-[#5AD4B5]/20 grid place-items-center text-[#5AD4B5]"><FontAwesomeIcon icon={faPen} /></span>
-          <div>
-            <div className="text-sm font-bold">Продолжить</div>
-            <div className="text-xs opacity-50">12 слов в очереди</div>
+      {/* friends / community */}
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+        <div className="rounded-[20px] border border-white/[0.06] bg-[#171717] p-5">
+          <h3 className="text-[14px] font-black tracking-tight flex items-center gap-2"><FontAwesomeIcon icon={faUsers} className="text-[#5B74FF]" /> Друзья учат</h3>
+          <div className="mt-4 space-y-3">
+            {[
+              { name: 'Марина', level: 'B1', streak: 12, avatar: 'М' },
+              { name: 'Игорь', level: 'A2', streak: 7, avatar: 'И' },
+              { name: 'София', level: 'A1', streak: 3, avatar: 'С' },
+            ].map((f) => (
+              <div key={f.name} className="flex items-center gap-3 rounded-xl bg-white/[0.03] border border-white/[0.04] p-3">
+                <span className="w-9 h-9 rounded-full bg-white/[0.08] border border-white/[0.08] grid place-items-center font-bold text-sm">{f.avatar}</span>
+                <div className="flex-1 min-w-0">
+                  <div className="text-sm font-bold leading-none">{f.name} • <span className="opacity-60 font-semibold">{f.level}</span></div>
+                  <div className="text-xs opacity-40">🔥 {f.streak} дней</div>
+                </div>
+                <span className="px-2.5 py-1 rounded-full bg-white/[0.06] border border-white/[0.06] text-xs font-bold">+</span>
+              </div>
+            ))}
           </div>
         </div>
-        <div className="rounded-2xl border border-white/[0.06] bg-[#171717] p-4 flex items-center gap-3">
-          <span className="w-10 h-10 rounded-xl bg-[#5B74FF]/10 border border-[#5B74FF]/20 grid place-items-center text-[#5B74FF]"><FontAwesomeIcon icon={faMedal} /></span>
-          <div>
-            <div className="text-sm font-bold">Рейтинг</div>
-            <div className="text-xs opacity-50">Топ 18% учеников</div>
-          </div>
-        </div>
-        <div className="rounded-2xl border border-white/[0.06] bg-[#171717] p-4 flex items-center gap-3">
-          <span className="w-10 h-10 rounded-xl bg-[#F08AB4]/10 border border-[#F08AB4]/20 grid place-items-center text-[#F08AB4]"><FontAwesomeIcon icon={faBolt} /></span>
-          <div>
-            <div className="text-sm font-bold">Испытание</div>
-            <div className="text-xs opacity-50">5 дней — награда</div>
+        <div className="rounded-[20px] border border-white/[0.06] bg-[#171717] p-5 flex flex-col">
+          <h3 className="text-[14px] font-black tracking-tight flex items-center gap-2"><FontAwesomeIcon icon={faPen} className="text-[#F08AB4]" /> Заметка себе</h3>
+          <p className="text-[13px] leading-relaxed opacity-60 mt-3 flex-1">“Не гонись за 100% — говори каждый день, даже с ошибками. Через месяц оглянешься и удивишься.”</p>
+          <div className="mt-4 flex gap-2">
+            <span className="px-3 py-1.5 rounded-full bg-[#F08AB4]/10 border border-[#F08AB4]/20 text-[#F08AB4] text-xs font-bold">#мотивация</span>
+            <span className="px-3 py-1.5 rounded-full bg-white/[0.06] border border-white/[0.06] text-xs font-semibold opacity-60">сохранено • сегодня</span>
           </div>
         </div>
       </div>
