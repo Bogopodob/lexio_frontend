@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { motion } from 'framer-motion'
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome'
 import {
@@ -10,11 +10,21 @@ import {
   faShieldHalved,
   faCircleInfo,
   faKeyboard,
-  faUser,
   faMoon,
   faSun,
 } from '@fortawesome/free-solid-svg-icons'
 import { useTheme } from '@/context/ThemeContext'
+
+const SECTIONS = [
+  { id: 'lang', label: 'Язык', icon: faLanguage },
+  { id: 'learn', label: 'Обучение', icon: faBullseye },
+  { id: 'appearance', label: 'Внешний вид', icon: faPalette },
+  { id: 'sound', label: 'Звук', icon: faVolumeHigh },
+  { id: 'notif', label: 'Уведомления', icon: faBell },
+  { id: 'shortcuts', label: 'Быстрый доступ', icon: faKeyboard },
+  { id: 'privacy', label: 'Приватность', icon: faShieldHalved },
+  { id: 'about', label: 'О приложении', icon: faCircleInfo },
+] as const
 
 export default function Settings() {
   const { theme, toggleTheme } = useTheme()
@@ -23,6 +33,34 @@ export default function Settings() {
   const [lang, setLang] = useState<'en' | 'es' | 'de'>('en')
   const [goal, setGoal] = useState(20)
   const [voice, setVoice] = useState<'female' | 'male'>('female')
+  const [active, setActive] = useState<string>('lang')
+  const refs = useRef<Record<string, HTMLElement | null>>({})
+
+  const scrollTo = (id: string) => {
+    const el = refs.current[id]
+    const scroller = document.getElementById('app-content-scroll') as HTMLElement | null
+    if (el && scroller) {
+      const top = el.offsetTop - 12
+      scroller.scrollTo({ top, behavior: 'smooth' })
+    } else {
+      el?.scrollIntoView({ behavior: 'smooth', block: 'start' })
+    }
+    setActive(id)
+  }
+
+  useEffect(() => {
+    const scroller = document.getElementById('app-content-scroll')
+    if (!scroller) return
+    const obs = new IntersectionObserver(
+      (entries) => {
+        const visible = entries.filter((e) => e.isIntersecting).sort((a, b) => a.boundingClientRect.top - b.boundingClientRect.top)
+        if (visible[0]?.target?.id) setActive(visible[0].target.id)
+      },
+      { root: scroller, rootMargin: '-20% 0px -70% 0px', threshold: 0 },
+    )
+    Object.values(refs.current).forEach((el) => el && obs.observe(el))
+    return () => obs.disconnect()
+  }, [])
 
   return (
     <motion.div initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.36 }} className="w-full flex flex-col gap-4">
@@ -33,27 +71,22 @@ export default function Settings() {
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-[280px_1fr] gap-4 items-start">
-        {/* left nav — как в desktop */}
+        {/* left nav — клик скроллит */}
         <div className="settings-group !mb-0 lg:sticky lg:top-4 h-fit hidden lg:block">
           <h3>Разделы</h3>
-          {[
-            { icon: faUser, label: 'Профиль', active: false },
-            { icon: faLanguage, label: 'Язык', active: true },
-            { icon: faBullseye, label: 'Обучение', active: false },
-            { icon: faPalette, label: 'Внешний вид', active: false },
-            { icon: faVolumeHigh, label: 'Звук', active: false },
-            { icon: faBell, label: 'Уведомления', active: false },
-            { icon: faShieldHalved, label: 'Приватность', active: false },
-          ].map((s) => (
-            <div key={s.label} className={`settings-row !py-2.5 ${s.active ? 'opacity-100' : 'opacity-60'}`}>
-              <span className="flex items-center gap-2.5"><span className={`w-7 h-7 rounded-lg grid place-items-center text-xs ${s.active ? 'bg-white text-black' : 'bg-white/[0.06] border border-white/[0.06]'}`}><FontAwesomeIcon icon={s.icon} /></span> {s.label}</span>
-              {s.active && <span className="w-1.5 h-1.5 rounded-full bg-[#5AD4B5]" />}
-            </div>
-          ))}
+          {SECTIONS.map((s) => {
+            const isActive = active === s.id
+            return (
+              <button key={s.id} onClick={() => scrollTo(s.id)} className={`settings-row !py-2.5 w-full text-left ${isActive ? 'opacity-100' : 'opacity-60 hover:opacity-100'}`}>
+                <span className="flex items-center gap-2.5"><span className={`w-7 h-7 rounded-lg grid place-items-center text-xs ${isActive ? 'bg-white text-black' : 'bg-white/[0.06] border border-white/[0.06]'}`}><FontAwesomeIcon icon={s.icon} /></span> {s.label}</span>
+                {isActive && <span className="w-1.5 h-1.5 rounded-full bg-[#5AD4B5] animate-pulse" />}
+              </button>
+            )
+          })}
         </div>
 
         <div className="flex flex-col gap-4 min-w-0">
-          <div className="settings-group !mb-0">
+          <div ref={(el) => { refs.current['lang'] = el }} id="lang" className="settings-group !mb-0 scroll-mt-4">
             <h3><FontAwesomeIcon icon={faLanguage} className="mr-2 opacity-60" /> Язык обучения</h3>
             <div className="grid grid-cols-3 gap-2">
               {[
@@ -73,7 +106,7 @@ export default function Settings() {
             </div>
           </div>
 
-          <div className="settings-group !mb-0">
+          <div ref={(el) => { refs.current['learn'] = el }} id="learn" className="settings-group !mb-0 scroll-mt-4">
             <h3><FontAwesomeIcon icon={faBullseye} className="mr-2 opacity-60" /> Обучение</h3>
             <div className="settings-row">
               <span className="flex flex-col gap-1"><span>Дневная цель</span><span className="text-xs opacity-40">{goal} слов • ~{Math.round(goal * 1.5)} мин</span></span>
@@ -94,7 +127,7 @@ export default function Settings() {
             </div>
           </div>
 
-          <div className="settings-group !mb-0">
+          <div ref={(el) => { refs.current['appearance'] = el }} id="appearance" className="settings-group !mb-0 scroll-mt-4">
             <h3><FontAwesomeIcon icon={faPalette} className="mr-2 opacity-60" /> Внешний вид</h3>
             <div className="grid grid-cols-2 gap-3">
               <button onClick={() => theme !== 'dark' && toggleTheme()} className={`p-3 rounded-xl border text-left flex items-center gap-3 ${theme === 'dark' ? 'bg-white text-black border-white' : 'bg-white/[0.03] border-white/[0.06] opacity-60'}`}>
@@ -121,7 +154,7 @@ export default function Settings() {
             </div>
           </div>
 
-          <div className="settings-group !mb-0">
+          <div ref={(el) => { refs.current['sound'] = el }} id="sound" className="settings-group !mb-0 scroll-mt-4">
             <h3><FontAwesomeIcon icon={faVolumeHigh} className="mr-2 opacity-60" /> Звук и озвучка</h3>
             <div className="settings-row">
               <span>Озвучка</span>
@@ -143,7 +176,7 @@ export default function Settings() {
             </div>
           </div>
 
-          <div className="settings-group !mb-0">
+          <div ref={(el) => { refs.current['notif'] = el }} id="notif" className="settings-group !mb-0 scroll-mt-4">
             <h3><FontAwesomeIcon icon={faBell} className="mr-2 opacity-60" /> Уведомления</h3>
             <div className="settings-row">
               <span>Ежедневно 09:00</span>
@@ -154,20 +187,20 @@ export default function Settings() {
             </div>
           </div>
 
-          <div className="settings-group !mb-0">
+          <div ref={(el) => { refs.current['shortcuts'] = el }} id="shortcuts" className="settings-group !mb-0 scroll-mt-4">
             <h3><FontAwesomeIcon icon={faKeyboard} className="mr-2 opacity-60" /> Быстрый доступ</h3>
             <div className="settings-row"><span>Поиск</span><span className="settings-row__hint">⌘K / Ctrl+K</span></div>
             <div className="settings-row"><span>Переворот карточки</span><span className="settings-row__hint">Клик / Enter</span></div>
             <div className="settings-row"><span>Озвучить</span><span className="settings-row__hint">L</span></div>
           </div>
 
-          <div className="settings-group !mb-0">
+          <div ref={(el) => { refs.current['privacy'] = el }} id="privacy" className="settings-group !mb-0 scroll-mt-4">
             <h3><FontAwesomeIcon icon={faShieldHalved} className="mr-2 opacity-60" /> Приватность</h3>
             <div className="settings-row"><span>Аналитика</span><span className="settings-row__value">только локально</span></div>
             <div className="settings-row"><span>Сбросить прогресс</span><button className="px-3 py-1 rounded-full bg-[#f43f5e]/10 border border-[#f43f5e]/20 text-[#f43f5e] text-xs font-bold hover:bg-[#f43f5e]/15">Сбросить</button></div>
           </div>
 
-          <div className="settings-group !mb-0">
+          <div ref={(el) => { refs.current['about'] = el }} id="about" className="settings-group !mb-0 scroll-mt-4">
             <h3><FontAwesomeIcon icon={faCircleInfo} className="mr-2 opacity-60" /> О приложении</h3>
             <div className="settings-row"><span>Версия</span><span className="settings-row__value">0.0.1 • qwicki</span></div>
             <div className="settings-row"><span>Сборка</span><span className="settings-row__value">5173 • /app/</span></div>
