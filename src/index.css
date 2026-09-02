@@ -1442,8 +1442,9 @@ button {
   position: fixed;
   inset: 0;
   z-index: 60;
-  background: rgba(0,0,0,0.52);
-  backdrop-filter: blur(8px);
+  background: rgba(0,0,0,0.48);
+  backdrop-filter: blur(12px) saturate(1.2);
+  -webkit-backdrop-filter: blur(12px) saturate(1.2);
 }
 
 [data-theme="light"] .command-palette__backdrop { background: rgba(0,0,0,0.18); }
@@ -1460,9 +1461,10 @@ button {
   overflow: hidden;
   border-radius: 20px;
   border: 1px solid rgba(255,255,255,0.08);
-  background: rgba(28,28,28,0.96);
-  box-shadow: 0 24px 64px rgba(0,0,0,0.42), inset 0 1px 0 rgba(255,255,255,0.06);
-  transform: translateX(-50%);
+  background: rgba(23,23,23,0.98);
+  box-shadow: 0 24px 64px rgba(0,0,0,0.52), 0 0 0 1px rgba(255,255,255,0.04) inset, inset 0 1px 0 rgba(255,255,255,0.06);
+  backdrop-filter: blur(20px) saturate(1.2);
+  -webkit-backdrop-filter: blur(20px) saturate(1.2);
 }
 
 [data-theme="light"] .command-palette {
