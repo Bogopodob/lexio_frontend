@@ -48,7 +48,6 @@ export default function Profile() {
                   <FontAwesomeIcon icon={faLocationDot} className="opacity-60" /> Москва • 24 года
                 </span>
               </div>
-              <p className="text-white/60 text-[13px] mt-1.5 leading-relaxed max-w-[52ch]">Учу английский для путешествий и работы. Люблю кофе, кино и разговоры на кухне. Цель — свободно говорить к лету.</p>
               <div className="flex flex-wrap gap-1.5 mt-3">
                 <span className="px-2.5 py-1 rounded-full bg-[#5AD4B5]/10 border border-[#5AD4B5]/20 text-[#5AD4B5] text-xs font-bold">✈️ Путешествия</span>
                 <span className="px-2.5 py-1 rounded-full bg-[#5B74FF]/10 border border-[#5B74FF]/20 text-[#8b9bff] text-xs font-bold">💼 Работа</span>
