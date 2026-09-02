@@ -6,7 +6,7 @@ import CommandPalette from '@/components/CommandPalette'
 export default function Providers({ children }: { children: ReactNode }) {
   return (
     <ThemeProvider>
-      <BrowserRouter>
+      <BrowserRouter basename="/app">
         {children}
         <CommandPalette />
       </BrowserRouter>
