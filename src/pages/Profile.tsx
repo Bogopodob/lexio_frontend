@@ -6,14 +6,11 @@ import {
   faBullseye,
   faStar,
   faTrophy,
-  faBook,
   faLocationDot,
   faLanguage,
   faHeart,
   faRocket,
-  faCalendar,
   faUsers,
-  faQuoteLeft,
   faPen,
   faCrown,
 } from '@fortawesome/free-solid-svg-icons'
@@ -81,45 +78,29 @@ export default function Profile() {
         </div>
       </div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-[1.1fr_1fr] gap-4">
-        {/* about */}
-        <div className="rounded-[20px] border border-white/[0.06] bg-[#171717] p-5">
-          <h3 className="text-[14px] font-black tracking-tight flex items-center gap-2"><FontAwesomeIcon icon={faBook} className="text-[#5AD4B5]" /> О себе</h3>
-          <p className="text-[13px] leading-relaxed opacity-70 mt-3">Привет! Я Алексей — учу английский, чтобы уверенно заказывать капучино в Риме и вести стендапы на работе. За 3 месяца выучил 142 слова, но главное — не бросаю. Каждый день по 15 минут.</p>
-          <div className="mt-4 rounded-2xl bg-[#0f0f0f] border border-white/[0.06] p-4 flex gap-3">
-            <span className="w-8 h-8 rounded-full bg-[#5AD4B5]/15 border border-[#5AD4B5]/20 grid place-items-center text-[#5AD4B5] shrink-0"><FontAwesomeIcon icon={faQuoteLeft} /></span>
-            <p className="text-[13px] leading-relaxed italic opacity-80">“Язык — это не про идеальную грамматику, а про смелость говорить. Ошибки — это прогресс.”</p>
-          </div>
-          <div className="mt-4 flex flex-wrap gap-2">
-            <span className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-white/[0.06] border border-white/[0.06] text-xs font-semibold"><FontAwesomeIcon icon={faCalendar} className="opacity-50" /> с янв 2026</span>
-            <span className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-white/[0.06] border border-white/[0.06] text-xs font-semibold"><FontAwesomeIcon icon={faUsers} className="opacity-50" /> 3 друга учат вместе</span>
-          </div>
+      {/* goals — во всю ширину, без О себе */}
+      <div className="rounded-[20px] border border-white/[0.06] bg-[#171717] p-5">
+        <div className="flex items-center justify-between">
+          <h3 className="text-[14px] font-black tracking-tight flex items-center gap-2"><FontAwesomeIcon icon={faBullseye} className="text-[#5B74FF]" /> Цели на месяц</h3>
+          <span className="text-[11px] opacity-40 font-bold">май • 2026</span>
         </div>
-
-        {/* goals */}
-        <div className="rounded-[20px] border border-white/[0.06] bg-[#171717] p-5">
-          <div className="flex items-center justify-between">
-            <h3 className="text-[14px] font-black tracking-tight flex items-center gap-2"><FontAwesomeIcon icon={faBullseye} className="text-[#5B74FF]" /> Цели на месяц</h3>
-            <span className="text-[11px] opacity-40 font-bold">май • 2026</span>
-          </div>
-          <div className="mt-4 grid gap-3">
-            {[
-              { title: 'Заговорить в кафе', desc: 'Заказать еду без пауз', progress: 68, color: '#5AD4B5' },
-              { title: '20 фраз для путешествий', desc: 'Аэропорт, отель, город', progress: 42, color: '#5B74FF' },
-              { title: 'Серия 14 дней', desc: 'Не пропускать', progress: 50, color: '#F5C16A' },
-            ].map((g) => (
-              <div key={g.title} className="rounded-xl bg-white/[0.03] border border-white/[0.04] p-3.5">
-                <div className="flex items-center justify-between">
-                  <span className="text-[13px] font-bold">{g.title}</span>
-                  <span className="text-xs font-black" style={{ color: g.color }}>{g.progress}%</span>
-                </div>
-                <div className="text-xs opacity-50">{g.desc}</div>
-                <div className="h-1.5 rounded-full bg-white/[0.06] overflow-hidden mt-2.5">
-                  <motion.div initial={{ width: 0 }} whileInView={{ width: `${g.progress}%` }} viewport={{ once: true }} transition={{ duration: 0.8 }} className="h-full rounded-full" style={{ background: g.color }} />
-                </div>
+        <div className="mt-4 grid gap-3 sm:grid-cols-3">
+          {[
+            { title: 'Заговорить в кафе', desc: 'Заказать еду без пауз', progress: 68, color: '#5AD4B5' },
+            { title: '20 фраз для путешествий', desc: 'Аэропорт, отель, город', progress: 42, color: '#5B74FF' },
+            { title: 'Серия 14 дней', desc: 'Не пропускать', progress: 50, color: '#F5C16A' },
+          ].map((g) => (
+            <div key={g.title} className="rounded-xl bg-white/[0.03] border border-white/[0.04] p-3.5">
+              <div className="flex items-center justify-between">
+                <span className="text-[13px] font-bold">{g.title}</span>
+                <span className="text-xs font-black" style={{ color: g.color }}>{g.progress}%</span>
               </div>
-            ))}
-          </div>
+              <div className="text-xs opacity-50">{g.desc}</div>
+              <div className="h-1.5 rounded-full bg-white/[0.06] overflow-hidden mt-2.5">
+                <motion.div initial={{ width: 0 }} whileInView={{ width: `${g.progress}%` }} viewport={{ once: true }} transition={{ duration: 0.8 }} className="h-full rounded-full" style={{ background: g.color }} />
+              </div>
+            </div>
+          ))}
         </div>
       </div>
 
