@@ -1,6 +1,9 @@
+import { useState } from 'react'
 import { motion } from 'framer-motion'
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome'
 import { faUtensils, faPlane, faFaceSmile, faBriefcase, faCircle, faLocationDot, faStar, faFire } from '@fortawesome/free-solid-svg-icons'
+import FlipCard from '@/components/FlipCard'
+import { useSpeech } from '@/hooks/useSpeech'
 
 const topicCards = [
   { icon: faUtensils, title: 'Еда', count: '48 слов', tone: 'topic-card--mint' },
@@ -53,6 +56,22 @@ function ProgressRing({ value }: { value: number }) {
 }
 
 export default function Home() {
+  const [flippedId, setFlippedId] = useState<string | null>(null)
+  const { speak, isSpeaking, cancel } = useSpeech({ lang: 'en-US', rate: 0.92 })
+  const [speakingId, setSpeakingId] = useState<string | null>(null)
+
+  const handleSpeak = (id: string, text: string) => {
+    if (isSpeaking && speakingId === id) {
+      cancel()
+      setSpeakingId(null)
+      return
+    }
+    setSpeakingId(id)
+    speak(text)
+    // reset after utterance ends — approximate
+    setTimeout(() => setSpeakingId(null), 4000)
+  }
+
   return (
     <motion.div
       animate="animate"
@@ -118,11 +137,12 @@ export default function Home() {
             <motion.article
               key={card.title}
               className={`topic-card ${card.tone}`}
-              initial={{ opacity: 0, y: 24, scale: 0.98 }}
-              animate={{ opacity: 1, y: 0, scale: 1 }}
-              transition={{ delay: 0.16 + index * 0.06, duration: 0.45 }}
-              whileHover={{ y: -5, rotate: index % 2 === 0 ? -1 : 1 }}
-              whileTap={{ scale: 0.98 }}
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ delay: 0.16 + index * 0.05, duration: 0.4, ease: [0.22, 1, 0.36, 1] }}
+              whileHover={{ y: -6 }}
+              whileTap={{ scale: 0.985 }}
+              style={{ willChange: 'transform' }}
             >
               <span className="topic-card__emoji"><FontAwesomeIcon icon={card.icon} /></span>
               <h4>{card.title}</h4>
@@ -179,22 +199,24 @@ export default function Home() {
 
         <div className="phrase-strip">
           {phraseCards.map((card, index) => (
-            <motion.article
+            <motion.div
               key={card.title}
-              className="phrase-card"
-              initial={{ opacity: 0, y: 24 }}
+              initial={{ opacity: 0, y: 20 }}
               animate={{ opacity: 1, y: 0 }}
-              transition={{ delay: 0.34 + index * 0.08, duration: 0.5 }}
-              whileHover={{ y: -5 }}
+              transition={{ delay: 0.34 + index * 0.07, duration: 0.42, ease: [0.22, 1, 0.36, 1] }}
             >
-              <div className="phrase-card__icon"><FontAwesomeIcon icon={card.icon} /></div>
-              <p className={`phrase-card__label ${card.accent}`}>{card.label}</p>
-              <h4>{card.title}</h4>
-              <p className="phrase-card__translation">{card.translation}</p>
-              <motion.button className="phrase-card__listen" type="button" whileHover={{ x: 2 }} whileTap={{ scale: 0.98 }}>
-                Слушать
-              </motion.button>
-            </motion.article>
+              <FlipCard
+                label={card.label}
+                labelAccent={card.accent}
+                icon={card.icon}
+                title={card.title}
+                translation={card.translation}
+                isFlipped={flippedId === card.title}
+                isSpeaking={speakingId === card.title && isSpeaking}
+                onFlip={() => setFlippedId((v) => (v === card.title ? null : card.title))}
+                onSpeak={() => handleSpeak(card.title, card.title)}
+              />
+            </motion.div>
           ))}
         </div>
       </motion.section>

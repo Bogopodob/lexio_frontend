@@ -1,10 +1,15 @@
 import { ReactNode } from 'react'
 import { BrowserRouter } from 'react-router-dom'
+import { ThemeProvider } from '@/context/ThemeContext'
+import CommandPalette from '@/components/CommandPalette'
 
 export default function Providers({ children }: { children: ReactNode }) {
   return (
-    <BrowserRouter>
-      {children}
-    </BrowserRouter>
+    <ThemeProvider>
+      <BrowserRouter>
+        {children}
+        <CommandPalette />
+      </BrowserRouter>
+    </ThemeProvider>
   )
 }

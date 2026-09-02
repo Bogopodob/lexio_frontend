@@ -1,0 +1,126 @@
+.root {
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+  min-height: 0;
+  width: 100%;
+  overflow: hidden;
+}
+
+.body {
+  display: flex;
+  flex: 1;
+  min-height: 0;
+  position: relative;
+  transition: transform 300ms cubic-bezier(0.4, 0, 0.2, 1);
+  will-change: transform;
+}
+
+.sidebarBackground {
+  position: fixed;
+  left: 0;
+  top: 0;
+  bottom: 0;
+  z-index: 5;
+  will-change: width;
+  transition: width 300ms cubic-bezier(0.4, 0, 0.2, 1);
+  pointer-events: none;
+  border-right: 1px solid transparent;
+  padding-top: 52px;
+  box-sizing: border-box;
+}
+
+.drawerOverlay {
+  position: fixed;
+  inset: 0;
+  z-index: 45;
+  background: rgba(0, 0, 0, 0.42);
+  backdrop-filter: blur(6px);
+  -webkit-backdrop-filter: blur(6px);
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 280ms ease;
+}
+
+.drawerOverlayVisible {
+  opacity: 1;
+  pointer-events: auto;
+}
+
+.mainContent {
+  flex: 1;
+  min-width: 0;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  transition: margin-left 300ms cubic-bezier(0.4, 0, 0.2, 1);
+  will-change: margin-left;
+}
+
+.contentScroll {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  overflow-x: hidden;
+  overscroll-behavior: contain;
+  scrollbar-gutter: stable;
+  scrollbar-width: thin;
+  scrollbar-color: rgba(255, 255, 255, 0.18) transparent;
+  -webkit-overflow-scrolling: touch;
+  padding: 0 12px 12px 24px;
+}
+
+.contentScroll::-webkit-scrollbar {
+  width: 8px;
+}
+
+.contentScroll::-webkit-scrollbar-thumb {
+  background: rgba(255, 255, 255, 0.14);
+  border-radius: 999px;
+  border: 2px solid transparent;
+  background-clip: content-box;
+}
+
+.contentScroll::-webkit-scrollbar-thumb:hover {
+  background: rgba(255, 255, 255, 0.22);
+  background-clip: content-box;
+}
+
+.contentScrollBlocked {
+  overflow: hidden;
+}
+
+.contentBlock {
+  min-height: 100%;
+  width: 100%;
+  padding: 8px clamp(8px, 1.2vw, 16px) 32px;
+}
+
+/* hide scrollbar utility */
+.hideScrollbar {
+  scrollbar-width: none;
+  -ms-overflow-style: none;
+}
+
+.hideScrollbar::-webkit-scrollbar {
+  display: none;
+}
+
+@media (max-width: 1023px) {
+  .sidebarBackground {
+    display: none;
+  }
+  .contentScroll {
+    padding-left: 12px;
+    padding-right: 12px;
+  }
+  .contentBlock {
+    padding: 8px 4px 80px;
+  }
+}
+
+@media (max-width: 640px) {
+  .contentScroll {
+    padding: 8px;
+  }
+}
