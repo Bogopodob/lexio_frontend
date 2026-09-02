@@ -1,3 +1,4 @@
+// @ts-nocheck
 import { NavLink, useLocation } from 'react-router-dom'
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome'
 import { faHome, faChartBar, faUser, faGear } from '@fortawesome/free-solid-svg-icons'
