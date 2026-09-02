@@ -14,11 +14,21 @@ interface Props {
   onSelect: (id: string) => void
 }
 
-const menuItems = [
-  { id: 'home', label: 'Главная', icon: faHome },
-  { id: 'stats', label: 'Статистика', icon: faChartBar },
-  { id: 'profile', label: 'Профиль', icon: faUser },
-  { id: 'settings', label: 'Настройки', icon: faGear },
+const sections = [
+  {
+    label: 'Навигация',
+    items: [
+      { id: 'home', label: 'Главная', icon: faHome, badge: '12/20' },
+      { id: 'stats', label: 'Статистика', icon: faChartBar, badge: '92%' },
+    ],
+  },
+  {
+    label: 'Аккаунт',
+    items: [
+      { id: 'profile', label: 'Профиль', icon: faUser, badge: 'A2' },
+      { id: 'settings', label: 'Настройки', icon: faGear },
+    ],
+  },
 ]
 
 const tips = [
@@ -85,16 +95,22 @@ export default function AppLeftSidebar({ isDesktop, isCollapsed, isOpen, activeI
       aria-label="Основная навигация"
     >
       <nav className="app-sidebar__nav" aria-label="Разделы">
-        {menuItems.map((item) => (
-          <AppLeftSidebarItem
-            key={item.id}
-            id={item.id}
-            label={item.label}
-            icon={item.icon}
-            isActive={activeId === item.id}
-            isCollapsed={isDesktop && isCollapsed}
-            onSelect={onSelect}
-          />
+        {sections.map((section) => (
+          <div key={section.label} className="app-sidebar__section">
+            {!isCollapsed && <div className="app-sidebar__section-label">{section.label}</div>}
+            {section.items.map((item) => (
+              <AppLeftSidebarItem
+                key={item.id}
+                id={item.id}
+                label={item.label}
+                icon={item.icon}
+                badge={item.badge}
+                isActive={activeId === item.id}
+                isCollapsed={isDesktop && isCollapsed}
+                onSelect={onSelect}
+              />
+            ))}
+          </div>
         ))}
       </nav>
 

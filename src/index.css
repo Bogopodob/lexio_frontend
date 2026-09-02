@@ -2649,3 +2649,220 @@ button {
   .app-header__search-label { display: none; }
   .app-header__search { padding: 8px 10px; }
 }
+
+/* ── Header — Premium enrich ── */
+.app-header__divider {
+  width: 1px;
+  height: 18px;
+  background: var(--sidebar-border);
+  margin: 0 4px;
+  flex-shrink: 0;
+}
+
+.app-header__breadcrumb {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 12px;
+  border-radius: 999px;
+  background: var(--sidebar-subtle);
+  border: 1px solid var(--sidebar-border);
+  font-size: 0.82rem;
+  white-space: nowrap;
+}
+
+.app-header__breadcrumb-label {
+  color: var(--sidebar-item-muted);
+  font-weight: 600;
+  font-size: 0.70rem;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.app-header__breadcrumb-sep {
+  color: var(--sidebar-icon);
+  font-size: 0.62rem;
+  opacity: 0.7;
+}
+
+.app-header__breadcrumb-current {
+  color: var(--sidebar-item-text);
+  font-weight: 700;
+}
+
+.app-header__search-icon {
+  color: var(--sidebar-icon);
+  font-size: 0.88rem;
+}
+
+.app-header__streak-dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: #ff8a2a;
+  box-shadow: 0 0 8px rgba(255,138,42,0.6);
+  flex-shrink: 0;
+}
+
+.app-header__avatar-wrap {
+  position: relative;
+  display: inline-flex;
+  flex-shrink: 0;
+}
+
+.app-header__avatar-status {
+  position: absolute;
+  right: -2px;
+  bottom: -2px;
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  background: #5ad4b5;
+  border: 2px solid var(--sidebar-bg);
+  box-shadow: 0 0 8px rgba(90,212,181,0.5);
+}
+
+/* ── Left Sidebar — Premium enrich ── */
+.app-sidebar__section {
+  display: grid;
+  gap: 4px;
+}
+
+.app-sidebar__section + .app-sidebar__section {
+  margin-top: 10px;
+  padding-top: 10px;
+  border-top: 1px solid var(--sidebar-border);
+}
+
+.app-sidebar__section-label {
+  padding: 6px 12px 4px;
+  font-size: 0.62rem;
+  font-weight: 800;
+  letter-spacing: 0.10em;
+  text-transform: uppercase;
+  color: var(--sidebar-item-muted);
+  opacity: 0.72;
+}
+
+.app-sidebar__item-badge {
+  margin-left: auto;
+  padding: 2px 7px;
+  border-radius: 999px;
+  background: var(--sidebar-subtle);
+  border: 1px solid var(--sidebar-border);
+  color: var(--sidebar-item-muted);
+  font-size: 0.70rem;
+  font-weight: 700;
+  line-height: 1;
+  white-space: nowrap;
+  transition: all 0.18s ease;
+}
+
+.app-sidebar__item--active .app-sidebar__item-badge {
+  background: rgba(90,212,181,0.16);
+  border-color: rgba(90,212,181,0.22);
+  color: #5ad4b5;
+}
+
+.app-sidebar__item:hover .app-sidebar__item-badge {
+  background: var(--sidebar-bg);
+  border-color: var(--sidebar-border);
+  color: var(--sidebar-item-text);
+}
+
+/* Bottom tip — more premium */
+.app-sidebar__tip-card {
+  position: relative;
+  overflow: hidden;
+  border-radius: 16px;
+  border: 1px solid var(--sidebar-border);
+  background: linear-gradient(135deg, rgba(90,212,181,0.10), rgba(91,116,255,0.08) 55%, var(--sidebar-subtle));
+  padding: 12px;
+  display: grid;
+  gap: 10px;
+  box-shadow: inset 0 1px 0 rgba(255,255,255,0.04);
+}
+
+.app-sidebar__tip-card::before {
+  content: "";
+  position: absolute;
+  inset: auto -20px -20px auto;
+  width: 80px;
+  height: 80px;
+  border-radius: 50%;
+  background: radial-gradient(circle, rgba(90,212,181,0.14), transparent 70%);
+  pointer-events: none;
+}
+
+
+/* Header premium tweaks */
+.app-header {
+  box-shadow: 0 1px 0 var(--sidebar-border), 0 4px 16px rgba(0,0,0,0.06);
+}
+
+.app-header__logo {
+  position: relative;
+  overflow: hidden;
+}
+
+.app-header__logo::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(180deg, rgba(255,255,255,0.16), transparent 60%);
+  pointer-events: none;
+}
+
+.app-header__brand:hover .app-header__brand-name {
+  color: #5ad4b5;
+  transition: color 0.18s ease;
+}
+
+.app-header__search:focus-visible {
+  outline: 2px solid rgba(90,212,181,0.42);
+  outline-offset: 2px;
+}
+
+/* Left item hover premium */
+.app-sidebar__item {
+  position: relative;
+  isolation: isolate;
+}
+
+.app-sidebar__item::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  border-radius: 12px;
+  background: linear-gradient(90deg, rgba(90,212,181,0.08), transparent 70%);
+  opacity: 0;
+  transition: opacity 0.18s ease;
+  pointer-events: none;
+  z-index: -1;
+}
+
+.app-sidebar__item:hover::before {
+  opacity: 1;
+}
+
+.app-sidebar__item:hover {
+  transform: translateX(2px);
+}
+
+.app-sidebar__item--active:hover {
+  transform: none;
+}
+
+.app-sidebar__item-icon {
+  transition: transform 0.18s ease, color 0.18s ease;
+}
+
+.app-sidebar__item:hover .app-sidebar__item-icon {
+  transform: scale(1.06);
+}
+
+/* Collapsed polish */
+.app-sidebar--collapsed .app-sidebar__item {
+  border-radius: 10px;
+}
+

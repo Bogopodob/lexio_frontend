@@ -7,12 +7,13 @@ interface Props {
   id: string
   label: string
   icon: IconDefinition
+  badge?: string
   isActive: boolean
   isCollapsed: boolean
   onSelect: (id: string) => void
 }
 
-export default function AppLeftSidebarItem({ id, label, icon, isActive, isCollapsed, onSelect }: Props) {
+export default function AppLeftSidebarItem({ id, label, icon, badge, isActive, isCollapsed, onSelect }: Props) {
   const btnRef = useRef<HTMLButtonElement>(null)
   const [showPopover, setShowPopover] = useState(false)
   const [rect, setRect] = useState<DOMRect | null>(null)
@@ -68,6 +69,7 @@ export default function AppLeftSidebarItem({ id, label, icon, isActive, isCollap
           <FontAwesomeIcon icon={icon} />
         </span>
         <span className="app-sidebar__item-label">{label}</span>
+        {badge && !isCollapsed && <span className="app-sidebar__item-badge">{badge}</span>}
       </button>
 
       {isCollapsed &&
