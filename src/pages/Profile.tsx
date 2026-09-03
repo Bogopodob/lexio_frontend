@@ -17,6 +17,10 @@ import {
   faBolt,
   faComments,
   faGraduationCap,
+  faPen,
+  faCheck,
+  faCamera,
+  faTrash,
 } from '@fortawesome/free-solid-svg-icons'
 import { useState, useRef } from 'react'
 import { createPortal } from 'react-dom'
@@ -176,81 +180,218 @@ function AchievementsBlock({ items }: { items: typeof achievements }) {
 }
 
 export default function Profile() {
+  const [isEditing, setIsEditing] = useState(false)
+  const [profile, setProfile] = useState({
+    name: 'Алексей',
+    birthDate: '2002-05-15',
+    city: 'Москва',
+    language: 'en',
+    tags: ['Путешествия', 'Работа', 'Кино', 'Кофе'],
+    avatar: null as string | null,
+    level: 'A2' as string,
+  })
+  const [draft, setDraft] = useState(profile)
+  const [customTag, setCustomTag] = useState('')
+  const fileRef = useRef<HTMLInputElement>(null)
+  const tagOptions = ['Путешествия', 'Работа', 'Кино', 'Кофе', 'Еда', 'Эмоции', 'Музыка', 'Спорт', 'Книги', 'Технологии']
+  const langOptions = [
+    { id: 'en', label: 'English', sub: 'Английский' },
+    { id: 'es', label: 'Español', sub: 'Испанский' },
+    { id: 'de', label: 'Deutsch', sub: 'Немецкий' },
+    { id: 'fr', label: 'Français', sub: 'Французский' },
+  ]
+  const [goals, setGoals] = useState([
+    { title: 'Заговорить в кафе', desc: 'Заказать еду без пауз', progress: 68, color: '#5AD4B5' },
+    { title: '20 фраз для путешествий', desc: 'Аэропорт, отель, город', progress: 42, color: '#5B74FF' },
+    { title: 'Серия 14 дней', desc: 'Не пропускать', progress: 50, color: '#F5C16A' },
+  ])
+  const [friends, setFriends] = useState([
+    { name: 'Марина', level: 'B1', streak: 12, avatar: 'М' },
+    { name: 'Игорь', level: 'A2', streak: 7, avatar: 'И' },
+    { name: 'София', level: 'A1', streak: 3, avatar: 'С' },
+  ])
+  const [friendQuery, setFriendQuery] = useState('')
+  const mockUsers = [
+    { name: 'Анна', level: 'B1', avatar: 'А' },
+    { name: 'Дмитрий', level: 'A2', avatar: 'Д' },
+    { name: 'Елена', level: 'B2', avatar: 'Е' },
+    { name: 'Павел', level: 'A1', avatar: 'П' },
+  ].filter((u) => u.name.toLowerCase().includes(friendQuery.toLowerCase()) && !friends.some((f) => f.name === u.name))
+
+  const age = (() => {
+    const d = new Date(draft.birthDate || profile.birthDate)
+    const diff = Date.now() - d.getTime()
+    return Math.max(0, Math.floor(diff / (1000 * 60 * 60 * 24 * 365.25)))
+  })()
+
+  const startEdit = () => { setDraft(profile); setIsEditing(true) }
+  const cancelEdit = () => setIsEditing(false)
+  const saveEdit = () => { setProfile(draft); setIsEditing(false) }
+  const onAvatarChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const f = e.target.files?.[0]
+    if (!f) return
+    const r = new FileReader()
+    r.onload = () => setDraft((p) => ({ ...p, avatar: r.result as string }))
+    r.readAsDataURL(f)
+  }
+  const toggleTag = (tag: string) => {
+    setDraft((p) => ({ ...p, tags: p.tags.includes(tag) ? p.tags.filter((t) => t !== tag) : p.tags.length < 6 ? [...p.tags, tag] : p.tags }))
+  }
+  const addCustomTag = () => {
+    const t = customTag.trim()
+    if (!t || draft.tags.includes(t) || draft.tags.length >= 6) return
+    setDraft((p) => ({ ...p, tags: [...p.tags, t] }))
+    setCustomTag('')
+  }
+
   return (
     <motion.div initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.36 }} className="w-full flex flex-col gap-5">
-      {/* hero — personal */}
+      {/* hero — personal + edit */}
       <div className="relative overflow-hidden rounded-[24px] border border-white/[0.06] bg-[#171717] p-0">
         <div className="absolute -right-20 -top-20 w-72 h-72 rounded-full bg-[#5AD4B5]/[0.06] blur-3xl pointer-events-none" />
         <div className="absolute inset-0 opacity-[0.03]" style={{ backgroundImage: `radial-gradient(circle at 1px 1px, white 1px, transparent 0)`, backgroundSize: '18px 18px' }} />
         <div className="relative p-6 sm:p-7">
-          <div className="flex gap-4">
-            <div className="relative shrink-0">
-              <div className="w-[84px] h-[84px] rounded-[20px] bg-gradient-to-br from-[#5AD4B5] to-[#5B74FF] p-[2px] shadow-[0_12px_32px_rgba(91,116,255,0.22)]">
-                <div className="w-full h-full rounded-[18px] bg-[#0f0f0f] grid place-items-center text-[28px]">А</div>
+          <div className="flex justify-between items-start gap-4">
+            <div className="flex gap-4 flex-1 min-w-0">
+              <div className="relative shrink-0 group/avatar">
+                <div className="w-[84px] h-[84px] rounded-[20px] bg-gradient-to-br from-[#5AD4B5] to-[#5B74FF] p-[2px] shadow-[0_12px_32px_rgba(91,116,255,0.22)]">
+                  <div className="w-full h-full rounded-[18px] bg-[#0f0f0f] grid place-items-center text-[28px] overflow-hidden">
+                    {isEditing && draft.avatar ? <img src={draft.avatar} alt="avatar" className="w-full h-full object-cover" /> : !isEditing && profile.avatar ? <img src={profile.avatar} alt="avatar" className="w-full h-full object-cover" /> : draft.name[0] || 'А'}
+                  </div>
+                </div>
+                <span className="absolute -bottom-1 -right-1 w-7 h-7 rounded-full bg-[#5AD4B5] text-black grid place-items-center text-[11px] font-black border-2 border-[#171717]">{profile.level}</span>
+                {isEditing && (
+                  <button onClick={() => fileRef.current?.click()} className="absolute inset-0 rounded-[20px] bg-black/60 backdrop-blur grid place-items-center opacity-0 group-hover/avatar:opacity-100 transition-opacity">
+                    <span className="px-2.5 py-1 rounded-full bg-white text-black text-xs font-bold flex items-center gap-1"><FontAwesomeIcon icon={faCamera} /> Загрузить</span>
+                  </button>
+                )}
+                <input ref={fileRef} type="file" accept="image/*" className="hidden" onChange={onAvatarChange} />
               </div>
-              <span className="absolute -bottom-1 -right-1 w-7 h-7 rounded-full bg-[#5AD4B5] text-black grid place-items-center text-[11px] font-black border-2 border-[#171717]">A2</span>
-            </div>
-            <div className="min-w-0 flex-1">
-              <div className="flex flex-wrap items-center gap-2">
-                <h1 className="text-[26px] sm:text-[30px] font-black tracking-tight leading-none">Алексей</h1>
-                <span className="px-2.5 py-1 rounded-full bg-white text-black text-[11px] font-black">PRO</span>
+              <div className="min-w-0 flex-1">
+                {isEditing ? (
+                  <div className="space-y-2">
+                    <input value={draft.name} onChange={(e) => setDraft({ ...draft, name: e.target.value })} placeholder="Имя" className="w-full max-w-[220px] px-3 py-1.5 rounded-xl bg-white/[0.06] border border-white/[0.08] text-sm font-bold placeholder:text-white/30 focus:outline-none focus:border-white/15" />
+                    <div className="flex flex-wrap gap-2">
+                      <input type="date" value={draft.birthDate} onChange={(e) => setDraft({ ...draft, birthDate: e.target.value })} className="px-2.5 py-1.5 rounded-full bg-white/[0.06] border border-white/[0.08] text-xs focus:outline-none" />
+                      <input value={draft.city} onChange={(e) => setDraft({ ...draft, city: e.target.value })} placeholder="Город" className="px-2.5 py-1.5 rounded-full bg-white/[0.06] border border-white/[0.08] text-xs focus:outline-none w-[120px]" />
+                    </div>
+                  </div>
+                ) : (
+                  <>
+                    <div className="flex flex-wrap items-center gap-2">
+                      <h1 className="text-[26px] sm:text-[30px] font-black tracking-tight leading-none">{profile.name}</h1>
+                      <span className="px-2.5 py-1 rounded-full bg-white text-black text-[11px] font-black">PRO</span>
                 <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-white/[0.06] border border-white/[0.08] text-white/60 text-xs font-medium">
-                  <FontAwesomeIcon icon={faLocationDot} className="opacity-60" /> Москва • 24 года
+                  <FontAwesomeIcon icon={faLocationDot} className="opacity-60" /> {(isEditing ? draft.city : profile.city) || 'Город'} • {age} лет
                 </span>
-              </div>
-              <div className="flex flex-wrap gap-1.5 mt-3">
-                <span className="px-2.5 py-1 rounded-full bg-[#5AD4B5]/10 border border-[#5AD4B5]/20 text-[#5AD4B5] text-xs font-bold">✈️ Путешествия</span>
-                <span className="px-2.5 py-1 rounded-full bg-[#5B74FF]/10 border border-[#5B74FF]/20 text-[#8b9bff] text-xs font-bold">💼 Работа</span>
-                <span className="px-2.5 py-1 rounded-full bg-white/[0.06] border border-white/[0.06] text-white/60 text-xs font-semibold">🎬 Кино</span>
-                <span className="px-2.5 py-1 rounded-full bg-white/[0.06] border border-white/[0.06] text-white/60 text-xs font-semibold">☕ Кофе</span>
+                    </div>
+                    <div className="flex flex-wrap gap-1.5 mt-3">
+                      {(isEditing ? draft.tags : profile.tags).map((t) => (
+                        <span key={t} className="px-2.5 py-1 rounded-full bg-white/[0.06] border border-white/[0.06] text-white/70 text-xs font-semibold">{t}</span>
+                      ))}
+                    </div>
+                  </>
+                )}
               </div>
             </div>
+            <button onClick={isEditing ? saveEdit : startEdit} className={`hidden sm:inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-black border shrink-0 ${isEditing ? 'bg-[#5AD4B5] text-black border-[#5AD4B5]' : 'bg-white text-black border-white'}`}>
+              <FontAwesomeIcon icon={isEditing ? faCheck : faPen} /> {isEditing ? 'Сохранить' : 'Редактировать'}
+            </button>
           </div>
+          {isEditing && (
+            <div className="mt-4 p-3 rounded-2xl bg-white/[0.03] border border-white/[0.06]">
+              <div className="text-xs font-bold opacity-60 mb-2">Теги — выбери из списка или добавь свой (до 6)</div>
+              <div className="flex flex-wrap gap-1.5">
+                {tagOptions.map((tag) => {
+                  const active = draft.tags.includes(tag)
+                  return (
+                    <button key={tag} onClick={() => toggleTag(tag)} className={`px-2.5 py-1 rounded-full text-xs font-bold border ${active ? 'bg-[#5AD4B5] text-black border-[#5AD4B5]' : 'bg-white/[0.04] border-white/[0.06] text-white/60 hover:bg-white/[0.08]'}`}>
+                      {tag} {active ? '×' : '+'}
+                    </button>
+                  )
+                })}
+              </div>
+              <div className="flex gap-2 mt-2.5">
+                <input value={customTag} onChange={(e) => setCustomTag(e.target.value)} onKeyDown={(e) => e.key === 'Enter' && (e.preventDefault(), addCustomTag())} placeholder="Свой тег..." maxLength={20} className="flex-1 px-3 py-1.5 rounded-full bg-black/20 border border-white/[0.06] text-xs placeholder:text-white/30 focus:outline-none" />
+                <button onClick={addCustomTag} className="px-3 py-1.5 rounded-full bg-white text-black text-xs font-black">Добавить</button>
+              </div>
+            </div>
+          )}
+          {isEditing && (
+            <div className="mt-3 flex sm:hidden gap-2">
+              <button onClick={cancelEdit} className="flex-1 py-2 rounded-full bg-white/[0.06] border border-white/[0.06] text-xs font-bold">Отмена</button>
+              <button onClick={saveEdit} className="flex-1 py-2 rounded-full bg-[#5AD4B5] text-black text-xs font-black">Сохранить</button>
+            </div>
+          )}
 
-          <div className="mt-5 grid grid-cols-3 gap-2.5">
-            <div className="rounded-2xl bg-white/[0.04] border border-white/[0.06] p-3.5">
-              <div className="text-[11px] tracking-[0.08em] uppercase font-bold opacity-40 flex items-center gap-1.5"><FontAwesomeIcon icon={faLanguage} /> Языки</div>
-              <div className="text-sm font-bold mt-1">Русский → English</div>
-              <div className="text-xs opacity-50">с нуля • 3 мес.</div>
-            </div>
-            <div className="rounded-2xl bg-white/[0.04] border border-white/[0.06] p-3.5">
-              <div className="text-[11px] tracking-[0.08em] uppercase font-bold opacity-40 flex items-center gap-1.5"><FontAwesomeIcon icon={faHeart} className="text-[#F08AB4]" /> Интересы</div>
-              <div className="text-sm font-bold mt-1">Еда и эмоции</div>
-              <div className="text-xs opacity-50">любимые темы</div>
-            </div>
-            <div className="rounded-2xl bg-[#5AD4B5] p-3.5 text-black">
-              <div className="text-[11px] tracking-[0.08em] uppercase font-black opacity-60 flex items-center gap-1"><FontAwesomeIcon icon={faRocket} /> Цель</div>
-              <div className="text-sm font-black mt-1">B1 к июню</div>
-              <div className="text-xs font-semibold opacity-60">ещё 58 слов</div>
-            </div>
-          </div>
         </div>
       </div>
 
-      {/* goals — во всю ширину, без О себе */}
+      {/* язык — вынесен из hero */}
+      <div className="settings-group !mb-0">
+        <h3><FontAwesomeIcon icon={faLanguage} className="mr-2 opacity-60" /> Язык обучения</h3>
+        <p className="text-xs opacity-40 -mt-2 mb-2">Выбери язык — изменится контент</p>
+        <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+          {langOptions.map((l) => {
+            const active = (isEditing ? draft.language : profile.language) === l.id
+            return (
+              <button key={l.id} onClick={() => isEditing && setDraft({ ...draft, language: l.id })} disabled={!isEditing} className={`p-3 rounded-xl border text-left transition-all ${active ? 'bg-[#5AD4B5]/10 border-[#5AD4B5]/30 text-[#5AD4B5]' : 'bg-white/[0.03] border-white/[0.06] opacity-60 hover:opacity-100 hover:bg-white/[0.06]'} ${!isEditing ? 'cursor-default' : ''}`}>
+                <div className="text-sm font-black">{l.label}</div>
+                <div className="text-xs opacity-60">{l.sub}</div>
+              </button>
+            )
+          })}
+        </div>
+        {!isEditing && <div className="text-xs opacity-40 mt-2">Текущий: Русский → {langOptions.find((l) => l.id === profile.language)?.label}</div>}
+        {isEditing && <div className="text-xs opacity-40 mt-2">Нажми на язык, чтобы выбрать (до сохранения)</div>}
+      </div>
+
       <div className="rounded-[20px] border border-white/[0.06] bg-[#171717] p-5">
         <div className="flex items-center justify-between">
           <h3 className="text-[14px] font-black tracking-tight flex items-center gap-2"><FontAwesomeIcon icon={faBullseye} className="text-[#5B74FF]" /> Цели на месяц</h3>
           <span className="text-[11px] opacity-40 font-bold">май • 2026</span>
         </div>
         <div className="mt-4 grid gap-3 sm:grid-cols-3">
-          {[
-            { title: 'Заговорить в кафе', desc: 'Заказать еду без пауз', progress: 68, color: '#5AD4B5' },
-            { title: '20 фраз для путешествий', desc: 'Аэропорт, отель, город', progress: 42, color: '#5B74FF' },
-            { title: 'Серия 14 дней', desc: 'Не пропускать', progress: 50, color: '#F5C16A' },
-          ].map((g) => (
-            <div key={g.title} className="rounded-xl bg-white/[0.03] border border-white/[0.04] p-3.5">
+          {(isEditing ? goals : goals).map((g) => (
+            <div key={g.title} className="rounded-xl bg-white/[0.03] border border-white/[0.04] p-3.5 relative">
+              {isEditing && (
+                <button onClick={() => setGoals((prev) => prev.filter((x) => x.title !== g.title))} className="absolute -top-1.5 -right-1.5 w-5 h-5 rounded-full bg-[#f43f5e] text-white grid place-items-center text-[10px] border border-[#171717]">×</button>
+              )}
               <div className="flex items-center justify-between">
-                <span className="text-[13px] font-bold">{g.title}</span>
-                <span className="text-xs font-black" style={{ color: g.color }}>{g.progress}%</span>
+                {isEditing ? <input value={g.title} onChange={(e) => setGoals((prev) => prev.map((x) => (x.title === g.title ? { ...x, title: e.target.value } : x)))} className="text-[13px] font-bold bg-transparent border-b border-white/10 focus:outline-none focus:border-white/20 w-full" /> : <span className="text-[13px] font-bold">{g.title}</span>}
+                <span className="text-xs font-black ml-2" style={{ color: g.color }}>{g.progress}%</span>
               </div>
-              <div className="text-xs opacity-50">{g.desc}</div>
+              {isEditing ? <input value={g.desc} onChange={(e) => setGoals((prev) => prev.map((x) => (x.title === g.title ? { ...x, desc: e.target.value } : x)))} className="text-xs opacity-50 bg-transparent border-b border-white/10 w-full mt-1 focus:outline-none" /> : <div className="text-xs opacity-50">{g.desc}</div>}
               <div className="h-1.5 rounded-full bg-white/[0.06] overflow-hidden mt-2.5">
                 <motion.div initial={{ width: 0 }} whileInView={{ width: `${g.progress}%` }} viewport={{ once: true }} transition={{ duration: 0.8 }} className="h-full rounded-full" style={{ background: g.color }} />
               </div>
             </div>
           ))}
         </div>
+        {isEditing && (
+          <div className="mt-4">
+            <div className="text-xs font-bold opacity-60 mb-2">Готовые цели — выбери до 3</div>
+            <div className="flex flex-wrap gap-1.5">
+              {[
+                { title: 'Читать 5 текстов', desc: '5 текстов • 20 мин', color: '#a78bfa' },
+                { title: 'Выучить 30 слов', desc: '7 дней • 30 слов', color: '#5AD4B5' },
+                { title: 'Пройти тест A2', desc: 'Грамматика • 15 мин', color: '#5B74FF' },
+                { title: 'Диалог без пауз', desc: 'Разговор • 10 мин', color: '#F08AB4' },
+                { title: 'Спринт 5 дней', desc: 'Серия • 5 дней', color: '#ff9d5c' },
+              ].filter(g => !goals.some(x => x.title === g.title)).map((g) => (
+                <button
+                  key={g.title}
+                  onClick={() => { if (goals.length < 3) setGoals([...goals, { ...g, progress: 0 }]) }}
+                  disabled={goals.length >= 3}
+                  className={`px-2.5 py-1.5 rounded-full text-xs font-bold border ${goals.length >= 3 ? 'opacity-30 cursor-not-allowed bg-white/[0.04] border-white/[0.06]' : 'bg-white/[0.04] border-white/[0.06] hover:bg-white/[0.08] hover:border-white/[0.10]'}`}
+                >
+                  + {g.title}
+                </button>
+              ))}
+            </div>
+            {goals.length >= 3 && <div className="text-[11px] opacity-40 mt-2">Максимум 3 цели — удали одну, чтобы добавить</div>}
+          </div>
+        )}
       </div>
 
       {/* achievements — переделано: много, hover с прогрессом */}
@@ -259,22 +400,49 @@ export default function Profile() {
       {/* friends / community */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
         <div className="rounded-[20px] border border-white/[0.06] bg-[#171717] p-5">
-          <h3 className="text-[14px] font-black tracking-tight flex items-center gap-2"><FontAwesomeIcon icon={faUsers} className="text-[#5B74FF]" /> Друзья учат</h3>
-          <div className="mt-4 space-y-3">
-            {[
-              { name: 'Марина', level: 'B1', streak: 12, avatar: 'М' },
-              { name: 'Игорь', level: 'A2', streak: 7, avatar: 'И' },
-              { name: 'София', level: 'A1', streak: 3, avatar: 'С' },
-            ].map((f) => (
-              <div key={f.name} className="flex items-center gap-3 rounded-xl bg-white/[0.03] border border-white/[0.04] p-3">
+          <div className="flex items-center justify-between">
+            <h3 className="text-[14px] font-black tracking-tight flex items-center gap-2"><FontAwesomeIcon icon={faUsers} className="text-[#5B74FF]" /> Друзья учат</h3>
+            <span className="text-[11px] opacity-40 font-bold">{friends.length} друга</span>
+          </div>
+          {isEditing && (
+            <div className="mt-3">
+              <div className="relative">
+                <input value={friendQuery} onChange={(e) => setFriendQuery(e.target.value)} placeholder="Поиск — Анна, Дмитрий..." className="w-full pl-8 pr-3 py-2 rounded-xl bg-black/20 border border-white/[0.06] text-sm placeholder:text-white/30 focus:outline-none focus:border-white/15" />
+                <FontAwesomeIcon icon={faUsers} className="absolute left-3 top-1/2 -translate-y-1/2 text-white/30 text-xs" />
+              </div>
+              {friendQuery && mockUsers.length > 0 && (
+                <div className="mt-2 rounded-xl border border-white/[0.06] bg-[#0f0f0f] overflow-hidden">
+                  {mockUsers.map((u) => (
+                    <button key={u.name} onClick={() => { setFriends([...friends, { name: u.name, level: u.level, streak: Math.floor(Math.random() * 10) + 1, avatar: u.avatar }]); setFriendQuery('') }} className="w-full flex items-center gap-2.5 p-2.5 hover:bg-white/[0.04] text-left">
+                      <span className="w-7 h-7 rounded-full bg-white/[0.08] grid place-items-center font-bold text-xs">{u.avatar}</span>
+                      <span className="text-sm font-bold">{u.name}</span>
+                      <span className="text-xs opacity-40">• {u.level}</span>
+                      <span className="ml-auto text-xs font-black text-[#5AD4B5]">+ Добавить</span>
+                    </button>
+                  ))}
+                </div>
+              )}
+              {friendQuery && mockUsers.length === 0 && <div className="text-xs opacity-40 mt-2">Никого не нашли по “{friendQuery}”</div>}
+            </div>
+          )}
+          <div className="mt-4 space-y-2.5">
+            {friends.map((f) => (
+              <div key={f.name} className="flex items-center gap-3 rounded-xl bg-white/[0.03] border border-white/[0.04] p-3 group">
                 <span className="w-9 h-9 rounded-full bg-white/[0.08] border border-white/[0.08] grid place-items-center font-bold text-sm">{f.avatar}</span>
                 <div className="flex-1 min-w-0">
                   <div className="text-sm font-bold leading-none">{f.name} • <span className="opacity-60 font-semibold">{f.level}</span></div>
                   <div className="text-xs opacity-40">🔥 {f.streak} дней</div>
                 </div>
-                <span className="px-2.5 py-1 rounded-full bg-white/[0.06] border border-white/[0.06] text-xs font-bold">+</span>
+                {isEditing ? (
+                  <button onClick={() => setFriends(friends.filter((x) => x.name !== f.name))} className="w-7 h-7 rounded-full bg-[#f43f5e]/10 border border-[#f43f5e]/20 text-[#f43f5e] grid place-items-center hover:bg-[#f43f5e]/20">
+                    <FontAwesomeIcon icon={faTrash} className="text-[11px]" />
+                  </button>
+                ) : (
+                  <span className="px-2.5 py-1 rounded-full bg-white/[0.06] border border-white/[0.06] text-xs font-bold opacity-60">•</span>
+                )}
               </div>
             ))}
+            {friends.length === 0 && <div className="text-xs opacity-40 text-center py-4">Пока нет друзей — добавь через поиск выше</div>}
           </div>
         </div>
         <div className="rounded-[20px] border border-white/[0.06] bg-[#171717] p-5">
