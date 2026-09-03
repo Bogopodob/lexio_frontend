@@ -24,6 +24,9 @@ import {
 } from '@fortawesome/free-solid-svg-icons'
 import { useState, useRef, useCallback, useMemo, memo, lazy, Suspense } from 'react'
 import { createPortal } from 'react-dom'
+import { DatePicker, DateField, Calendar } from '@heroui/react'
+import { parseDate, getLocalTimeZone, today } from '@internationalized/date'
+import type { DateValue } from '@internationalized/date'
 
 const achievements = [
   { icon: faFire, title: '3 дня подряд', desc: 'Серия', condition: 'Учи 3 дня без пропуска', total: 3, current: 3, progress: 100, rarity: 'common', color: '#ff9d5c', reward: '+50 XP' },
@@ -58,9 +61,9 @@ const AchievementsBlock = memo(function AchievementsBlock({ items }: { items: ty
   }), [items, filter])
   const doneCount = useMemo(() => items.filter((a) => a.progress === 100).length, [items])
 
-  const onEnter = useCallback((a: (typeof achievements)[number], e: React.MouseEvent, idx: number) => {
+  const onEnter = useCallback((a: (typeof achievements)[number], e: React.MouseEvent) => {
     if (hoverTimeout.current) window.clearTimeout(hoverTimeout.current)
-    const rect = (e.currentTarget as HTMLElement).getBoundingClientRect()
+    const rect = e.currentTarget.getBoundingClientRect()
     setPos({ x: rect.left + rect.width / 2, y: rect.top })
     setHovered(a)
   }, [])
@@ -184,6 +187,70 @@ const AchievementsBlock = memo(function AchievementsBlock({ items }: { items: ty
   )
 })
 
+const BirthDatePicker = memo(function BirthDatePicker({ value, onChange }: { value: string; onChange: (v: string) => void }) {
+  const dateValue = useMemo(() => {
+    try {
+      return value ? parseDate(value.slice(0, 10)) : undefined
+    } catch {
+      return undefined
+    }
+  }, [value])
+  const minValue = useMemo(() => parseDate('1900-01-01'), [])
+  const maxValue = useMemo(() => today(getLocalTimeZone()), [])
+
+  const handleChange = useCallback((v: DateValue | null) => {
+    if (!v) return
+    onChange(v.toString().slice(0, 10))
+  }, [onChange])
+
+  return (
+    <DatePicker
+      value={dateValue}
+      onChange={handleChange}
+      minValue={minValue}
+      maxValue={maxValue}
+      granularity="day"
+      className="shrink-0 w-[182px]"
+    >
+      <DateField.Group className="flex items-center gap-1 w-full px-2.5 py-1.5 rounded-full bg-white/[0.06] border border-white/[0.08] text-xs text-white focus-within:border-white/15">
+        <DateField.Input className="flex-1 min-w-0 flex items-center whitespace-nowrap overflow-visible text-white/90 tabular-nums">
+          {(segment) => <DateField.Segment segment={segment} className="px-[3px] py-px rounded-md tabular-nums focus:bg-white/20 focus:text-white focus:outline-none text-white/90 data-[placeholder]:text-white/30" />}
+        </DateField.Input>
+        <DateField.Suffix className="shrink-0 flex items-center">
+          <DatePicker.Trigger className="text-white/50 hover:text-white rounded-full w-5 h-5 shrink-0 grid place-items-center">
+            <DatePicker.TriggerIndicator className="text-xs" />
+          </DatePicker.Trigger>
+        </DateField.Suffix>
+      </DateField.Group>
+      <DatePicker.Popover className="max-w-none w-max bg-[#1e1e1e] border border-white/10 rounded-2xl shadow-[0_20px_60px_rgba(0,0,0,0.55)]">
+        <Calendar aria-label="Дата рождения" className="bg-transparent text-white">
+          <Calendar.Header>
+            <Calendar.YearPickerTrigger>
+              <Calendar.YearPickerTriggerHeading />
+              <Calendar.YearPickerTriggerIndicator />
+            </Calendar.YearPickerTrigger>
+            <Calendar.NavButton slot="previous" />
+            <Calendar.NavButton slot="next" />
+          </Calendar.Header>
+          <Calendar.Grid>
+            <Calendar.GridHeader>
+              {(day) => <Calendar.HeaderCell>{day}</Calendar.HeaderCell>}
+            </Calendar.GridHeader>
+            <Calendar.GridBody>
+              {(date) => <Calendar.Cell date={date} />}
+            </Calendar.GridBody>
+          </Calendar.Grid>
+          <Calendar.YearPickerGrid>
+            <Calendar.YearPickerGridBody>
+              {({ year, formattedYear }) => <Calendar.YearPickerCell year={year}>{formattedYear}</Calendar.YearPickerCell>}
+            </Calendar.YearPickerGridBody>
+          </Calendar.YearPickerGrid>
+        </Calendar>
+      </DatePicker.Popover>
+    </DatePicker>
+  )
+})
+
 export default function Profile() {
   const [isEditing, setIsEditing] = useState(false)
   const [profile, setProfile] = useState({
@@ -235,6 +302,10 @@ export default function Profile() {
     return Math.max(0, Math.floor(diff / (1000 * 60 * 60 * 24 * 365.25)))
   }, [draft.birthDate, profile.birthDate])
 
+  const handleBirthDateChange = useCallback((v: string) => {
+    setDraft((p) => ({ ...p, birthDate: v }))
+  }, [])
+
   const startEdit = useCallback(() => { setDraft(profile); setIsEditing(true) }, [profile])
   const cancelEdit = useCallback(() => setIsEditing(false), [])
   const saveEdit = useCallback(() => { setProfile(draft); setIsEditing(false) }, [draft])
@@ -283,7 +354,7 @@ export default function Profile() {
                   <div className="space-y-2">
                     <input value={draft.name} onChange={(e) => setDraft({ ...draft, name: e.target.value })} placeholder="Имя" className="w-full max-w-[220px] px-3 py-1.5 rounded-xl bg-white/[0.06] border border-white/[0.08] text-sm font-bold placeholder:text-white/30 focus:outline-none focus:border-white/15" />
                     <div className="flex flex-wrap gap-2">
-                      <input type="date" value={draft.birthDate} onChange={(e) => setDraft({ ...draft, birthDate: e.target.value })} className="px-2.5 py-1.5 rounded-full bg-white/[0.06] border border-white/[0.08] text-xs focus:outline-none" />
+                      <BirthDatePicker value={draft.birthDate} onChange={handleBirthDateChange} />
                       <input value={draft.city} onChange={(e) => setDraft({ ...draft, city: e.target.value })} placeholder="Город" className="px-2.5 py-1.5 rounded-full bg-white/[0.06] border border-white/[0.08] text-xs focus:outline-none w-[120px]" />
                     </div>
                   </div>
