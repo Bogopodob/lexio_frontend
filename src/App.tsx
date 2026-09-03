@@ -1,8 +1,20 @@
 import { motion } from 'framer-motion'
+import { useLocation } from 'react-router-dom'
 import Router from '@/router'
 import AppLayout from '@/widgets/app-layout/ui/AppLayout'
 
 export default function App() {
+  const { pathname } = useLocation()
+  const bare = pathname === '/auth'
+
+  if (bare) {
+    return (
+      <div className="app-shell">
+        <Router />
+      </div>
+    )
+  }
+
   return (
     <div className="app-shell">
       <motion.div
