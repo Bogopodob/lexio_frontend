@@ -22,7 +22,7 @@ import {
   faCamera,
   faTrash,
 } from '@fortawesome/free-solid-svg-icons'
-import { useState, useRef } from 'react'
+import { useState, useRef, useCallback, useMemo, memo, lazy, Suspense } from 'react'
 import { createPortal } from 'react-dom'
 
 const achievements = [
@@ -40,29 +40,29 @@ const achievements = [
   { icon: faHeart, title: 'Любимчик', desc: '5 тем изучено', condition: 'Закрой 5 тем', total: 5, current: 1, progress: 20, rarity: 'common', color: '#F08AB4', reward: '+70 XP' },
 ]
 
-function AchievementsBlock({ items }: { items: typeof achievements }) {
+const AchievementsBlock = memo(function AchievementsBlock({ items }: { items: typeof achievements }) {
   const [filter, setFilter] = useState<'all' | 'done' | 'progress'>('all')
   const [hovered, setHovered] = useState<(typeof achievements)[number] | null>(null)
   const [pos, setPos] = useState({ x: 0, y: 0 })
   const hoverTimeout = useRef<number | null>(null)
 
-  const filtered = items.filter((a) => {
+  const filtered = useMemo(() => items.filter((a) => {
     if (filter === 'done') return a.progress === 100
     if (filter === 'progress') return a.progress < 100
     return true
-  })
-  const doneCount = items.filter((a) => a.progress === 100).length
+  }), [items, filter])
+  const doneCount = useMemo(() => items.filter((a) => a.progress === 100).length, [items])
 
-  const onEnter = (a: (typeof achievements)[number], e: React.MouseEvent) => {
+  const onEnter = useCallback((a: (typeof achievements)[number], e: React.MouseEvent) => {
     if (hoverTimeout.current) window.clearTimeout(hoverTimeout.current)
     const rect = (e.currentTarget as HTMLElement).getBoundingClientRect()
     setPos({ x: rect.left + rect.width / 2, y: rect.top })
     setHovered(a)
-  }
-  const onLeave = () => {
+  }, [])
+  const onLeave = useCallback(() => {
     if (hoverTimeout.current) window.clearTimeout(hoverTimeout.current)
     hoverTimeout.current = window.setTimeout(() => setHovered(null), 80) as unknown as number
-  }
+  }, [])
 
   return (
     <div className="rounded-[20px] border border-white/[0.06] bg-[#171717] overflow-hidden">
@@ -177,7 +177,7 @@ function AchievementsBlock({ items }: { items: typeof achievements }) {
         )}
     </div>
   )
-}
+})
 
 export default function Profile() {
   const [isEditing, setIsEditing] = useState(false)
@@ -211,38 +211,42 @@ export default function Profile() {
     { name: 'София', level: 'A1', streak: 3, avatar: 'С' },
   ])
   const [friendQuery, setFriendQuery] = useState('')
-  const mockUsers = [
-    { name: 'Анна', level: 'B1', avatar: 'А' },
-    { name: 'Дмитрий', level: 'A2', avatar: 'Д' },
-    { name: 'Елена', level: 'B2', avatar: 'Е' },
-    { name: 'Павел', level: 'A1', avatar: 'П' },
-  ].filter((u) => u.name.toLowerCase().includes(friendQuery.toLowerCase()) && !friends.some((f) => f.name === u.name))
+  const mockUsers = useMemo(
+    () =>
+      [
+        { name: 'Анна', level: 'B1', avatar: 'А' },
+        { name: 'Дмитрий', level: 'A2', avatar: 'Д' },
+        { name: 'Елена', level: 'B2', avatar: 'Е' },
+        { name: 'Павел', level: 'A1', avatar: 'П' },
+      ].filter((u) => u.name.toLowerCase().includes(friendQuery.toLowerCase()) && !friends.some((f) => f.name === u.name)),
+    [friendQuery, friends],
+  )
 
-  const age = (() => {
+  const age = useMemo(() => {
     const d = new Date(draft.birthDate || profile.birthDate)
     const diff = Date.now() - d.getTime()
     return Math.max(0, Math.floor(diff / (1000 * 60 * 60 * 24 * 365.25)))
-  })()
+  }, [draft.birthDate, profile.birthDate])
 
-  const startEdit = () => { setDraft(profile); setIsEditing(true) }
-  const cancelEdit = () => setIsEditing(false)
-  const saveEdit = () => { setProfile(draft); setIsEditing(false) }
-  const onAvatarChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const startEdit = useCallback(() => { setDraft(profile); setIsEditing(true) }, [profile])
+  const cancelEdit = useCallback(() => setIsEditing(false), [])
+  const saveEdit = useCallback(() => { setProfile(draft); setIsEditing(false) }, [draft])
+  const onAvatarChange = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
     const f = e.target.files?.[0]
     if (!f) return
     const r = new FileReader()
     r.onload = () => setDraft((p) => ({ ...p, avatar: r.result as string }))
     r.readAsDataURL(f)
-  }
-  const toggleTag = (tag: string) => {
+  }, [])
+  const toggleTag = useCallback((tag: string) => {
     setDraft((p) => ({ ...p, tags: p.tags.includes(tag) ? p.tags.filter((t) => t !== tag) : p.tags.length < 6 ? [...p.tags, tag] : p.tags }))
-  }
-  const addCustomTag = () => {
+  }, [])
+  const addCustomTag = useCallback(() => {
     const t = customTag.trim()
     if (!t || draft.tags.includes(t) || draft.tags.length >= 6) return
     setDraft((p) => ({ ...p, tags: [...p.tags, t] }))
     setCustomTag('')
-  }
+  }, [customTag, draft.tags])
 
   return (
     <motion.div initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.36 }} className="w-full flex flex-col gap-5">
