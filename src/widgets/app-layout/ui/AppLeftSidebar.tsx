@@ -4,7 +4,7 @@ import { faLightbulb } from '@fortawesome/free-solid-svg-icons'
 import { motion, AnimatePresence } from 'framer-motion'
 import AppLeftSidebarItem from './AppLeftSidebarItem'
 import { cn } from '@/shared/lib/cn'
-import { faHome, faChartBar, faUser, faGear } from '@fortawesome/free-solid-svg-icons'
+import { faHome, faChartBar, faGear } from '@fortawesome/free-solid-svg-icons'
 
 interface Props {
   isDesktop: boolean
@@ -14,7 +14,14 @@ interface Props {
   onSelect: (id: string) => void
 }
 
-const sections = [
+interface SidebarItem {
+  id: string
+  label: string
+  icon: typeof faHome
+  badge?: string
+}
+
+const sections: { label: string; items: SidebarItem[] }[] = [
   {
     label: 'Навигация',
     items: [
@@ -25,7 +32,6 @@ const sections = [
   {
     label: 'Аккаунт',
     items: [
-      { id: 'profile', label: 'Профиль', icon: faUser, badge: 'A2' },
       { id: 'settings', label: 'Настройки', icon: faGear },
     ],
   },

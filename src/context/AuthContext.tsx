@@ -4,6 +4,7 @@ import {
   clearSession,
   loadSession,
   loginRequest,
+  logoutRequest,
   meRequest,
   registerRequest,
   saveSession,
@@ -16,7 +17,7 @@ interface AuthContextValue {
   ready: boolean
   login: (email: string, password: string) => Promise<void>
   register: (email: string, password: string, name?: string) => Promise<void>
-  logout: () => void
+  logout: () => Promise<void>
 }
 
 const AuthContext = createContext<AuthContextValue | null>(null)
@@ -55,7 +56,15 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     setToken(payload.token)
   }, [])
 
-  const logout = useCallback(() => {
+  const logout = useCallback(async () => {
+    const current = loadSession()
+    if (current) {
+      try {
+        await logoutRequest(current.token)
+      } catch {
+        // token already invalid — just drop the local session
+      }
+    }
     clearSession()
     setUser(null)
     setToken(null)

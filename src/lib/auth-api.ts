@@ -73,6 +73,13 @@ export async function registerRequest(
   })
 }
 
+export async function logoutRequest(token: string): Promise<void> {
+  await request<{ revoked: boolean }>('/auth/logout', {
+    method: 'POST',
+    headers: { Authorization: `Bearer ${token}` },
+  })
+}
+
 export async function meRequest(token: string): Promise<AuthUser> {
   const data = await request<{ user?: AuthUser } & AuthUser>('/auth/me', {
     headers: { Authorization: `Bearer ${token}` },

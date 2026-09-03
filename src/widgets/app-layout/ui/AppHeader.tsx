@@ -1,7 +1,9 @@
-import { NavLink, useLocation } from 'react-router-dom'
+import { useEffect, useRef, useState } from 'react'
+import { NavLink, useLocation, useNavigate } from 'react-router-dom'
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome'
-import { faMagnifyingGlass, faFire, faBars, faXmark, faTableColumns, faChevronRight } from '@fortawesome/free-solid-svg-icons'
-import { motion } from 'framer-motion'
+import { faMagnifyingGlass, faFire, faBars, faXmark, faTableColumns, faChevronRight, faGhost, faRightToBracket, faUser, faArrowRightFromBracket } from '@fortawesome/free-solid-svg-icons'
+import { AnimatePresence, motion } from 'framer-motion'
+import { useAuth } from '@/context/AuthContext'
 
 interface AppHeaderProps {
   isDesktop: boolean
@@ -22,6 +24,38 @@ export default function AppHeader({
 }: AppHeaderProps) {
   const menuIcon = isDesktop ? (isSidebarCollapsed ? faBars : faXmark) : isMenuOpen ? faXmark : faBars
   const { pathname } = useLocation()
+  const navigate = useNavigate()
+  const { user, ready, logout } = useAuth()
+  const displayName = user?.name?.trim() || user?.email || 'Гость'
+  const avatarLetter = (displayName[0] || 'Г').toUpperCase()
+  const [menuOpen, setMenuOpen] = useState(false)
+  const menuRef = useRef<HTMLDivElement>(null)
+
+  useEffect(() => {
+    setMenuOpen(false)
+  }, [pathname])
+
+  useEffect(() => {
+    if (!menuOpen) return
+    const onPointerDown = (e: PointerEvent) => {
+      if (menuRef.current && !menuRef.current.contains(e.target as Node)) setMenuOpen(false)
+    }
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') setMenuOpen(false)
+    }
+    document.addEventListener('pointerdown', onPointerDown)
+    document.addEventListener('keydown', onKey)
+    return () => {
+      document.removeEventListener('pointerdown', onPointerDown)
+      document.removeEventListener('keydown', onKey)
+    }
+  }, [menuOpen])
+
+  const handleLogout = async () => {
+    setMenuOpen(false)
+    await logout()
+    navigate('/')
+  }
   const titleMap: Record<string, string> = {
     '/': 'Главная',
     '/stats': 'Статистика',
@@ -115,10 +149,92 @@ export default function AppHeader({
             <span className="app-header__streak-dot" aria-hidden="true" />
           </motion.div>
 
-          <div className="app-header__avatar-wrap">
-            <div className="app-header__avatar" aria-label="Профиль">А</div>
-            <span className="app-header__avatar-status" aria-hidden="true" />
-          </div>
+          {!ready ? null : !user ? (
+            <div className="app-header__guest">
+              <motion.button
+                type="button"
+                className="app-header__guest-avatar"
+                aria-label="Гостевой режим — войти"
+                title="Ты в гостевом режиме. Нажми, чтобы войти."
+                onClick={() => navigate('/auth')}
+                whileHover={{ scale: 1.06, rotate: -4 }}
+                whileTap={{ scale: 0.94 }}
+              >
+                <FontAwesomeIcon icon={faGhost} />
+                <span className="app-header__guest-ping" aria-hidden="true" />
+              </motion.button>
+              <div className="app-header__guest-text">
+                <span className="app-header__guest-name">Гость</span>
+                <button
+                  type="button"
+                  className="app-header__guest-login"
+                  onClick={() => navigate('/auth')}
+                >
+                  <FontAwesomeIcon icon={faRightToBracket} />
+                  <span>Войти</span>
+                </button>
+              </div>
+            </div>
+          ) : (
+            <div className="app-header__avatar-wrap" ref={menuRef}>
+              <button
+                type="button"
+                className="app-header__avatar-btn"
+                aria-label={`Меню: ${displayName}`}
+                aria-haspopup="menu"
+                aria-expanded={menuOpen}
+                title={displayName}
+                onClick={() => setMenuOpen((v) => !v)}
+              >
+                <div className="app-header__avatar">{avatarLetter}</div>
+                <span className="app-header__avatar-status" aria-hidden="true" />
+              </button>
+              <AnimatePresence>
+                {menuOpen && (
+                  <motion.div
+                    initial={{ opacity: 0, y: -8, scale: 0.96 }}
+                    animate={{ opacity: 1, y: 0, scale: 1 }}
+                    exit={{ opacity: 0, y: -8, scale: 0.96 }}
+                    transition={{ duration: 0.18, ease: 'easeOut' }}
+                    className="app-header__menu"
+                    role="menu"
+                  >
+                    <div className="app-header__menu-head">
+                      <div className="app-header__menu-avatar">{avatarLetter}</div>
+                      <div className="app-header__menu-id">
+                        <span className="app-header__menu-name">{displayName}</span>
+                        {user?.email && user?.name?.trim() && (
+                          <span className="app-header__menu-email">{user.email}</span>
+                        )}
+                      </div>
+                    </div>
+                    <div className="app-header__menu-sep" aria-hidden="true" />
+                    <button
+                      type="button"
+                      role="menuitem"
+                      className="app-header__menu-item"
+                      onClick={() => {
+                        setMenuOpen(false)
+                        navigate('/profile')
+                      }}
+                    >
+                      <FontAwesomeIcon icon={faUser} />
+                      <span>Профиль</span>
+                    </button>
+                    <button
+                      type="button"
+                      role="menuitem"
+                      className="app-header__menu-item app-header__menu-item--danger"
+                      onClick={handleLogout}
+                    >
+                      <FontAwesomeIcon icon={faArrowRightFromBracket} />
+                      <span>Выйти</span>
+                    </button>
+                  </motion.div>
+                )}
+              </AnimatePresence>
+            </div>
+          )}
 
           <motion.button
             type="button"

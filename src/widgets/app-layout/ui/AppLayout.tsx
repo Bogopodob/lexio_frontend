@@ -3,6 +3,7 @@ import { useLocation, useNavigate } from 'react-router-dom'
 import { useIsDesktop } from '@/shared/lib/useIsDesktop'
 import { cn } from '@/shared/lib/cn'
 import AppHeader from './AppHeader'
+import GuestBanner from '@/components/GuestBanner'
 import AppLeftSidebar from './AppLeftSidebar'
 import AppRightSidebar from './AppRightSidebar'
 import styles from './app-layout.module.css'
@@ -139,7 +140,10 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
           }}
         >
           <div id="app-content-scroll" className={cn(styles.contentScroll, isRightOpen && !isDesktop && styles.contentScrollBlocked)}>
-            <div className={styles.contentBlock}>{children}</div>
+            <div className={styles.contentBlock}>
+              <GuestBanner />
+              {children}
+            </div>
           </div>
         </main>
       </div>
