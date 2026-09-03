@@ -45,6 +45,11 @@ const AchievementsBlock = memo(function AchievementsBlock({ items }: { items: ty
   const [hovered, setHovered] = useState<(typeof achievements)[number] | null>(null)
   const [pos, setPos] = useState({ x: 0, y: 0 })
   const hoverTimeout = useRef<number | null>(null)
+  const itemCircumferences = useMemo(() => items.map((a) => {
+    const circumference = 2 * Math.PI * 26
+    const dashOffset = circumference * (1 - a.progress / 100)
+    return { circumference, dashOffset }
+  }), [items])
 
   const filtered = useMemo(() => items.filter((a) => {
     if (filter === 'done') return a.progress === 100
@@ -53,7 +58,7 @@ const AchievementsBlock = memo(function AchievementsBlock({ items }: { items: ty
   }), [items, filter])
   const doneCount = useMemo(() => items.filter((a) => a.progress === 100).length, [items])
 
-  const onEnter = useCallback((a: (typeof achievements)[number], e: React.MouseEvent) => {
+  const onEnter = useCallback((a: (typeof achievements)[number], e: React.MouseEvent, idx: number) => {
     if (hoverTimeout.current) window.clearTimeout(hoverTimeout.current)
     const rect = (e.currentTarget as HTMLElement).getBoundingClientRect()
     setPos({ x: rect.left + rect.width / 2, y: rect.top })
@@ -212,13 +217,15 @@ export default function Profile() {
   ])
   const [friendQuery, setFriendQuery] = useState('')
   const mockUsers = useMemo(
-    () =>
-      [
+    () => {
+      const lowerQuery = friendQuery.toLowerCase()
+      return [
         { name: 'Анна', level: 'B1', avatar: 'А' },
         { name: 'Дмитрий', level: 'A2', avatar: 'Д' },
         { name: 'Елена', level: 'B2', avatar: 'Е' },
         { name: 'Павел', level: 'A1', avatar: 'П' },
-      ].filter((u) => u.name.toLowerCase().includes(friendQuery.toLowerCase()) && !friends.some((f) => f.name === u.name)),
+      ].filter((u) => u.name.toLowerCase().includes(lowerQuery) && !friends.some((f) => f.name === u.name))
+    },
     [friendQuery, friends],
   )
 
