@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useState, useCallback, useMemo, memo, lazy, Suspense } from 'react'
 import { motion } from 'framer-motion'
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome'
 import {
@@ -20,11 +20,12 @@ import FlipCard from '@/components/FlipCard'
 import { useSpeech } from '@/hooks/useSpeech'
 import SpotlightCard from '@/components/SpotlightCard'
 import CountUp from '@/components/CountUp'
-import { AreaChart } from '@/components/charts/area-chart'
-import { Area } from '@/components/charts/area'
-import { Grid } from '@/components/charts/grid'
-import { XAxis } from '@/components/charts/x-axis'
-import { ChartTooltip } from '@/components/charts/tooltip'
+// Heavy charts — lazy to not block initial paint, UI unchanged
+const AreaChart = lazy(() => import('@/components/charts/area-chart').then((m) => ({ default: m.AreaChart })))
+const Area = lazy(() => import('@/components/charts/area').then((m) => ({ default: m.Area })))
+const Grid = lazy(() => import('@/components/charts/grid').then((m) => ({ default: m.Grid })))
+const XAxis = lazy(() => import('@/components/charts/x-axis').then((m) => ({ default: m.XAxis })))
+const ChartTooltip = lazy(() => import('@/components/charts/tooltip').then((m) => ({ default: m.ChartTooltip })))
 
 const topicCards = [
   { icon: 'utensils', title: 'Еда', count: '48 слов', sub: 'ресторан • рынок', tone: 'topic-card--mint' },
@@ -41,10 +42,10 @@ const topicIconMap = {
 } as const
 
 const grammarCards = [
-  { dot: 'grammar-card__dot--mint', title: 'Глаголы', subtitle: '200 слов • 34 выучено', progress: 17, level: 'Основа речи', accent: 'rgba(90,212,181,0.22)' },
-  { dot: 'grammar-card__dot--blue', title: 'Существительные', subtitle: '300 слов • 12 выучено', progress: 4, level: 'База словаря', accent: 'rgba(91,116,255,0.22)' },
-  { dot: 'grammar-card__dot--pink', title: 'Прилагательные', subtitle: '150 слов • 8 выучено', progress: 5, level: 'Описание', accent: 'rgba(240,138,180,0.22)' },
-  { dot: 'grammar-card__dot--gold', title: 'Фразы', subtitle: '80 фраз • 0 выучено', progress: 0, level: 'Практика', accent: 'rgba(219,159,58,0.22)' },
+  { dot: 'grammar-card__dot--mint', title: 'Глаголы', subtitle: '200 слов • 34 выучено', progress: 17, level: 'Основа речи', accent: 'rgba(90,212,181,0.22)', color: '#5AD4B5' },
+  { dot: 'grammar-card__dot--blue', title: 'Существительные', subtitle: '300 слов • 12 выучено', progress: 4, level: 'База словаря', accent: 'rgba(91,116,255,0.22)', color: '#5B74FF' },
+  { dot: 'grammar-card__dot--pink', title: 'Прилагательные', subtitle: '150 слов • 8 выучено', progress: 5, level: 'Описание', accent: 'rgba(240,138,180,0.22)', color: '#F08AB4' },
+  { dot: 'grammar-card__dot--gold', title: 'Фразы', subtitle: '80 фраз • 0 выучено', progress: 0, level: 'Практика', accent: 'rgba(219,159,58,0.22)', color: '#DB9F3A' },
 ]
 
 const phraseCards = [
@@ -68,10 +69,14 @@ const fadeUp = {
   animate: { opacity: 1, y: 0 },
 }
 
-function ProgressRing({ value }: { value: number }) {
+// Memoized — не пересоздаётся на каждый рендер Home, UI тот же
+const ProgressRing = memo(function ProgressRing({ value }: { value: number }) {
+  const { circumference, dashOffset } = useMemo(() => {
+    const radius = 28
+    const c = 2 * Math.PI * radius
+    return { circumference: c, dashOffset: c * (1 - value), radius }
+  }, [value])
   const radius = 28
-  const circumference = 2 * Math.PI * radius
-  const dashOffset = circumference * (1 - value)
   return (
     <motion.div
       className="progress-ring !w-[72px] !h-[72px] !rounded-full !overflow-hidden !bg-[#1e1e1e] !border !border-[#262626]"
@@ -98,23 +103,114 @@ function ProgressRing({ value }: { value: number }) {
       </span>
     </motion.div>
   )
-}
+})
+
+const MemoTopicCard = memo(function MemoTopicCard({ card, index }: { card: (typeof topicCards)[number]; index: number }) {
+  const Icon = topicIconMap[card.icon as keyof typeof topicIconMap]
+  return (
+    <SpotlightCard spotlightColor={'rgba(255,255,255,0.06)' as unknown as `rgba(${number}, ${number}, ${number}, ${number})`} className="!p-0 !bg-transparent !border-0 h-full">
+      <motion.div
+        className={`group relative rounded-[20px] border border-white/[0.06] p-[1px] h-full overflow-hidden ${card.tone}`}
+        initial={{ opacity: 0, y: 16 }}
+        whileInView={{ opacity: 1, y: 0 }}
+        viewport={{ once: true, margin: '-40px' }}
+        transition={{ delay: index * 0.04, duration: 0.38 }}
+        whileHover={{ y: -4 }}
+        style={{ willChange: 'transform' }}
+      >
+        <div className="rounded-[19px] bg-[#171717] p-4 h-full flex flex-col gap-3 relative overflow-hidden">
+          <div className="absolute -right-6 -top-6 w-24 h-24 rounded-full opacity-[0.07] group-hover:opacity-[0.12] transition-opacity blur-[18px]" style={{ background: card.tone.includes('mint') ? '#5AD4B5' : card.tone.includes('sky') ? '#5B74FF' : card.tone.includes('rose') ? '#F08AB4' : '#DB9F3A' }} />
+          <div className="w-10 h-10 rounded-xl bg-white/[0.06] border border-white/[0.06] grid place-items-center text-white/90 group-hover:bg-white group-hover:text-black transition-colors">
+            <FontAwesomeIcon icon={Icon} />
+          </div>
+          <div className="mt-1">
+            <h4 className="text-[17px] font-black tracking-tight leading-none">{card.title}</h4>
+            <p className="text-[13px] font-bold opacity-90 mt-1">{card.count}</p>
+            <p className="text-[12px] opacity-50 leading-tight mt-1">{card.sub}</p>
+          </div>
+          <div className="mt-auto pt-3 flex items-center justify-between">
+            <span className="text-[11px] font-bold tracking-widest uppercase opacity-40">Открыть →</span>
+            <span className="w-6 h-6 rounded-full bg-white text-black grid place-items-center text-[11px] opacity-0 group-hover:opacity-100 -translate-x-1 group-hover:translate-x-0 transition-all">↗</span>
+          </div>
+        </div>
+      </motion.div>
+    </SpotlightCard>
+  )
+})
+
+const MemoGrammarCard = memo(function MemoGrammarCard({ card, index }: { card: (typeof grammarCards)[number]; index: number }) {
+  return (
+    <SpotlightCard spotlightColor={(card.accent as unknown as `rgba(${number}, ${number}, ${number}, ${number})`)} className="!p-0 !bg-transparent !border-0 h-full">
+      <motion.article
+        className="group relative rounded-[20px] border border-white/[0.06] bg-[#171717] p-4 flex flex-col gap-3 h-full overflow-hidden hover:border-white/10 transition-colors"
+        initial={{ opacity: 0, y: 16 }}
+        whileInView={{ opacity: 1, y: 0 }}
+        viewport={{ once: true, margin: '-40px' }}
+        transition={{ delay: index * 0.05, duration: 0.38 }}
+        whileHover={{ y: -4 }}
+      >
+        <div className="flex items-center justify-between">
+          <span className="w-2.5 h-2.5 rounded-full" style={{ background: card.color, boxShadow: `0 0 10px ${card.color}60` }} />
+          <span className="text-[10px] font-bold tracking-[0.10em] uppercase px-2 py-1 rounded-full bg-white/[0.06] border border-white/[0.06] opacity-70">{card.level}</span>
+        </div>
+        <div>
+          <h4 className="text-[15px] font-black tracking-tight">{card.title}</h4>
+          <p className="text-[12px] opacity-50 leading-tight mt-1">{card.subtitle}</p>
+        </div>
+        <div className="mt-auto pt-2 flex items-center gap-3">
+          <div className="flex-1 h-1.5 rounded-full bg-white/[0.06] overflow-hidden">
+            <motion.div className="h-full rounded-full" style={{ background: card.color }} initial={{ width: 0 }} whileInView={{ width: `${card.progress}%` }} viewport={{ once: true }} transition={{ delay: 0.4 + index * 0.06, duration: 0.8 }} />
+          </div>
+          <span className="text-[12px] font-black tabular-nums">
+            <CountUp to={card.progress} duration={0.9} />%
+          </span>
+        </div>
+      </motion.article>
+    </SpotlightCard>
+  )
+})
+
+const MemoPhraseCard = memo(function MemoPhraseCard({
+  card,
+  isFlipped,
+  isSpeaking,
+  onFlip,
+  onSpeak,
+}: {
+  card: (typeof phraseCards)[number]
+  isFlipped: boolean
+  isSpeaking: boolean
+  onFlip: () => void
+  onSpeak: () => void
+}) {
+  return (
+    <SpotlightCard spotlightColor={'rgba(240, 138, 180, 0.16)' as unknown as `rgba(${number}, ${number}, ${number}, ${number})`} className="!p-0 !bg-transparent !border-0 h-full">
+      <FlipCard label={card.label} labelAccent={card.accent} icon={card.icon} title={card.title} translation={card.translation} isFlipped={isFlipped} isSpeaking={isSpeaking} onFlip={onFlip} onSpeak={onSpeak} />
+    </SpotlightCard>
+  )
+})
 
 export default function Home() {
   const [flippedId, setFlippedId] = useState<string | null>(null)
   const { speak, isSpeaking, cancel } = useSpeech({ lang: 'en-US', rate: 0.92 })
   const [speakingId, setSpeakingId] = useState<string | null>(null)
 
-  const handleSpeak = (id: string, text: string) => {
-    if (isSpeaking && speakingId === id) {
-      cancel()
-      setSpeakingId(null)
-      return
-    }
-    setSpeakingId(id)
-    speak(text)
-    setTimeout(() => setSpeakingId(null), 4000)
-  }
+  // useCallback — не создаётся заново на каждый рендер, не триггерит детей
+  const handleSpeak = useCallback(
+    (id: string, text: string) => {
+      if (isSpeaking && speakingId === id) {
+        cancel()
+        setSpeakingId(null)
+        return
+      }
+      setSpeakingId(id)
+      speak(text)
+      setTimeout(() => setSpeakingId(null), 4000)
+    },
+    [isSpeaking, speakingId, speak, cancel],
+  )
+  const handleFlip = useCallback((title: string) => setFlippedId((v) => (v === title ? null : title)), [])
+  const memoWeeklyData = useMemo(() => weeklyData, [])
 
   return (
     <motion.div animate="animate" initial="initial" transition={{ staggerChildren: 0.08 }} className="relative">
@@ -216,38 +312,20 @@ export default function Home() {
         </SpotlightCard>
       </motion.section>
 
-      {/* TOPICS — 2026 minimal, без фото, иконки + градиент */}
+      {/* TOPICS — мемоизированы, viewport once */}
       <motion.section className="content-section !mt-6" variants={fadeUp} transition={{ duration: 0.5 }}>
         <div className="section-header">
           <h3>По теме</h3>
           <button className="text-link" type="button">Все темы</button>
         </div>
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
-          {topicCards.map((card) => (
-            <SpotlightCard key={card.title} spotlightColor={'rgba(255,255,255,0.06)' as unknown as `rgba(${number}, ${number}, ${number}, ${number})`} className="!p-0 !bg-transparent !border-0 h-full">
-              <div className={`group relative rounded-[20px] border border-white/[0.06] p-[1px] h-full overflow-hidden ${card.tone}`}>
-                <div className="rounded-[19px] bg-[#171717] p-4 h-full flex flex-col gap-3 relative overflow-hidden">
-                  <div className="absolute -right-6 -top-6 w-24 h-24 rounded-full opacity-[0.07] group-hover:opacity-[0.12] transition-opacity blur-[18px]" style={{ background: card.tone.includes('mint') ? '#5AD4B5' : card.tone.includes('sky') ? '#5B74FF' : card.tone.includes('rose') ? '#F08AB4' : '#DB9F3A' }} />
-                  <div className="w-10 h-10 rounded-xl bg-white/[0.06] border border-white/[0.06] grid place-items-center text-white/90 group-hover:bg-white group-hover:text-black transition-colors">
-                    <FontAwesomeIcon icon={topicIconMap[card.icon as keyof typeof topicIconMap]} />
-                  </div>
-                  <div className="mt-1">
-                    <h4 className="text-[17px] font-black tracking-tight leading-none">{card.title}</h4>
-                    <p className="text-[13px] font-bold opacity-90 mt-1">{card.count}</p>
-                    <p className="text-[12px] opacity-50 leading-tight mt-1">{card.sub}</p>
-                  </div>
-                  <div className="mt-auto pt-3 flex items-center justify-between">
-                    <span className="text-[11px] font-bold tracking-widest uppercase opacity-40">Открыть →</span>
-                    <span className="w-6 h-6 rounded-full bg-white text-black grid place-items-center text-[11px] opacity-0 group-hover:opacity-100 -translate-x-1 group-hover:translate-x-0 transition-all">↗</span>
-                  </div>
-                </div>
-              </div>
-            </SpotlightCard>
+          {topicCards.map((card, index) => (
+            <MemoTopicCard key={card.title} card={card} index={index} />
           ))}
         </div>
       </motion.section>
 
-      {/* GRAMMAR — 2026 clean, без “2010” теней */}
+      {/* GRAMMAR — мемоизированы */}
       <motion.section className="content-section !mt-6" variants={fadeUp} transition={{ duration: 0.5 }}>
         <div className="section-header section-header--stacked">
           <div>
@@ -257,37 +335,12 @@ export default function Home() {
         </div>
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
           {grammarCards.map((card, index) => (
-            <SpotlightCard key={card.title} spotlightColor={(card.accent as unknown as `rgba(${number}, ${number}, ${number}, ${number})`)} className="!p-0 !bg-transparent !border-0 h-full">
-              <motion.article
-                className="group relative rounded-[20px] border border-white/[0.06] bg-[#171717] p-4 flex flex-col gap-3 h-full overflow-hidden hover:border-white/10 transition-colors"
-                initial={{ opacity: 0, y: 16 }}
-                animate={{ opacity: 1, y: 0 }}
-                transition={{ delay: 0.16 + index * 0.05, duration: 0.38 }}
-                whileHover={{ y: -4 }}
-              >
-                <div className="flex items-center justify-between">
-                  <span className={`w-2.5 h-2.5 rounded-full ${card.dot.replace('grammar-card__dot--', 'bg-').replace('mint', '[#5AD4B5]').replace('blue', '[#5B74FF]').replace('pink', '[#F08AB4]').replace('gold', '[#DB9F3A]')}`} style={{ background: card.dot.includes('mint') ? '#5AD4B5' : card.dot.includes('blue') ? '#5B74FF' : card.dot.includes('pink') ? '#F08AB4' : '#DB9F3A', boxShadow: `0 0 10px ${card.dot.includes('mint') ? '#5AD4B5' : card.dot.includes('blue') ? '#5B74FF' : card.dot.includes('pink') ? '#F08AB4' : '#DB9F3A'}60` }} />
-                  <span className="text-[10px] font-bold tracking-[0.10em] uppercase px-2 py-1 rounded-full bg-white/[0.06] border border-white/[0.06] opacity-70">{card.level}</span>
-                </div>
-                <div>
-                  <h4 className="text-[15px] font-black tracking-tight">{card.title}</h4>
-                  <p className="text-[12px] opacity-50 leading-tight mt-1">{card.subtitle}</p>
-                </div>
-                <div className="mt-auto pt-2 flex items-center gap-3">
-                  <div className="flex-1 h-1.5 rounded-full bg-white/[0.06] overflow-hidden">
-                    <motion.div className="h-full rounded-full" style={{ background: card.dot.includes('mint') ? '#5AD4B5' : card.dot.includes('blue') ? '#5B74FF' : card.dot.includes('pink') ? '#F08AB4' : '#DB9F3A' }} initial={{ width: 0 }} animate={{ width: `${card.progress}%` }} transition={{ delay: 0.4 + index * 0.06, duration: 0.8 }} />
-                  </div>
-                  <span className="text-[12px] font-black tabular-nums">
-                    <CountUp to={card.progress} duration={0.9} />%
-                  </span>
-                </div>
-              </motion.article>
-            </SpotlightCard>
+            <MemoGrammarCard key={card.title} card={card} index={index} />
           ))}
         </div>
       </motion.section>
 
-      {/* WEEKLY TREND — Bklit AreaChart (как родной) */}
+      {/* WEEKLY TREND — lazy, не блокирует первый paint */}
       <motion.section className="content-section !mt-6" variants={fadeUp} transition={{ duration: 0.5 }}>
         <div className="section-header">
           <h3 className="flex items-center gap-2">
@@ -296,14 +349,16 @@ export default function Home() {
           <span className="text-[11px] tracking-[0.12em] uppercase opacity-50 font-bold">интерактив • наведи</span>
         </div>
         <div className="rounded-[24px] border border-white/[0.06] bg-white/[0.02] p-3 sm:p-5 backdrop-blur">
-          <div className="h-[220px] w-full">
-            <AreaChart data={weeklyData as unknown as Record<string, unknown>[]} xDataKey="date" aspectRatio="3 / 1" className="w-full h-full">
-              <Grid horizontal numTicksRows={4} stroke="rgba(255,255,255,0.06)" />
-              <Area dataKey="minutes" fill="var(--chart-line-primary)" stroke="var(--chart-line-primary)" fillOpacity={0.24} strokeWidth={2.5} />
-              <XAxis numTicks={7} />
-              <ChartTooltip />
-            </AreaChart>
-          </div>
+          <Suspense fallback={<div className="h-[220px] w-full animate-pulse rounded-xl bg-white/[0.04]" />}>
+            <div className="h-[220px] w-full">
+              <AreaChart data={memoWeeklyData as unknown as Record<string, unknown>[]} xDataKey="date" aspectRatio="3 / 1" className="w-full h-full">
+                <Grid horizontal numTicksRows={4} stroke="rgba(255,255,255,0.06)" />
+                <Area dataKey="minutes" fill="var(--chart-line-primary)" stroke="var(--chart-line-primary)" fillOpacity={0.24} strokeWidth={2.5} />
+                <XAxis numTicks={7} />
+                <ChartTooltip />
+              </AreaChart>
+            </div>
+          </Suspense>
           <div className="flex gap-2 mt-3 flex-wrap">
             <span className="px-3 py-1 rounded-full bg-[#5AD4B5]/15 text-[#5AD4B5] text-xs font-bold border border-[#5AD4B5]/20">18 мин сегодня</span>
             <span className="px-3 py-1 rounded-full bg-white/5 text-white/60 text-xs font-semibold border border-white/10">Пик: 30 мин в субботу</span>
@@ -333,41 +388,17 @@ export default function Home() {
         </div>
       </motion.section>
 
-      {/* PHRASES — Flip + Spotlight */}
+      {/* PHRASES — мемоизированы, коллбеки стабильны */}
       <motion.section className="content-section !mt-6" variants={fadeUp} transition={{ duration: 0.5 }}>
         <div className="section-header">
           <h3 className="flex items-center gap-2">
             <FontAwesomeIcon icon={faComments} className="text-[#F08AB4]" /> Разговорные фразы • клик — флип, L — звук
           </h3>
-          <button className="text-link" type="button">
-            Все фразы
-          </button>
+          <button className="text-link" type="button">Все фразы</button>
         </div>
-
         <div className="phrase-strip">
-          {phraseCards.map((card, index) => (
-            <motion.div
-              key={card.title}
-              initial={{ opacity: 0, y: 20 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ delay: 0.32 + index * 0.07, duration: 0.42 }}
-              className="relative"
-              whileHover={{ y: -4 }}
-            >
-              <SpotlightCard spotlightColor={'rgba(240, 138, 180, 0.16)' as unknown as `rgba(${number}, ${number}, ${number}, ${number})`} className="!p-0 !bg-transparent !border-0 h-full">
-                <FlipCard
-                  label={card.label}
-                  labelAccent={card.accent}
-                  icon={card.icon}
-                  title={card.title}
-                  translation={card.translation}
-                  isFlipped={flippedId === card.title}
-                  isSpeaking={speakingId === card.title && isSpeaking}
-                  onFlip={() => setFlippedId((v) => (v === card.title ? null : card.title))}
-                  onSpeak={() => handleSpeak(card.title, card.title)}
-                />
-              </SpotlightCard>
-            </motion.div>
+          {phraseCards.map((card) => (
+            <MemoPhraseCard key={card.title} card={card} isFlipped={flippedId === card.title} isSpeaking={speakingId === card.title && isSpeaking} onFlip={() => handleFlip(card.title)} onSpeak={() => handleSpeak(card.title, card.title)} />
           ))}
         </div>
       </motion.section>
