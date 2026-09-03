@@ -660,77 +660,25 @@ function Comet({
 }) {
   const head = useRef<THREE.Sprite>(null)
   const glowTex = useMemo(() => makeGlowTexture(color), [color])
-  const trail = useMemo(() => {
-    const N = 42
-    const arr = new Float32Array(N * 3)
-    const axis = new THREE.Vector3(1, 0, 0)
-    for (let i = 0; i < N; i++) {
-      const a = offset - (N - 1 - i) * 0.045 * Math.sign(speed || 1)
-      const p = new THREE.Vector3(
-        Math.cos(a) * radius,
-        Math.sin(a * 0.9) * radius * 0.35,
-        Math.sin(a) * radius,
-      ).applyAxisAngle(axis, tilt)
-      arr[i * 3] = p.x
-      arr[i * 3 + 1] = p.y
-      arr[i * 3 + 2] = p.z
-    }
-    const geo = new THREE.BufferGeometry()
-    geo.setAttribute('position', new THREE.BufferAttribute(arr, 3))
-    return { geo, N }
-  }, [radius, speed, tilt, offset])
+  const axis = useMemo(() => new THREE.Vector3(1, 0, 0), [])
 
-  useEffect(
-    () => () => {
-      trail.geo.dispose()
-      glowTex.dispose()
-    },
-    [trail, glowTex],
-  )
+  useEffect(() => () => glowTex.dispose(), [glowTex])
 
   useFrame((state) => {
     const t = state.clock.elapsedTime * speed + offset
-    const head3 = new THREE.Vector3(
-      Math.cos(t) * radius,
-      Math.sin(t * 0.9) * radius * 0.35,
-      Math.sin(t) * radius,
-    ).applyAxisAngle(new THREE.Vector3(1, 0, 0), tilt)
-    if (head.current) head.current.position.copy(head3)
-
-    const attr = trail.geo.getAttribute('position') as THREE.BufferAttribute
-    const arr = attr.array as Float32Array
-    arr.copyWithin(3, 0, (trail.N - 1) * 3)
-    arr[(trail.N - 1) * 3] = head3.x
-    arr[(trail.N - 1) * 3 + 1] = head3.y
-    arr[(trail.N - 1) * 3 + 2] = head3.z
-    attr.needsUpdate = true
-  })
-
-  const lineObj = useMemo(
-    () =>
-      new THREE.Line(
-        trail.geo,
-        new THREE.LineBasicMaterial({
-          color,
-          transparent: true,
-          opacity: 0.45,
-          blending: THREE.AdditiveBlending,
-          depthWrite: false,
-        }),
-      ),
-    [trail, color],
-  )
-
-  useEffect(() => {
-    const mat = lineObj.material as THREE.Material
-    return () => {
-      mat.dispose()
+    if (head.current) {
+      head.current.position
+        .set(
+          Math.cos(t) * radius,
+          Math.sin(t * 0.9) * radius * 0.35,
+          Math.sin(t) * radius,
+        )
+        .applyAxisAngle(axis, tilt)
     }
-  }, [lineObj])
+  })
 
   return (
     <group>
-      <primitive object={lineObj} />
       <sprite ref={head} scale={[0.42, 0.42, 1]}>
         <spriteMaterial
           map={glowTex}
