@@ -359,6 +359,164 @@ function WordSprite({
   )
 }
 
+/**
+ * Threads from the core to every word.
+ * Appear when the cursor is over the scene; the thread nearest
+ * to the cursor glows brighter. Colors are animated per-vertex
+ * (additive blending turns black into invisible).
+ */
+function CoreThreads({
+  positions,
+  words,
+  group,
+  pointer,
+  fx,
+}: {
+  positions: THREE.Vector3[]
+  words: Word[]
+  group: React.RefObject<THREE.Group | null>
+  pointer: React.RefObject<{ x: number; y: number }>
+  fx: React.RefObject<{ glow: number }>
+}) {
+  const ref = useRef<THREE.LineSegments>(null)
+  const { camera } = useThree()
+
+  const { geometry, baseColors } = useMemo(() => {
+    const verts: number[] = []
+    const colors: number[] = []
+    const tmp = new THREE.Color()
+    positions.forEach((p, i) => {
+      verts.push(0, 0, 0, p.x, p.y, p.z)
+      tmp.set(words[i].color)
+      // core end brighter, word end softer
+      colors.push(tmp.r * 1.4, tmp.g * 1.4, tmp.b * 1.4, tmp.r * 0.7, tmp.g * 0.7, tmp.b * 0.7)
+    })
+    const geometry = new THREE.BufferGeometry()
+    geometry.setAttribute('position', new THREE.Float32BufferAttribute(verts, 3))
+    const baseColors = new Float32Array(colors)
+    geometry.setAttribute('color', new THREE.BufferAttribute(baseColors.slice(), 3))
+    return { geometry, baseColors }
+  }, [positions, words])
+
+  useEffect(() => () => geometry.dispose(), [geometry])
+
+  const screen = useMemo(() => new THREE.Vector3(), [])
+
+  useFrame(() => {
+    const mat = ref.current?.material as THREE.LineBasicMaterial | undefined
+    const attr = geometry.getAttribute('color') as THREE.BufferAttribute
+    if (!mat || !attr || !group.current) return
+    const glow = fx.current?.glow ?? 0
+    const arr = attr.array as Float32Array
+    const px = pointer.current?.x ?? 0
+    const py = pointer.current?.y ?? 0
+
+    for (let i = 0; i < positions.length; i++) {
+      // project word to screen, boost the thread nearest the cursor
+      screen.copy(positions[i]).applyMatrix4(group.current.matrixWorld).project(camera)
+      const dist = Math.hypot(screen.x - px, screen.y - py)
+      const near = Math.max(0, 1 - dist / 0.7)
+      const intensity = glow * (0.22 + 0.78 * near * near)
+      for (let v = 0; v < 2; v++) {
+        const o = (i * 2 + v) * 3
+        const boost = v === 0 ? 1.25 : 0.85
+        arr[o] = baseColors[o] * intensity * boost
+        arr[o + 1] = baseColors[o + 1] * intensity * boost
+        arr[o + 2] = baseColors[o + 2] * intensity * boost
+      }
+    }
+    attr.needsUpdate = true
+    mat.opacity = Math.min(1, 0.25 + glow)
+  })
+
+  return (
+    <lineSegments ref={ref} geometry={geometry} frustumCulled={false}>
+      <lineBasicMaterial
+        vertexColors
+        transparent
+        opacity={0}
+        blending={THREE.AdditiveBlending}
+        depthWrite={false}
+      />
+    </lineSegments>
+  )
+}
+
+/**
+ * Energy pulses travelling from the core to the words along the threads.
+ */
+function EnergyFlow({
+  positions,
+  fx,
+}: {
+  positions: THREE.Vector3[]
+  fx: React.RefObject<{ glow: number }>
+}) {
+  const ref = useRef<THREE.Points>(null)
+  const COUNT = 10
+
+  const seeds = useMemo(
+    () =>
+      Array.from({ length: COUNT }, (_, i) => ({
+        word: (i * 5 + 1) % positions.length,
+        phase: (i / COUNT + Math.random() * 0.08) % 1,
+        speed: 0.32 + Math.random() * 0.22,
+      })),
+    [positions.length],
+  )
+
+  const geometry = useMemo(() => {
+    const geo = new THREE.BufferGeometry()
+    geo.setAttribute('position', new THREE.BufferAttribute(new Float32Array(COUNT * 3), 3))
+    return geo
+  }, [])
+
+  useEffect(() => () => geometry.dispose(), [geometry])
+
+  const tmp = useMemo(() => new THREE.Vector3(), [])
+  const reduced = useMemo(
+    () => window.matchMedia('(prefers-reduced-motion: reduce)').matches,
+    [],
+  )
+
+  useFrame((state) => {
+    const attr = geometry.getAttribute('position') as THREE.BufferAttribute
+    const arr = attr.array as Float32Array
+    const t = state.clock.elapsedTime
+    const glow = fx.current?.glow ?? 0
+    for (let i = 0; i < COUNT; i++) {
+      const s = seeds[i]
+      const k = (t * s.speed * (reduced ? 0 : 1) + s.phase) % 1
+      // ease in-out so pulses linger at the ends
+      const e = k < 0.5 ? 2 * k * k : 1 - Math.pow(-2 * k + 2, 2) / 2
+      tmp.copy(positions[s.word]).multiplyScalar(e)
+      arr[i * 3] = tmp.x
+      arr[i * 3 + 1] = tmp.y
+      arr[i * 3 + 2] = tmp.z
+    }
+    attr.needsUpdate = true
+    const mat = ref.current?.material as THREE.PointsMaterial | undefined
+    if (mat) {
+      mat.opacity = glow * 0.95
+      mat.size = 0.085 * (0.8 + 0.4 * Math.sin(t * 3))
+    }
+  })
+
+  return (
+    <points ref={ref} geometry={geometry} frustumCulled={false}>
+      <pointsMaterial
+        color="#c8fff0"
+        size={0.085}
+        transparent
+        opacity={0}
+        depthWrite={false}
+        blending={THREE.AdditiveBlending}
+        sizeAttenuation
+      />
+    </points>
+  )
+}
+
 function Constellation({ positions }: { positions: THREE.Vector3[] }) {
   const ref = useRef<THREE.LineSegments>(null)
   const geometry = useMemo(() => {
@@ -590,15 +748,18 @@ function Comet({
 function Scene({
   onSelect,
   pointer,
+  interact,
 }: {
   onSelect: (w: Word | null) => void
   pointer: React.RefObject<{ x: number; y: number }>
+  interact: React.RefObject<{ inside: boolean }>
 }) {
   const group = useRef<THREE.Group>(null)
   const glow = useRef<THREE.Sprite>(null)
   const { camera } = useThree()
   const drag = useRef({ down: false, x: 0, y: 0, vx: 0, tilt: 0 })
   const orbit = useRef(0)
+  const fx = useRef({ glow: 0 })
   const [bursts, setBursts] = useState<Burst[]>([])
   const burstId = useRef(0)
 
@@ -637,6 +798,10 @@ function Scene({
   useFrame((state, delta) => {
     const d = Math.min(delta, 0.05)
     const t = state.clock.elapsedTime
+    // threads glow follows cursor presence over the scene
+    const target = interact.current?.inside ? 1 : 0
+    fx.current.glow += (target - fx.current.glow) * (1 - Math.exp(-d * 3.2))
+    if (fx.current.glow < 0.003 && target === 0) fx.current.glow = 0
     const g = group.current
     if (g) {
       const dr = drag.current
@@ -707,6 +872,8 @@ function Scene({
 
           <BlobCore />
           <Constellation positions={positions} />
+          <CoreThreads positions={positions} words={WORDS} group={group} pointer={pointer} fx={fx} />
+          <EnergyFlow positions={positions} fx={fx} />
 
           {WORDS.map((w, i) => (
             <WordSprite key={w.text} word={w} position={positions[i]} onSelect={spawnBurst} />
@@ -735,6 +902,7 @@ function Scene({
 export default function WordSphere() {
   const [selected, setSelected] = useState<Word | null>(null)
   const pointer = useRef({ x: 0, y: 0 })
+  const interact = useRef({ inside: false })
 
   return (
     <div
@@ -746,6 +914,13 @@ export default function WordSphere() {
           y: -(((e.clientY - rect.top) / rect.height) * 2 - 1),
         }
       }}
+      onPointerEnter={() => {
+        interact.current.inside = true
+      }}
+      onPointerLeave={() => {
+        interact.current.inside = false
+        pointer.current = { x: 0, y: 0 }
+      }}
     >
       <Canvas
         dpr={[1, 1.75]}
@@ -756,7 +931,7 @@ export default function WordSphere() {
         }}
       >
         <Suspense fallback={null}>
-          <Scene onSelect={setSelected} pointer={pointer} />
+          <Scene onSelect={setSelected} pointer={pointer} interact={interact} />
         </Suspense>
       </Canvas>
 
@@ -778,7 +953,7 @@ export default function WordSphere() {
         )}
       </AnimatePresence>
 
-      <div className="auth-scene__hint">тяни сферу · кликни по слову</div>
+      <div className="auth-scene__hint">наведи — тянутся нити · кликни по слову</div>
     </div>
   )
 }
