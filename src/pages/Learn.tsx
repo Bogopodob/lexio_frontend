@@ -64,7 +64,7 @@ export default function Learn() {
   const [profiles, setProfiles] = useState<RemoteLearningProfile[]>([])
   const [langMap, setLangMap] = useState<Record<string, string>>({})
   const [profileId, setProfileId] = useState<string | null>(null)
-  const [activeSession, setActiveSession] = useState<RemoteSession | null>(null)
+  const [sessions, setSessions] = useState<RemoteSession[]>([])
   const [source, setSource] = useState<'mixed' | 'due' | 'new'>('mixed')
   const [limit, setLimit] = useState(20)
   const [offset, setOffset] = useState(0)
@@ -73,15 +73,30 @@ export default function Learn() {
   const [availability, setAvailability] = useState<Availability | null>(null)
   const [categoryNames, setCategoryNames] = useState<Record<string, string>>({})
 
+  // Resume is scoped to the current topic: each category keeps its own
+  // continuation, a fresh start abandons only the matching one (backend).
+  // NOTE: must stay below the categoryId declaration (TDZ otherwise).
+  const resumeSession =
+    sessions.find(
+      (s) => s.status === 'active' && (s.category_id ?? null) === (categoryId ?? null),
+    ) ?? null
+
   const SOURCE_LABELS: Record<string, string> = {
     mixed: 'Всё сразу',
     due: 'Повторение',
     new: 'Новые слова',
   }
 
+  const refreshSessions = useCallback(() => {
+    if (!user || !token || !profileId) return
+    listSessions(user.id, token, profileId)
+      .then(setSessions)
+      .catch(() => undefined)
+  }, [user, token, profileId])
+
   // Resolve the resume banner's category name.
   useEffect(() => {
-    const id = activeSession?.category_id
+    const id = resumeSession?.category_id
     if (!id || categoryNames[id]) return
     let cancelled = false
     listCategories()
@@ -99,7 +114,7 @@ export default function Learn() {
     return () => {
       cancelled = true
     }
-  }, [activeSession?.category_id, categoryNames])
+  }, [resumeSession?.category_id, categoryNames])
 
   // Preselected category from topic/grammar cards (?category=<id>).
   useEffect(() => {
@@ -113,6 +128,11 @@ export default function Learn() {
     setCategoryId(id)
     setSource('new')
     setOffset(0)
+    // Same route, new topic: drop any in-progress study screen back to menu.
+    setPhase('menu')
+    setSession(null)
+    setCard(null)
+    setFlipped(false)
     listCategories()
       .then((list) => {
         if (cancelled) return
@@ -162,8 +182,7 @@ export default function Learn() {
           listSessions(uid, tk, active.id)
             .then((list) => {
               if (cancelled) return
-              const resumable = list.find((s) => s.status === 'active')
-              setActiveSession(resumable ?? null)
+              setSessions(list)
               setPhase('menu')
             })
             .catch(() => {
@@ -238,7 +257,16 @@ export default function Learn() {
           offset: source === 'due' ? 0 : offset,
         })
         setSession(created)
-        setActiveSession(created.status === 'active' ? created : null)
+        setSessions((prev) => {
+          const rest = prev.filter(
+            (s) =>
+              !(
+                s.status === 'active' &&
+                (s.category_id ?? null) === (created.category_id ?? null)
+              ),
+          )
+          return [created, ...rest]
+        })
         setSessionCorrect(0)
         setSessionXp(0)
         setUnlocked([])
@@ -292,9 +320,9 @@ export default function Learn() {
     } catch {
       /* ignore */
     }
-    setActiveSession(null)
+    refreshSessions()
     setPhase('finished')
-  }, [user, token, session])
+  }, [user, token, session, refreshSessions])
 
   const speakCard = useCallback(() => {
     if (!card) return
@@ -401,27 +429,27 @@ export default function Learn() {
 
       {phase === 'menu' && (
         <div className="flex flex-col gap-4">
-          {activeSession && activeSession.status === 'active' && (
+          {resumeSession && (
             <button
-              onClick={() => beginSession(activeSession.id)}
+              onClick={() => beginSession(resumeSession.id)}
               className="rounded-[20px] border border-[#F5C16A]/30 bg-[#F5C16A]/[0.07] p-5 text-left hover:bg-[#F5C16A]/[0.1] transition-colors"
             >
               <div className="flex items-center gap-2 text-[#F5C16A] text-[12px] font-black uppercase tracking-wide">
                 <FontAwesomeIcon icon={faRotateRight} /> Продолжить с места остановки
               </div>
               <div className="text-[13px] font-bold text-white/70 mt-1">
-                {SOURCE_LABELS[activeSession.source] ?? activeSession.source}
-                {activeSession.category_id
-                  ? ` • ${categoryNames[activeSession.category_id] ?? 'тема'}`
+                {SOURCE_LABELS[resumeSession.source] ?? resumeSession.source}
+                {resumeSession.category_id
+                  ? ` • ${categoryNames[resumeSession.category_id] ?? 'тема'}`
                   : ' • все слова'}
               </div>
               <div className="text-[22px] font-black mt-1 tabular-nums">
-                {activeSession.answered}/{activeSession.total}
+                {resumeSession.answered}/{resumeSession.total}
               </div>
               <div className="h-1.5 rounded-full bg-white/[0.08] overflow-hidden mt-2">
                 <div
                   className="h-full rounded-full bg-[#F5C16A]"
-                  style={{ width: `${activeSession.total > 0 ? Math.round((activeSession.answered / activeSession.total) * 100) : 0}%` }}
+                  style={{ width: `${resumeSession.total > 0 ? Math.round((resumeSession.answered / resumeSession.total) * 100) : 0}%` }}
                 />
               </div>
             </button>
@@ -532,11 +560,11 @@ export default function Learn() {
                     key={p.id}
                     onClick={() => {
                       setProfileId(p.id)
-                      setActiveSession(null)
+                      setSessions([])
                       setOffset(0)
                       if (user && token) {
                         listSessions(user.id, token, p.id)
-                          .then((list) => setActiveSession(list.find((s) => s.status === 'active') ?? null))
+                          .then(setSessions)
                           .catch(() => undefined)
                       }
                     }}
@@ -738,7 +766,7 @@ export default function Learn() {
                 setUnlocked([])
                 if (user && token && profileId) {
                   listSessions(user.id, token, profileId)
-                    .then((list) => setActiveSession(list.find((s) => s.status === 'active') ?? null))
+                    .then(setSessions)
                     .catch(() => undefined)
                 }
               }}
