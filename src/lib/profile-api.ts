@@ -95,6 +95,101 @@ export function listLearningProfiles(
   return request<RemoteLearningProfile[]>(`/learning/users/${userId}/profiles`, token)
 }
 
+export interface RemoteGoal {
+  id: string
+  profile_id: string
+  title: string
+  desc: string | null
+  color: string | null
+  progress: number
+  sort: number
+}
+
+export function listGoals(userId: string, token: string, profileId: string): Promise<RemoteGoal[]> {
+  return request(`/learning/users/${userId}/profiles/${profileId}/goals`, token)
+}
+
+export function createGoal(
+  userId: string,
+  token: string,
+  profileId: string,
+  goal: { title: string; desc?: string; color?: string },
+): Promise<RemoteGoal> {
+  return request(`/learning/users/${userId}/profiles/${profileId}/goals`, token, {
+    method: 'POST',
+    body: JSON.stringify(goal),
+  })
+}
+
+export function updateGoal(
+  userId: string,
+  token: string,
+  profileId: string,
+  goalId: string,
+  patch: { title?: string; desc?: string; color?: string; progress?: number },
+): Promise<RemoteGoal> {
+  return request(`/learning/users/${userId}/profiles/${profileId}/goals/${goalId}`, token, {
+    method: 'PATCH',
+    body: JSON.stringify(patch),
+  })
+}
+
+export function deleteGoal(
+  userId: string,
+  token: string,
+  profileId: string,
+  goalId: string,
+): Promise<void> {
+  return request(`/learning/users/${userId}/profiles/${profileId}/goals/${goalId}`, token, {
+    method: 'DELETE',
+  }).then(() => undefined)
+}
+
+export interface RemoteAchievement {
+  id: string
+  code: string
+  title: string
+  desc: string | null
+  condition: string
+  rarity: string
+  color: string | null
+  reward_xp: number
+  target: number
+  progress: number
+  unlocked: boolean
+  unlocked_at: string | null
+}
+
+export function listAchievements(
+  userId: string,
+  token: string,
+  profileId: string,
+): Promise<RemoteAchievement[]> {
+  return request(`/learning/users/${userId}/profiles/${profileId}/achievements`, token)
+}
+
+export interface RemoteStat {
+  id: string
+  profile_id: string
+  words_learned: number
+  streak_days: number
+  best_streak: number
+  xp: number
+  accuracy: number
+  last_activity_at: string | null
+}
+
+export function getStats(userId: string, token: string, profileId: string): Promise<RemoteStat> {
+  return request(`/learning/users/${userId}/profiles/${profileId}/stats`, token)
+}
+
+export function getDueCount(userId: string, token: string, profileId: string): Promise<number> {
+  return request<Array<unknown>>(
+    `/learning/users/${userId}/profiles/${profileId}/due?limit=100`,
+    token,
+  ).then((list) => list.length)
+}
+
 export function updateLearningProfile(
   userId: string,
   token: string,

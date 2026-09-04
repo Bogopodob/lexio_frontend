@@ -27,18 +27,26 @@ import { useState, useEffect, useRef, useCallback, useMemo, memo, lazy, Suspense
 import { createPortal } from 'react-dom'
 import { useAuth } from '@/context/AuthContext'
 import {
+  createGoal,
   createLearningProfile,
+  deleteGoal,
   getProfile,
+  listAchievements,
+  listGoals,
   listLanguages,
   listLearningProfiles,
+  updateGoal,
   updateLearningProfile,
   updateProfile,
+  type RemoteAchievement,
+  type RemoteGoal,
+  type RemoteLearningProfile,
 } from '@/lib/profile-api'
 import { DatePicker, DateField, Calendar } from '@heroui/react'
 import { parseDate, getLocalTimeZone, today } from '@internationalized/date'
 import type { DateValue } from '@internationalized/date'
 
-const achievements = [
+const achievementsFallback = [
   { icon: faFire, title: '3 дня подряд', desc: 'Серия', condition: 'Учи 3 дня без пропуска', total: 3, current: 3, progress: 100, rarity: 'common', color: '#ff9d5c', reward: '+50 XP' },
   { icon: faDumbbell, title: '50 слов', desc: 'Первый словарь', condition: 'Выучи 50 слов', total: 50, current: 50, progress: 100, rarity: 'common', color: '#5AD4B5', reward: '+100 XP' },
   { icon: faBullseye, title: 'Первый урок', desc: 'Старт дан', condition: 'Пройди первый урок', total: 1, current: 1, progress: 100, rarity: 'common', color: '#5B74FF', reward: '+25 XP' },
@@ -53,9 +61,9 @@ const achievements = [
   { icon: faHeart, title: 'Любимчик', desc: '5 тем изучено', condition: 'Закрой 5 тем', total: 5, current: 1, progress: 20, rarity: 'common', color: '#F08AB4', reward: '+70 XP' },
 ]
 
-const AchievementsBlock = memo(function AchievementsBlock({ items }: { items: typeof achievements }) {
+const AchievementsBlock = memo(function AchievementsBlock({ items }: { items: typeof achievementsFallback }) {
   const [filter, setFilter] = useState<'all' | 'done' | 'progress'>('all')
-  const [hovered, setHovered] = useState<(typeof achievements)[number] | null>(null)
+  const [hovered, setHovered] = useState<(typeof achievementsFallback)[number] | null>(null)
   const [pos, setPos] = useState({ x: 0, y: 0 })
   const hoverTimeout = useRef<number | null>(null)
   const itemCircumferences = useMemo(() => items.map((a) => {
@@ -71,7 +79,7 @@ const AchievementsBlock = memo(function AchievementsBlock({ items }: { items: ty
   }), [items, filter])
   const doneCount = useMemo(() => items.filter((a) => a.progress === 100).length, [items])
 
-  const onEnter = useCallback((a: (typeof achievements)[number], e: React.MouseEvent) => {
+  const onEnter = useCallback((a: (typeof achievementsFallback)[number], e: React.MouseEvent) => {
     if (hoverTimeout.current) window.clearTimeout(hoverTimeout.current)
     const rect = e.currentTarget.getBoundingClientRect()
     setPos({ x: rect.left + rect.width / 2, y: rect.top })
@@ -309,6 +317,7 @@ export default function Profile() {
   const [langIdByCode, setLangIdByCode] = useState<Record<string, string>>({})
   const [hasLearningProfile, setHasLearningProfile] = useState(false)
   const [activeProfileId, setActiveProfileId] = useState<string | null>(null)
+  const [learningProfiles, setLearningProfiles] = useState<RemoteLearningProfile[]>([])
   const [goal, setGoal] = useState(20)
   const fileRef = useRef<HTMLInputElement>(null)
   const { user, token, ready: authReady } = useAuth()
@@ -319,11 +328,12 @@ export default function Profile() {
     { id: 'de', label: 'Deutsch', sub: 'Немецкий' },
     { id: 'fr', label: 'Français', sub: 'Французский' },
   ]
-  const [goals, setGoals] = useState([
-    { title: 'Заговорить в кафе', desc: 'Заказать еду без пауз', progress: 68, color: '#5AD4B5' },
-    { title: '20 фраз для путешествий', desc: 'Аэропорт, отель, город', progress: 42, color: '#5B74FF' },
-    { title: 'Серия 14 дней', desc: 'Не пропускать', progress: 50, color: '#F5C16A' },
+  const [goals, setGoals] = useState<(RemoteGoal & { desc: string; color: string })[]>([
+    { id: 'mock-1', profile_id: '', title: 'Заговорить в кафе', desc: 'Заказать еду без пауз', progress: 68, color: '#5AD4B5', sort: 0 },
+    { id: 'mock-2', profile_id: '', title: '20 фраз для путешествий', desc: 'Аэропорт, отель, город', progress: 42, color: '#5B74FF', sort: 1 },
+    { id: 'mock-3', profile_id: '', title: 'Серия 14 дней', desc: 'Не пропускать', progress: 50, color: '#F5C16A', sort: 2 },
   ])
+  const [achievements, setAchievements] = useState<typeof achievementsFallback | null>(null)
   const [friends, setFriends] = useState([
     { name: 'Марина', level: 'B1', streak: 12, avatar: 'М' },
     { name: 'Игорь', level: 'A2', streak: 7, avatar: 'И' },
@@ -388,6 +398,7 @@ export default function Profile() {
           setLangIdByCode(idByCode)
         }
         const profiles = profilesRes.status === 'fulfilled' ? profilesRes.value : []
+        setLearningProfiles(profiles)
         const active = profiles.find((p) => p.is_active) ?? profiles[0] ?? null
         setHasLearningProfile(active !== null)
         setActiveProfileId(active ? active.id : null)
@@ -441,21 +452,36 @@ export default function Profile() {
     }
     if (snapshot.avatar && snapshot.avatar.length <= 2000) payload.avatar = snapshot.avatar
     updateProfile(user.id, token, payload)
-      .then(() => {
-        if (!hasLearningProfile) {
-          const targetId = langIdByCode[snapshot.language]
-          const nativeId = langIdByCode.ru
-          if (targetId && nativeId) {
-            return createLearningProfile(user.id, token as string, targetId, nativeId)
-              .then(() => setHasLearningProfile(true))
-              .catch(() => undefined)
+      .then(async () => {
+        // Language IS the learning profile: ensure one exists for the chosen
+        // language and make it active (backend deactivates the rest).
+        const targetId = langIdByCode[snapshot.language]
+        const nativeId = langIdByCode.ru
+        if (!targetId || !nativeId) return
+        try {
+          let profile = learningProfiles.find((p) => p.target_language_id === targetId)
+          if (!profile) {
+            profile = await createLearningProfile(user.id, token as string, targetId, nativeId)
+            setLearningProfiles((prev) => [...prev, profile as RemoteLearningProfile])
           }
+          const updated = await updateLearningProfile(user.id, token as string, profile.id, {
+            is_active: true,
+          })
+          setLearningProfiles((prev) =>
+            prev.map((p) => (p.id === updated.id ? updated : { ...p, is_active: false })),
+          )
+          setActiveProfileId(updated.id)
+          setHasLearningProfile(true)
+          if (updated.level) {
+            setProfile((prev) => ({ ...prev, level: (updated as RemoteLearningProfile).level }))
+          }
+        } catch {
+          // profile stays local-only; base data is already saved
         }
-        return undefined
       })
       .catch(() => setSaveError('Не сохранилось на сервер — проверь соединение'))
       .finally(() => setSaving(false))
-  }, [draft, user, token, hasLearningProfile, langIdByCode, birthDateError])
+  }, [draft, user, token, learningProfiles, langIdByCode, birthDateError])
   const onAvatarChange = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
     const f = e.target.files?.[0]
     if (!f) return
@@ -558,6 +584,124 @@ export default function Profile() {
       return next
     })
   }, [])
+
+  const ACHIEVEMENT_ICONS: Record<string, typeof faFire> = {
+    streak_3: faFire,
+    words_50: faDumbbell,
+    first_lesson: faBullseye,
+    goal_streak_5: faStar,
+    words_100: faTrophy,
+    words_500: faCrown,
+    phrases_50: faComments,
+    streak_7: faBolt,
+    accuracy_95: faMedal,
+  }
+
+  // Goals + achievements of the active language profile (guests keep mocks).
+  useEffect(() => {
+    if (!user || !token || !activeProfileId) return
+    let cancelled = false
+    const uid = user.id
+    const tk = token
+    const pid = activeProfileId
+    listGoals(uid, tk, pid)
+      .then((list) => {
+        if (cancelled || list.length === 0) return
+        setGoals(
+          list.map((g, i) => ({
+            id: g.id,
+            profile_id: g.profile_id,
+            title: g.title,
+            desc: g.desc ?? '',
+            color: g.color ?? ['#5AD4B5', '#5B74FF', '#F5C16A'][i % 3],
+            progress: g.progress,
+            sort: g.sort,
+          })),
+        )
+      })
+      .catch(() => undefined)
+    listAchievements(uid, tk, pid)
+      .then((list) => {
+        if (cancelled || list.length === 0) return
+        setAchievements(
+          list.map((a) => ({
+            icon: ACHIEVEMENT_ICONS[a.code] ?? faStar,
+            title: a.title,
+            desc: a.desc ?? '',
+            condition: a.condition,
+            total: a.target,
+            current: Math.min(a.progress, a.target),
+            progress: a.target > 0 ? Math.round((Math.min(a.progress, a.target) / a.target) * 100) : 0,
+            rarity: a.rarity,
+            color: a.color ?? '#5AD4B5',
+            reward: `+${a.reward_xp} XP`,
+          })),
+        )
+      })
+      .catch(() => undefined)
+    return () => {
+      cancelled = true
+    }
+  }, [user, token, activeProfileId])
+
+  const goalKey = (g: { id?: string; title: string }) => g.id ?? g.title
+
+  const removeGoal = useCallback(
+    (g: { id?: string; title: string }) => {
+      const key = goalKey(g)
+      setGoals((prev) => prev.filter((x) => goalKey(x) !== key))
+      if (user && token && activeProfileId && g.id && !g.id.startsWith('mock-')) {
+        deleteGoal(user.id, token, activeProfileId, g.id).catch(() => undefined)
+      }
+    },
+    [user, token, activeProfileId],
+  )
+
+  const addGoal = useCallback(
+    (preset: { title: string; desc: string; color: string }) => {
+      if (goals.length >= 3) return
+      if (user && token && activeProfileId) {
+        createGoal(user.id, token, activeProfileId, preset)
+          .then((created) =>
+            setGoals((prev) =>
+              prev.length >= 3
+                ? prev
+                : [
+                    ...prev,
+                    {
+                      id: created.id,
+                      profile_id: created.profile_id,
+                      title: created.title,
+                      desc: created.desc ?? preset.desc,
+                      color: created.color ?? preset.color,
+                      progress: created.progress,
+                      sort: created.sort,
+                    },
+                  ],
+            ),
+          )
+          .catch(() => undefined)
+        return
+      }
+      setGoals((prev) =>
+        prev.length >= 3
+          ? prev
+          : [...prev, { id: `mock-${Date.now()}`, profile_id: '', sort: prev.length, ...preset, progress: 0 }],
+      )
+    },
+    [goals.length, user, token, activeProfileId],
+  )
+
+  const patchGoal = useCallback(
+    (g: { id?: string; title: string }, patch: { title?: string; desc?: string; progress?: number }) => {
+      const key = goalKey(g)
+      setGoals((prev) => prev.map((x) => (goalKey(x) === key ? { ...x, ...patch } : x)))
+      if (user && token && activeProfileId && g.id && !g.id.startsWith('mock-')) {
+        updateGoal(user.id, token, activeProfileId, g.id, patch).catch(() => undefined)
+      }
+    },
+    [user, token, activeProfileId],
+  )
 
   const goalMood = goal <= 10 ? '🐢 Спокойный темп — главное каждый день'
     : goal <= 20 ? '💪 Уверенный темп — так держать'
@@ -697,19 +841,26 @@ export default function Profile() {
           <span className="text-[11px] opacity-40 font-bold">май • 2026</span>
         </div>
         <div className="mt-4 grid gap-3 sm:grid-cols-3">
-          {(isEditing ? goals : goals).map((g) => (
-            <div key={g.title} className="rounded-xl bg-white/[0.03] border border-white/[0.04] p-3.5 relative">
+          {goals.map((g) => (
+            <div key={g.id ?? g.title} className="rounded-xl bg-white/[0.03] border border-white/[0.04] p-3.5 relative">
               {isEditing && (
-                <button onClick={() => setGoals((prev) => prev.filter((x) => x.title !== g.title))} className="absolute -top-1.5 -right-1.5 w-5 h-5 rounded-full bg-[#f43f5e] text-white grid place-items-center text-[10px] border border-[#171717]">×</button>
+                <button onClick={() => removeGoal(g)} className="absolute -top-1.5 -right-1.5 w-5 h-5 rounded-full bg-[#f43f5e] text-white grid place-items-center text-[10px] border border-[#171717]">×</button>
               )}
               <div className="flex items-center justify-between">
-                {isEditing ? <input value={g.title} onChange={(e) => setGoals((prev) => prev.map((x) => (x.title === g.title ? { ...x, title: e.target.value } : x)))} className="text-[13px] font-bold bg-transparent border-b border-white/10 focus:outline-none focus:border-white/20 w-full" /> : <span className="text-[13px] font-bold">{g.title}</span>}
+                {isEditing ? <input value={g.title} onChange={(e) => setGoals((prev) => prev.map((x) => (goalKey(x) === goalKey(g) ? { ...x, title: e.target.value } : x)))} onBlur={(e) => patchGoal(g, { title: e.target.value })} className="text-[13px] font-bold bg-transparent border-b border-white/10 focus:outline-none focus:border-white/20 w-full" /> : <span className="text-[13px] font-bold">{g.title}</span>}
                 <span className="text-xs font-black ml-2" style={{ color: g.color }}>{g.progress}%</span>
               </div>
-              {isEditing ? <input value={g.desc} onChange={(e) => setGoals((prev) => prev.map((x) => (x.title === g.title ? { ...x, desc: e.target.value } : x)))} className="text-xs opacity-50 bg-transparent border-b border-white/10 w-full mt-1 focus:outline-none" /> : <div className="text-xs opacity-50">{g.desc}</div>}
+              {isEditing ? <input value={g.desc} onChange={(e) => setGoals((prev) => prev.map((x) => (goalKey(x) === goalKey(g) ? { ...x, desc: e.target.value } : x)))} onBlur={(e) => patchGoal(g, { desc: e.target.value })} className="text-xs opacity-50 bg-transparent border-b border-white/10 w-full mt-1 focus:outline-none" /> : <div className="text-xs opacity-50">{g.desc}</div>}
               <div className="h-1.5 rounded-full bg-white/[0.06] overflow-hidden mt-2.5">
-                <motion.div initial={{ width: 0 }} whileInView={{ width: `${g.progress}%` }} viewport={{ once: true }} transition={{ duration: 0.8 }} className="h-full rounded-full" style={{ background: g.color }} />
+                <motion.div initial={false} animate={{ width: `${g.progress}%` }} transition={{ duration: 0.5 }} className="h-full rounded-full" style={{ background: g.color }} />
               </div>
+              {isEditing && (
+                <div className="flex items-center gap-1.5 mt-2">
+                  <button onClick={() => patchGoal(g, { progress: Math.max(0, g.progress - 10) })} className="w-5 h-5 rounded-full bg-white/[0.06] border border-white/[0.06] grid place-items-center text-[11px] hover:bg-white/10">−</button>
+                  <button onClick={() => patchGoal(g, { progress: Math.min(100, g.progress + 10) })} className="w-5 h-5 rounded-full bg-white/[0.06] border border-white/[0.06] grid place-items-center text-[11px] hover:bg-white/10">+</button>
+                  <span className="text-[10px] opacity-40 ml-1">прогресс ±10</span>
+                </div>
+              )}
             </div>
           ))}
         </div>
@@ -726,7 +877,7 @@ export default function Profile() {
               ].filter(g => !goals.some(x => x.title === g.title)).map((g) => (
                 <button
                   key={g.title}
-                  onClick={() => { if (goals.length < 3) setGoals([...goals, { ...g, progress: 0 }]) }}
+                  onClick={() => addGoal(g)}
                   disabled={goals.length >= 3}
                   className={`px-2.5 py-1.5 rounded-full text-xs font-bold border ${goals.length >= 3 ? 'opacity-30 cursor-not-allowed bg-white/[0.04] border-white/[0.06]' : 'bg-white/[0.04] border-white/[0.06] hover:bg-white/[0.08] hover:border-white/[0.10]'}`}
                 >
@@ -834,7 +985,7 @@ export default function Profile() {
       </div>
 
       {/* achievements — переделано: много, hover с прогрессом */}
-      <AchievementsBlock items={achievements} />
+      <AchievementsBlock items={achievements ?? achievementsFallback} />
 
       {/* friends / community */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">

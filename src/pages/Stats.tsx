@@ -1,5 +1,14 @@
-import { useMemo, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { motion } from 'framer-motion'
+import { useAuth } from '@/context/AuthContext'
+import {
+  getDueCount,
+  getStats,
+  listLanguages,
+  listLearningProfiles,
+  type RemoteLearningProfile,
+  type RemoteStat,
+} from '@/lib/profile-api'
 import { AreaChart } from '@/components/charts/area-chart'
 import { Area } from '@/components/charts/area'
 import { Grid } from '@/components/charts/grid'
@@ -81,6 +90,56 @@ export default function Stats() {
   const isLight = theme === 'light'
   const [period, setPeriod] = useState<Period>('week')
   const [hoveredRing, setHoveredRing] = useState<number | null>(null)
+  const { user, token, ready: authReady } = useAuth()
+  const [statProfiles, setStatProfiles] = useState<RemoteLearningProfile[]>([])
+  const [statLangMap, setStatLangMap] = useState<Record<string, string>>({})
+  const [statProfileId, setStatProfileId] = useState<string | null>(null)
+  const [realStat, setRealStat] = useState<RemoteStat | null>(null)
+  const [dueCount, setDueCount] = useState<number | null>(null)
+
+  // Real per-language-profile stats (charts below stay demo until history API lands).
+  useEffect(() => {
+    if (!authReady || !user || !token) return
+    let cancelled = false
+    Promise.allSettled([listLanguages(), listLearningProfiles(user.id, token)]).then(
+      ([langsRes, profRes]) => {
+        if (cancelled) return
+        if (langsRes.status === 'fulfilled') {
+          const map: Record<string, string> = {}
+          langsRes.value.forEach((l) => {
+            map[l.id] = l.code.toUpperCase()
+          })
+          setStatLangMap(map)
+        }
+        if (profRes.status === 'fulfilled' && profRes.value.length > 0) {
+          setStatProfiles(profRes.value)
+          const active = profRes.value.find((p) => p.is_active) ?? profRes.value[0]
+          setStatProfileId(active.id)
+        }
+      },
+    )
+    return () => {
+      cancelled = true
+    }
+  }, [authReady, user, token])
+
+  useEffect(() => {
+    if (!user || !token || !statProfileId) return
+    let cancelled = false
+    getStats(user.id, token, statProfileId)
+      .then((s) => {
+        if (!cancelled) setRealStat(s)
+      })
+      .catch(() => undefined)
+    getDueCount(user.id, token, statProfileId)
+      .then((n) => {
+        if (!cancelled) setDueCount(n)
+      })
+      .catch(() => undefined)
+    return () => {
+      cancelled = true
+    }
+  }, [user, token, statProfileId])
 
   const daily = useMemo(() => genDaily(period), [period])
   const hourly = useMemo(() => genHourly(), [period])
@@ -195,6 +254,54 @@ export default function Stats() {
         </div>
         <span className="text-xs opacity-40">период • {mainSub}</span>
       </div>
+
+      {/* language profile + real stats */}
+      {statProfiles.length > 0 && (
+        <div className="rounded-[20px] border border-white/[0.06] bg-[#171717] p-5">
+          <div className="flex flex-wrap items-center gap-2">
+            {statProfiles.map((p) => {
+              const active = p.id === statProfileId
+              return (
+                <button
+                  key={p.id}
+                  onClick={() => setStatProfileId(p.id)}
+                  className={`px-3.5 py-1.5 rounded-full text-xs font-black border transition-all ${active ? 'bg-[#5AD4B5] text-black border-[#5AD4B5]' : 'bg-white/[0.04] border-white/[0.06] text-white/60 hover:bg-white/[0.08]'}`}
+                >
+                  {statLangMap[p.target_language_id] ?? p.level} • {p.level}
+                </button>
+              )
+            })}
+            <span className="text-[11px] opacity-40 font-bold ml-1">статистика профиля</span>
+          </div>
+          {realStat && (
+            <div className="mt-4 grid grid-cols-2 lg:grid-cols-5 gap-3">
+              {[
+                { label: 'Слов выучено', value: String(realStat.words_learned), color: '#5AD4B5' },
+                { label: 'Серия', value: `${realStat.streak_days} дн.`, color: '#F5C16A' },
+                { label: 'Рекорд серии', value: `${realStat.best_streak} дн.`, color: '#ff9d5c' },
+                { label: 'XP', value: String(realStat.xp), color: '#5B74FF' },
+                {
+                  label: 'Точность',
+                  value: `${Math.round(realStat.accuracy * 100)}%`,
+                  color: '#F08AB4',
+                },
+              ].map((s) => (
+                <div key={s.label} className="rounded-xl bg-white/[0.03] border border-white/[0.04] p-3">
+                  <div className="text-[10px] tracking-[0.08em] uppercase font-bold opacity-40">{s.label}</div>
+                  <div className="text-[20px] font-black mt-0.5 tabular-nums" style={{ color: s.color }}>
+                    {s.value}
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+          {dueCount !== null && (
+            <div className="text-xs opacity-50 mt-3">
+              Сегодня к повторению: <span className="font-black text-white">{dueCount}</span>
+            </div>
+          )}
+        </div>
+      )}
 
       {/* pills */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
