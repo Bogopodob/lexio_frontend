@@ -2,6 +2,7 @@ import { motion } from 'framer-motion'
 import { useLocation } from 'react-router-dom'
 import Router from '@/router'
 import AppLayout from '@/widgets/app-layout/ui/AppLayout'
+import ErrorBoundary from '@/components/ErrorBoundary'
 
 export default function App() {
   const { pathname } = useLocation()
@@ -10,7 +11,9 @@ export default function App() {
   if (bare) {
     return (
       <div className="app-shell">
-        <Router />
+        <ErrorBoundary>
+          <Router />
+        </ErrorBoundary>
       </div>
     )
   }
@@ -34,7 +37,9 @@ export default function App() {
       />
 
       <AppLayout>
-        <Router />
+        <ErrorBoundary>
+          <Router />
+        </ErrorBoundary>
       </AppLayout>
     </div>
   )

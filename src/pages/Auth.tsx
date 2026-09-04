@@ -100,9 +100,26 @@ export default function Auth() {
   const goApp = () => navigate(afterLogin, { replace: true })
   const { user, ready } = useAuth()
 
+  const typed = useTypewriter(PHRASES)
+  const rootRef = useRef<HTMLDivElement>(null)
+  const [entered, setEntered] = useState(false)
+
   useEffect(() => {
     if (ready && user) navigate(afterLogin, { replace: true })
   }, [ready, user, navigate, afterLogin])
+
+  useEffect(() => {
+    setEntered(true)
+    if (!rootRef.current) return
+    const ctx = gsap.context(() => {
+      gsap.fromTo(
+        '.auth-intro',
+        { opacity: 0, y: 26, filter: 'blur(6px)' },
+        { opacity: 1, y: 0, filter: 'blur(0px)', duration: 0.9, stagger: 0.09, ease: 'power3.out' },
+      )
+    }, rootRef)
+    return () => ctx.revert()
+  }, [])
 
   if (!ready || user) {
     return (
@@ -119,22 +136,6 @@ export default function Auth() {
       </div>
     )
   }
-
-  const typed = useTypewriter(PHRASES)
-  const rootRef = useRef<HTMLDivElement>(null)
-  const [entered, setEntered] = useState(false)
-
-  useEffect(() => {
-    setEntered(true)
-    const ctx = gsap.context(() => {
-      gsap.fromTo(
-        '.auth-intro',
-        { opacity: 0, y: 26, filter: 'blur(6px)' },
-        { opacity: 1, y: 0, filter: 'blur(0px)', duration: 0.9, stagger: 0.09, ease: 'power3.out' },
-      )
-    }, rootRef)
-    return () => ctx.revert()
-  }, [])
 
   return (
     <div ref={rootRef} className="auth-page">
