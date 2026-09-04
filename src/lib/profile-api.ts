@@ -12,6 +12,7 @@ export interface RemoteProfile {
   birth_date: string | null
   tags: string[] | null
   reminder_schedule?: ReminderSchedule | unknown[] | null
+  gender?: string | null
 }
 
 export interface RemoteLanguage {
@@ -68,6 +69,7 @@ export interface UpdateProfilePayload {
   tags?: string[]
   avatar?: string | null
   reminder_schedule?: ReminderSchedule | null
+  gender?: string | null
 }
 
 export function updateProfile(

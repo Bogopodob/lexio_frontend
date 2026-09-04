@@ -1,9 +1,10 @@
 import { Suspense, lazy, useEffect, useRef, useState } from 'react'
-import { useNavigate } from 'react-router-dom'
+import { useLocation, useNavigate } from 'react-router-dom'
 import { motion } from 'framer-motion'
 import gsap from 'gsap'
 import { BookOpenText, Flame, GraduationCap, Languages, Sparkles } from 'lucide-react'
 import AuthCard from '@/components/auth/AuthCard'
+import { useAuth } from '@/context/AuthContext'
 
 const WordSphere = lazy(() => import('@/components/auth/WordSphere'))
 
@@ -91,6 +92,34 @@ function Stat({ icon: Icon, value, label, color, started }: (typeof STATS)[numbe
 
 export default function Auth() {
   const navigate = useNavigate()
+  const location = useLocation()
+  const afterLogin =
+    typeof (location.state as { from?: unknown } | null)?.from === 'string'
+      ? ((location.state as { from: string }).from as string)
+      : '/'
+  const goApp = () => navigate(afterLogin, { replace: true })
+  const { user, ready } = useAuth()
+
+  useEffect(() => {
+    if (ready && user) navigate(afterLogin, { replace: true })
+  }, [ready, user, navigate, afterLogin])
+
+  if (!ready || user) {
+    return (
+      <div className="auth-page">
+        <div className="auth-bg" aria-hidden>
+          <div className="auth-bg__orb auth-bg__orb--mint" />
+          <div className="auth-bg__orb auth-bg__orb--violet" />
+        </div>
+        <div className="auth-layout" style={{ placeItems: 'center', gridTemplateColumns: '1fr' }}>
+          <div className="px-4 py-2 rounded-full bg-white/[0.06] border border-white/[0.08] text-white/50 text-xs font-bold animate-pulse">
+            {user ? 'Уже вошли — возвращаем…' : 'Проверяем вход…'}
+          </div>
+        </div>
+      </div>
+    )
+  }
+
   const typed = useTypewriter(PHRASES)
   const rootRef = useRef<HTMLDivElement>(null)
   const [entered, setEntered] = useState(false)
@@ -139,7 +168,7 @@ export default function Auth() {
           </p>
 
           <div className="auth-intro">
-            <AuthCard onSuccess={() => navigate('/')} />
+            <AuthCard onSuccess={goApp} />
           </div>
 
           <div className="auth-intro auth-stats">

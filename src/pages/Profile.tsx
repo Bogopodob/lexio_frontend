@@ -1,6 +1,8 @@
 import { motion } from 'framer-motion'
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome'
 import {
+  faVenus,
+  faMars,
   faFire,
   faDumbbell,
   faBullseye,
@@ -319,6 +321,7 @@ export default function Profile() {
     tags: ['Путешествия', 'Работа', 'Кино', 'Кофе'],
     avatar: null as string | null,
     level: 'A2' as string,
+    gender: '' as string,
   })
   const [draft, setDraft] = useState(profile)
   const [customTag, setCustomTag] = useState('')
@@ -519,6 +522,7 @@ export default function Profile() {
           city: remoteProfile?.city || '',
           tags: Array.isArray(remoteProfile?.tags) ? (remoteProfile.tags as string[]) : [],
           avatar: remoteProfile?.avatar ?? null,
+          gender: remoteProfile?.gender === 'male' || remoteProfile?.gender === 'female' ? remoteProfile.gender : '',
         }
         let language = 'en'
         let level = 'A2'
@@ -551,11 +555,12 @@ export default function Profile() {
     setSaveError(null)
     if (!user || !token) return
     setSaving(true)
-    const payload: { name?: string | null; city?: string | null; birth_date?: string | null; tags?: string[]; avatar?: string | null } = {
+    const payload: { name?: string | null; city?: string | null; birth_date?: string | null; tags?: string[]; avatar?: string | null; gender?: string | null } = {
       name: snapshot.name.trim() || null,
       city: snapshot.city.trim() || null,
       birth_date: snapshot.birthDate || null,
       tags: snapshot.tags,
+      gender: snapshot.gender === 'male' || snapshot.gender === 'female' ? snapshot.gender : null,
     }
     if (snapshot.avatar && snapshot.avatar.length <= 2000) payload.avatar = snapshot.avatar
     updateProfile(user.id, token, payload)
@@ -874,7 +879,31 @@ export default function Profile() {
               <div className="min-w-0 flex-1">
                 {isEditing ? (
                   <div className="space-y-2">
-                    <input value={draft.name} onChange={(e) => setDraft({ ...draft, name: e.target.value })} placeholder="Имя" className="w-full max-w-[220px] px-3 py-1.5 rounded-xl bg-white/[0.06] border border-white/[0.08] text-sm font-bold placeholder:text-white/30 focus:outline-none focus:border-white/15" />
+                    <div className="flex flex-wrap items-center gap-2">
+                      <input value={draft.name} onChange={(e) => setDraft({ ...draft, name: e.target.value })} placeholder="Имя" className="w-full max-w-[220px] px-3 py-1.5 rounded-xl bg-white/[0.06] border border-white/[0.08] text-sm font-bold placeholder:text-white/30 focus:outline-none focus:border-white/15" />
+                      <div className="flex items-center gap-1 p-1 rounded-full bg-black/20 border border-white/[0.06]" role="radiogroup" aria-label="Пол">
+                        <button
+                          type="button"
+                          role="radio"
+                          aria-checked={draft.gender === 'female'}
+                          title="Женский"
+                          onClick={() => setDraft({ ...draft, gender: draft.gender === 'female' ? '' : 'female' })}
+                          className={`w-7 h-7 rounded-full grid place-items-center text-[13px] border transition-all ${draft.gender === 'female' ? 'bg-[#f43f5e]/15 border-[#f43f5e]/40 text-[#f43f5e]' : 'bg-transparent border-transparent text-white/35 hover:text-white'}`}
+                        >
+                          <FontAwesomeIcon icon={faVenus} />
+                        </button>
+                        <button
+                          type="button"
+                          role="radio"
+                          aria-checked={draft.gender === 'male'}
+                          title="Мужской"
+                          onClick={() => setDraft({ ...draft, gender: draft.gender === 'male' ? '' : 'male' })}
+                          className={`w-7 h-7 rounded-full grid place-items-center text-[13px] border transition-all ${draft.gender === 'male' ? 'bg-[#5B74FF]/15 border-[#5B74FF]/40 text-[#5B74FF]' : 'bg-transparent border-transparent text-white/35 hover:text-white'}`}
+                        >
+                          <FontAwesomeIcon icon={faMars} />
+                        </button>
+                      </div>
+                    </div>
                     <div className="flex flex-wrap gap-2">
                       <BirthDatePicker value={draft.birthDate} onChange={handleBirthDateChange} />
                       <input value={draft.city} onChange={(e) => setDraft({ ...draft, city: e.target.value })} placeholder="Город" className="px-2.5 py-1.5 rounded-full bg-white/[0.06] border border-white/[0.08] text-xs focus:outline-none w-[120px]" />
@@ -887,6 +916,12 @@ export default function Profile() {
                   <>
                     <div className="flex flex-wrap items-center gap-2">
                       <h1 className="text-[26px] sm:text-[30px] font-black tracking-tight leading-none">{profile.name || 'Без имени'}</h1>
+                      {profile.gender === 'female' && (
+                        <span title="Женский" className="w-7 h-7 rounded-full grid place-items-center border bg-[#f43f5e]/10 border-[#f43f5e]/30 text-[#f43f5e] text-sm"><FontAwesomeIcon icon={faVenus} /></span>
+                      )}
+                      {profile.gender === 'male' && (
+                        <span title="Мужской" className="w-7 h-7 rounded-full grid place-items-center border bg-[#5B74FF]/10 border-[#5B74FF]/30 text-[#5B74FF] text-sm"><FontAwesomeIcon icon={faMars} /></span>
+                      )}
                       <span className="px-2.5 py-1 rounded-full bg-white text-black text-[11px] font-black">PRO</span>
                       {remote === 'loading' && (
                         <span className="px-2.5 py-1 rounded-full bg-white/[0.06] border border-white/[0.08] text-white/50 text-[11px] font-bold animate-pulse">Загрузка…</span>

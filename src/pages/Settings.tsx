@@ -244,7 +244,7 @@ export default function Settings() {
           <div ref={(el) => { refs.current['about'] = el }} id="about" className="settings-group !mb-0 scroll-mt-4">
             <h3><FontAwesomeIcon icon={faCircleInfo} className="mr-2 opacity-60" /> О приложении</h3>
             <div className="settings-row"><span>Версия</span><span className="settings-row__value">0.0.1 • qwicki</span></div>
-            <div className="settings-row"><span>Сборка</span><span className="settings-row__value">5173 • /app/</span></div>
+            <div className="settings-row"><span>Сборка</span><span className="settings-row__value">5173 • /</span></div>
             <div className="text-xs opacity-40 mt-2">Lexio — учим язык строго, без игр. ⌘K для поиска.</div>
           </div>
         </div>

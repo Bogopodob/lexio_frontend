@@ -9,7 +9,7 @@ export default function Providers({ children }: { children: ReactNode }) {
   return (
     <ThemeProvider>
       <LocaleProvider>
-      <BrowserRouter basename="/app">
+      <BrowserRouter>
         <AuthProvider>
           {children}
           <CommandPalette />

@@ -1,6 +1,7 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useState } from 'react'
 import type { ReactNode } from 'react'
 import {
+  AuthError,
   clearSession,
   loadSession,
   loginRequest,
@@ -38,7 +39,17 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         setUser(fresh)
         setToken(session.token)
       })
-      .catch(() => clearSession())
+      .catch((err) => {
+        // Drop the session only when the backend rejects the token.
+        // Network failures keep the stored session so a reload
+        // without connection doesn't log the user out.
+        if (err instanceof AuthError && err.status === 401) {
+          clearSession()
+        } else {
+          setUser(session.user)
+          setToken(session.token)
+        }
+      })
       .finally(() => setReady(true))
   }, [])
 
