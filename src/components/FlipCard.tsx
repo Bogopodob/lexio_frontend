@@ -3,6 +3,7 @@ import { motion } from 'framer-motion'
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome'
 import { faVolumeHigh } from '@fortawesome/free-solid-svg-icons'
 import type { IconDefinition } from '@fortawesome/fontawesome-svg-core'
+import { matchesShortcut, useShortcuts } from '@/lib/shortcuts'
 
 interface FlipCardProps {
   label: string
@@ -27,6 +28,13 @@ export default function FlipCard({
   onFlip,
   onSpeak,
 }: FlipCardProps) {
+  const { bindings } = useShortcuts()
+  const handleCardKey = (e) => {
+    if (matchesShortcut(e, bindings.flip) || e.key === ' ') {
+      e.preventDefault()
+      onFlip()
+    }
+  }
   return (
     <div className="flip-card" style={{ perspective: 1200 }}>
       <motion.div
@@ -43,11 +51,8 @@ export default function FlipCard({
           tabIndex={0}
           aria-label={`${title} — нажать чтобы увидеть перевод`}
           onKeyDown={(e) => {
-            if (e.key === 'Enter' || e.key === ' ') {
-              e.preventDefault()
-              onFlip()
-            }
-            if (e.key.toLowerCase() === 'l') {
+            handleCardKey(e)
+            if (matchesShortcut(e, bindings.speak)) {
               e.preventDefault()
               onSpeak()
             }
@@ -90,12 +95,7 @@ export default function FlipCard({
           role="button"
           tabIndex={0}
           aria-label={`${translation} — нажать чтобы вернуться`}
-          onKeyDown={(e) => {
-            if (e.key === 'Enter' || e.key === ' ') {
-              e.preventDefault()
-              onFlip()
-            }
-          }}
+          onKeyDown={handleCardKey}
           style={{ transform: 'rotateY(180deg)' }}
         >
           <div className="phrase-card__icon phrase-card__icon--back">✦</div>

@@ -4,9 +4,7 @@ import { FontAwesomeIcon } from '@fortawesome/react-fontawesome'
 import {
   faPalette,
   faVolumeHigh,
-  faBell,
   faLanguage,
-  faBullseye,
   faShieldHalved,
   faCircleInfo,
   faKeyboard,
@@ -14,24 +12,94 @@ import {
   faSun,
 } from '@fortawesome/free-solid-svg-icons'
 import { useTheme } from '@/context/ThemeContext'
+import { useLocale } from '@/context/LocaleContext'
+import {
+  DEFAULT_SHORTCUTS,
+  SHORTCUT_META,
+  bindingFromEvent,
+  formatBinding,
+  useShortcuts,
+  type ShortcutId,
+} from '@/lib/shortcuts'
 
 const SECTIONS = [
   { id: 'lang', label: 'Язык', icon: faLanguage },
-  { id: 'learn', label: 'Обучение', icon: faBullseye },
   { id: 'appearance', label: 'Внешний вид', icon: faPalette },
   { id: 'sound', label: 'Звук', icon: faVolumeHigh },
-  { id: 'notif', label: 'Уведомления', icon: faBell },
   { id: 'shortcuts', label: 'Быстрый доступ', icon: faKeyboard },
   { id: 'privacy', label: 'Приватность', icon: faShieldHalved },
   { id: 'about', label: 'О приложении', icon: faCircleInfo },
 ] as const
 
+const SHORTCUT_IDS = Object.keys(SHORTCUT_META) as ShortcutId[]
+
+function ShortcutRows() {
+  const { bindings, setBinding, resetBindings } = useShortcuts()
+  const [capturing, setCapturing] = useState<ShortcutId | null>(null)
+  const [conflict, setConflict] = useState<string | null>(null)
+
+  useEffect(() => {
+    if (!capturing) return
+    const handler = (e: KeyboardEvent) => {
+      e.preventDefault()
+      e.stopPropagation()
+      if (e.key === 'Escape') {
+        setCapturing(null)
+        setConflict(null)
+        return
+      }
+      const binding = bindingFromEvent(e)
+      if (!binding) return
+      const takenBy = SHORTCUT_IDS.find((id) => id !== capturing && bindings[id] === binding)
+      if (takenBy) {
+        setConflict(`Уже используется: ${SHORTCUT_META[takenBy].label}`)
+        return
+      }
+      setBinding(capturing, binding)
+      setCapturing(null)
+      setConflict(null)
+    }
+    window.addEventListener('keydown', handler, true)
+    return () => window.removeEventListener('keydown', handler, true)
+  }, [capturing, bindings, setBinding])
+
+  const isDefault = SHORTCUT_IDS.every((id) => bindings[id] === DEFAULT_SHORTCUTS[id])
+
+  return (
+    <>
+      {SHORTCUT_IDS.map((id) => (
+        <div className="settings-row" key={id}>
+          <span className="flex flex-col gap-0.5">
+            <span>{SHORTCUT_META[id].label}</span>
+            <span className="text-xs opacity-40">{SHORTCUT_META[id].hint}</span>
+          </span>
+          <button
+            type="button"
+            onClick={() => {
+              setConflict(null)
+              setCapturing(capturing === id ? null : id)
+            }}
+            className={`settings-kbd ${capturing === id ? 'settings-kbd--capturing' : ''}`}
+            aria-label={`Изменить: ${SHORTCUT_META[id].label}`}
+          >
+            {capturing === id ? 'Нажми…' : formatBinding(bindings[id])}
+          </button>
+        </div>
+      ))}
+      {conflict && <div className="text-xs font-bold text-[#F5C16A] -mt-1">{conflict}</div>}
+      {!isDefault && (
+        <button type="button" onClick={() => resetBindings()} className="mt-1 text-xs font-bold opacity-50 hover:opacity-100 transition-opacity">
+          Сбросить по умолчанию
+        </button>
+      )}
+    </>
+  )
+}
+
 export default function Settings() {
   const { theme, toggleTheme } = useTheme()
+  const { locale, setLocale } = useLocale()
   const [soundOn, setSoundOn] = useState(true)
-  const [notifOn, setNotifOn] = useState(true)
-  const [lang, setLang] = useState<'en' | 'es' | 'de'>('en')
-  const [goal, setGoal] = useState(20)
   const [voice, setVoice] = useState<'female' | 'male'>('female')
   const [active, setActive] = useState<string>('lang')
   const refs = useRef<Record<string, HTMLElement | null>>({})
@@ -87,44 +155,29 @@ export default function Settings() {
 
         <div className="flex flex-col gap-4 min-w-0">
           <div ref={(el) => { refs.current['lang'] = el }} id="lang" className="settings-group !mb-0 scroll-mt-4">
-            <h3><FontAwesomeIcon icon={faLanguage} className="mr-2 opacity-60" /> Язык обучения</h3>
-            <div className="grid grid-cols-3 gap-2">
+            <h3><FontAwesomeIcon icon={faLanguage} className="mr-2 opacity-60" /> Язык интерфейса</h3>
+            <div className="grid grid-cols-2 gap-2">
               {[
-                { id: 'en', name: 'English', sub: 'Английский' },
-                { id: 'es', name: 'Español', sub: 'Испанский' },
-                { id: 'de', name: 'Deutsch', sub: 'Немецкий' },
+                { id: 'ru', name: 'Русский', sub: 'Интерфейс на русском' },
+                { id: 'en', name: 'English', sub: 'Interface in English' },
               ].map((l) => (
-                <button key={l.id} onClick={() => setLang(l.id as never)} className={`p-3 rounded-xl border text-left transition-all ${lang === l.id ? 'bg-[#5AD4B5]/10 border-[#5AD4B5]/30 text-[#5AD4B5]' : 'bg-white/[0.03] border-white/[0.06] hover:bg-white/[0.06] text-white'}`}>
-                  <div className="text-sm font-black">{l.name}</div>
-                  <div className={`text-xs ${lang === l.id ? 'opacity-80' : 'opacity-40'}`}>{l.sub}</div>
-                  <div className={`text-[11px] mt-1 ${lang === l.id ? 'opacity-70' : 'opacity-50'}`}>Русский → {l.name}</div>
+                <button key={l.id} onClick={() => setLocale(l.id as 'ru' | 'en')} className={`p-3 rounded-xl border text-left transition-all ${locale === l.id ? 'bg-[#5AD4B5]/10 border-[#5AD4B5]/30 text-[#5AD4B5]' : 'bg-white/[0.03] border-white/[0.06] hover:bg-white/[0.06] text-white'}`}>
+                  <div className="text-sm font-black flex items-center gap-2">
+                    {l.name}
+                    {l.id === 'en' && (
+                      <span className="px-1.5 py-0.5 rounded-full bg-white/[0.08] border border-white/[0.1] text-[10px] font-bold text-white/50">скоро</span>
+                    )}
+                  </div>
+                  <div className={`text-xs ${locale === l.id ? 'opacity-80' : 'opacity-40'}`}>{l.sub}</div>
                 </button>
               ))}
             </div>
             <div className="settings-row">
-              <span>Интерфейс</span><span className="settings-row__value">Русский</span>
+              <span>Язык обучения</span><span className="settings-row__value">выбирается в профиле</span>
             </div>
-          </div>
-
-          <div ref={(el) => { refs.current['learn'] = el }} id="learn" className="settings-group !mb-0 scroll-mt-4">
-            <h3><FontAwesomeIcon icon={faBullseye} className="mr-2 opacity-60" /> Обучение</h3>
-            <div className="settings-row">
-              <span className="flex flex-col gap-1"><span>Дневная цель</span><span className="text-xs opacity-40">{goal} слов • ~{Math.round(goal * 1.5)} мин</span></span>
-              <span className="flex items-center gap-2">
-                <button onClick={() => setGoal((v) => Math.max(5, v - 5))} className="w-7 h-7 rounded-full bg-white/[0.06] border border-white/[0.06] grid place-items-center hover:bg-white/10">−</button>
-                <span className="min-w-[36px] text-center font-black tabular-nums">{goal}</span>
-                <button onClick={() => setGoal((v) => Math.min(50, v + 5))} className="w-7 h-7 rounded-full bg-white text-black grid place-items-center hover:bg-white/90">+</button>
-              </span>
-            </div>
-            <div className="h-1.5 rounded-full bg-white/[0.06] overflow-hidden">
-              <div className="h-full bg-[#5AD4B5] rounded-full transition-all" style={{ width: `${(goal / 50) * 100}%` }} />
-            </div>
-            <div className="settings-row">
-              <span>Напоминание</span><span className="settings-row__value">09:00 • каждый день</span>
-            </div>
-            <div className="settings-row">
-              <span>Сложность</span><span className="settings-row__value">Адаптивная</span>
-            </div>
+            {locale === 'en' && (
+              <div className="text-xs opacity-40 mt-2">Английский интерфейс в разработке — пока остаётся русский.</div>
+            )}
           </div>
 
           <div ref={(el) => { refs.current['appearance'] = el }} id="appearance" className="settings-group !mb-0 scroll-mt-4">
@@ -176,22 +229,10 @@ export default function Settings() {
             </div>
           </div>
 
-          <div ref={(el) => { refs.current['notif'] = el }} id="notif" className="settings-group !mb-0 scroll-mt-4">
-            <h3><FontAwesomeIcon icon={faBell} className="mr-2 opacity-60" /> Уведомления</h3>
-            <div className="settings-row">
-              <span>Ежедневно 09:00</span>
-              <button type="button" role="switch" aria-checked={notifOn} onClick={() => setNotifOn((v) => !v)} className={`settings-switch ${notifOn ? 'settings-switch--on' : ''}`}><span className="settings-switch__thumb" /></button>
-            </div>
-            <div className="settings-row">
-              <span>Напоминание о серии</span><span className="settings-row__value">за 2 ч до сна</span>
-            </div>
-          </div>
-
           <div ref={(el) => { refs.current['shortcuts'] = el }} id="shortcuts" className="settings-group !mb-0 scroll-mt-4">
             <h3><FontAwesomeIcon icon={faKeyboard} className="mr-2 opacity-60" /> Быстрый доступ</h3>
-            <div className="settings-row"><span>Поиск</span><span className="settings-row__hint">⌘K / Ctrl+K</span></div>
-            <div className="settings-row"><span>Переворот карточки</span><span className="settings-row__hint">Клик / Enter</span></div>
-            <div className="settings-row"><span>Озвучить</span><span className="settings-row__hint">L</span></div>
+            <ShortcutRows />
+            <div className="text-xs opacity-40 mt-2">Нажми на комбинацию, затем нажми новые клавиши. Esc — отмена.</div>
           </div>
 
           <div ref={(el) => { refs.current['privacy'] = el }} id="privacy" className="settings-group !mb-0 scroll-mt-4">

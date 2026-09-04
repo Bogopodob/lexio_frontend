@@ -91,6 +91,18 @@ export function listLearningProfiles(
   return request<RemoteLearningProfile[]>(`/learning/users/${userId}/profiles`, token)
 }
 
+export function updateLearningProfile(
+  userId: string,
+  token: string,
+  profileId: string,
+  payload: { level?: string; daily_goal?: number; is_active?: boolean },
+): Promise<RemoteLearningProfile> {
+  return request(`/learning/users/${userId}/profiles/${profileId}`, token, {
+    method: 'PATCH',
+    body: JSON.stringify(payload),
+  })
+}
+
 export function createLearningProfile(
   userId: string,
   token: string,

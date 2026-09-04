@@ -16,6 +16,7 @@ import {
   faMedal,
   faBolt,
   faComments,
+  faBell,
   faGraduationCap,
   faPen,
   faCheck,
@@ -30,6 +31,7 @@ import {
   getProfile,
   listLanguages,
   listLearningProfiles,
+  updateLearningProfile,
   updateProfile,
 } from '@/lib/profile-api'
 import { DatePicker, DateField, Calendar } from '@heroui/react'
@@ -277,6 +279,9 @@ export default function Profile() {
   const [saveError, setSaveError] = useState<string | null>(null)
   const [langIdByCode, setLangIdByCode] = useState<Record<string, string>>({})
   const [hasLearningProfile, setHasLearningProfile] = useState(false)
+  const [activeProfileId, setActiveProfileId] = useState<string | null>(null)
+  const [goal, setGoal] = useState(20)
+  const [notifOn, setNotifOn] = useState(true)
   const fileRef = useRef<HTMLInputElement>(null)
   const { user, token, ready: authReady } = useAuth()
   const tagOptions = ['Путешествия', 'Работа', 'Кино', 'Кофе', 'Еда', 'Эмоции', 'Музыка', 'Спорт', 'Книги', 'Технологии']
@@ -357,6 +362,8 @@ export default function Profile() {
         const profiles = profilesRes.status === 'fulfilled' ? profilesRes.value : []
         const active = profiles.find((p) => p.is_active) ?? profiles[0] ?? null
         setHasLearningProfile(active !== null)
+        setActiveProfileId(active ? active.id : null)
+        if (active && typeof active.daily_goal === 'number') setGoal(active.daily_goal)
         const remoteProfile = profileRes.status === 'fulfilled' ? profileRes.value : null
         // Authed users get honest server state: missing fields stay EMPTY,
         // mocks remain for guests only.
@@ -433,6 +440,15 @@ export default function Profile() {
     setDraft((p) => ({ ...p, tags: [...p.tags, t] }))
     setCustomTag('')
   }, [customTag, draft.tags])
+  const changeGoal = useCallback((delta: number) => {
+    setGoal((prev) => {
+      const next = Math.min(50, Math.max(5, prev + delta))
+      if (user && token && activeProfileId && next !== prev) {
+        updateLearningProfile(user.id, token, activeProfileId, { daily_goal: next }).catch(() => undefined)
+      }
+      return next
+    })
+  }, [user, token, activeProfileId])
 
   return (
     <motion.div initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.36 }} className="w-full flex flex-col gap-5">
@@ -597,6 +613,45 @@ export default function Profile() {
             {goals.length >= 3 && <div className="text-[11px] opacity-40 mt-2">Максимум 3 цели — удали одну, чтобы добавить</div>}
           </div>
         )}
+      </div>
+
+      {/* обучение — дневная цель, напоминание, сложность */}
+      <div className="rounded-[20px] border border-white/[0.06] bg-[#171717] p-5">
+        <div className="flex items-center justify-between">
+          <h3 className="text-[14px] font-black tracking-tight flex items-center gap-2"><FontAwesomeIcon icon={faGraduationCap} className="text-[#5AD4B5]" /> Обучение</h3>
+          <span className="text-[11px] opacity-40 font-bold">твой темп</span>
+        </div>
+        <div className="mt-4 settings-row !mx-0">
+          <span className="flex flex-col gap-1"><span className="text-[13px] font-bold">Дневная цель</span><span className="text-xs opacity-40">{goal} слов • ~{Math.round(goal * 1.5)} мин</span></span>
+          <span className="flex items-center gap-2">
+            <button onClick={() => changeGoal(-5)} className="w-7 h-7 rounded-full bg-white/[0.06] border border-white/[0.06] grid place-items-center hover:bg-white/10 text-sm">−</button>
+            <span className="min-w-[36px] text-center text-[13px] font-black tabular-nums">{goal}</span>
+            <button onClick={() => changeGoal(5)} className="w-7 h-7 rounded-full bg-white text-black grid place-items-center hover:bg-white/90 text-sm font-black">+</button>
+          </span>
+        </div>
+        <div className="h-1.5 rounded-full bg-white/[0.06] overflow-hidden mt-3">
+          <div className="h-full bg-[#5AD4B5] rounded-full transition-all" style={{ width: `${(goal / 50) * 100}%` }} />
+        </div>
+        <div className="mt-3 settings-row !mx-0">
+          <span className="text-[13px]">Напоминание</span><span className="text-xs opacity-40 font-bold">09:00 • каждый день</span>
+        </div>
+        <div className="settings-row !mx-0">
+          <span className="text-[13px]">Сложность</span><span className="text-xs opacity-40 font-bold">Адаптивная</span>
+        </div>
+      </div>
+
+      {/* уведомления */}
+      <div className="rounded-[20px] border border-white/[0.06] bg-[#171717] p-5">
+        <div className="flex items-center justify-between">
+          <h3 className="text-[14px] font-black tracking-tight flex items-center gap-2"><FontAwesomeIcon icon={faBell} className="text-[#F5C16A]" /> Уведомления</h3>
+          <button type="button" role="switch" aria-checked={notifOn} onClick={() => setNotifOn((v) => !v)} className={`settings-switch ${notifOn ? 'settings-switch--on' : ''}`}><span className="settings-switch__thumb" /></button>
+        </div>
+        <div className="mt-3 settings-row !mx-0">
+          <span className="text-[13px]">Ежедневно 09:00</span><span className="text-xs opacity-40 font-bold">{notifOn ? 'включены' : 'выключены'}</span>
+        </div>
+        <div className="settings-row !mx-0">
+          <span className="text-[13px]">Напоминание о серии</span><span className="text-xs opacity-40 font-bold">за 2 ч до сна</span>
+        </div>
       </div>
 
       {/* achievements — переделано: много, hover с прогрессом */}

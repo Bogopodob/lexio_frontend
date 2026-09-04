@@ -15,6 +15,7 @@ import {
   faArrowRight,
 } from '@fortawesome/free-solid-svg-icons'
 import { useTheme } from '@/context/ThemeContext'
+import { matchesShortcut, useShortcuts } from '@/lib/shortcuts'
 
 interface Command {
   id: string
@@ -117,11 +118,13 @@ export default function CommandPalette() {
     setSelected(0)
   }, [query])
 
+  const { bindings } = useShortcuts()
+
   useEffect(() => {
     const handler = (e: KeyboardEvent) => {
-      const isModK = (e.metaKey || e.ctrlKey) && e.key.toLowerCase() === 'k'
+      const isSearch = matchesShortcut(e, bindings.search)
       const isSlash = e.key === '/' && !open && !(e.target instanceof HTMLInputElement)
-      if (isModK || isSlash) {
+      if (isSearch || isSlash) {
         e.preventDefault()
         setOpen((v) => !v)
       }
@@ -134,7 +137,7 @@ export default function CommandPalette() {
       window.removeEventListener('keydown', handler)
       window.removeEventListener('lexio:open-palette' as unknown as keyof WindowEventMap, custom as EventListener)
     }
-  }, [open])
+  }, [open, bindings.search])
 
   useEffect(() => {
     if (open) {

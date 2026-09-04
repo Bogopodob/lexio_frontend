@@ -4048,3 +4048,46 @@ button.app-header__avatar-wrap {
 [data-theme="light"] .app-header__menu-item { color: rgba(20, 20, 20, 0.8); }
 [data-theme="light"] .app-header__menu-item:hover { background: rgba(20, 20, 20, 0.05); color: #141414; }
 [data-theme="light"] .app-header__menu-item svg { color: rgba(20, 20, 20, 0.4); }
+
+/* ── Settings: shortcut editor ── */
+.settings-kbd {
+  padding: 6px 12px;
+  border-radius: 10px;
+  font-size: 12px;
+  font-weight: 800;
+  font-variant-numeric: tabular-nums;
+  color: #fff;
+  background: rgba(255, 255, 255, 0.06);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  box-shadow: 0 2px 0 rgba(255, 255, 255, 0.06);
+  transition: border-color 0.15s, background 0.15s, color 0.15s;
+  white-space: nowrap;
+}
+
+.settings-kbd:hover {
+  border-color: rgba(90, 212, 181, 0.5);
+  background: rgba(90, 212, 181, 0.08);
+}
+
+.settings-kbd--capturing {
+  color: #06281f;
+  background: #5ad4b5;
+  border-color: #5ad4b5;
+  animation: settings-kbd-pulse 1s ease-in-out infinite;
+}
+
+@keyframes settings-kbd-pulse {
+  50% { box-shadow: 0 0 0 5px rgba(90, 212, 181, 0.18); }
+}
+
+[data-theme="light"] .settings-kbd {
+  color: #141414;
+  background: rgba(20, 20, 20, 0.05);
+  border-color: rgba(20, 20, 20, 0.12);
+}
+
+[data-theme="light"] .settings-kbd--capturing {
+  color: #06281f;
+  background: #5ad4b5;
+  border-color: #5ad4b5;
+}
