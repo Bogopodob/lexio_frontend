@@ -1,17 +1,32 @@
 import { useSyncExternalStore } from 'react'
 
-export type ShortcutId = 'search' | 'flip' | 'speak'
+export type ShortcutId =
+  | 'search'
+  | 'flip'
+  | 'speak'
+  | 'grade_again'
+  | 'grade_hard'
+  | 'grade_good'
+  | 'grade_easy'
 
 export const SHORTCUT_META: Record<ShortcutId, { label: string; hint: string }> = {
   search: { label: 'Поиск', hint: 'Открыть палитру команд' },
   flip: { label: 'Переворот карточки', hint: 'Показать перевод' },
   speak: { label: 'Озвучить', hint: 'Произнести фразу вслух' },
+  grade_again: { label: 'Оценка: Снова', hint: 'Не вспомнил — повторить' },
+  grade_hard: { label: 'Оценка: Трудно', hint: 'Вспомнил с трудом' },
+  grade_good: { label: 'Оценка: Хорошо', hint: 'Уверенно вспомнил' },
+  grade_easy: { label: 'Оценка: Легко', hint: 'Сразу вспомнил' },
 }
 
 export const DEFAULT_SHORTCUTS: Record<ShortcutId, string> = {
   search: 'mod+k',
   flip: 'Enter',
   speak: 'l',
+  grade_again: '1',
+  grade_hard: '2',
+  grade_good: '3',
+  grade_easy: '4',
 }
 
 const STORAGE_KEY = 'lexio:shortcuts'

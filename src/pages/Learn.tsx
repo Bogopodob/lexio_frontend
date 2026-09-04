@@ -32,18 +32,27 @@ import {
   listLearningProfiles,
   type RemoteLearningProfile,
 } from '@/lib/profile-api'
+import { formatBinding, matchesShortcut, useShortcuts } from '@/lib/shortcuts'
 import { listCategories } from '@/lib/catalog-api'
 
 type Phase = 'loading' | 'menu' | 'study' | 'finished'
 
 const GRADES = [
-  { quality: 1, label: 'Снова', sub: 'не помню', color: '#f43f5e', key: '1' },
-  { quality: 3, label: 'Трудно', sub: 'еле вспомнил', color: '#ff9d5c', key: '2' },
-  { quality: 4, label: 'Хорошо', sub: 'вспомнил', color: '#5AD4B5', key: '3' },
-  { quality: 5, label: 'Легко', sub: 'сразу', color: '#5B74FF', key: '4' },
-]
+  { quality: 1, bindingId: 'grade_again', label: 'Снова', sub: 'не помню', color: '#f43f5e' },
+  { quality: 3, bindingId: 'grade_hard', label: 'Трудно', sub: 'еле вспомнил', color: '#ff9d5c' },
+  { quality: 4, bindingId: 'grade_good', label: 'Хорошо', sub: 'вспомнил', color: '#5AD4B5' },
+  { quality: 5, bindingId: 'grade_easy', label: 'Легко', sub: 'сразу', color: '#5B74FF' },
+] as const
 
 const LIMITS = [10, 20, 30]
+
+function Kbd({ children }: { children: React.ReactNode }) {
+  return (
+    <kbd className="px-1.5 py-0.5 rounded-md bg-white/[0.08] border border-white/[0.12] text-[10.5px] font-black text-white/85 font-sans">
+      {children}
+    </kbd>
+  )
+}
 
 export default function Learn() {
   const navigate = useNavigate()
@@ -270,21 +279,31 @@ export default function Learn() {
     window.setTimeout(() => setSpeaking(false), 4000)
   }, [card, isSpeaking, speak, cancel])
 
-  // number keys 1-4 grade the flipped card
+  const { bindings } = useShortcuts()
+
+  // Keyboard-first lesson: Space flips / advances, grade keys evaluate.
+  // Capture phase + stopPropagation so the focused card doesn't double-flip.
   useEffect(() => {
     if (phase !== 'study') return
     const handler = (e: KeyboardEvent) => {
       const target = e.target as HTMLElement | null
       if (target && (target.tagName === 'INPUT' || target.tagName === 'TEXTAREA')) return
-      const found = GRADES.find((g) => g.key === e.key)
+      if (e.key === ' ') {
+        e.preventDefault()
+        e.stopPropagation()
+        if (!flipped) setFlipped(true)
+        else grade(4)
+        return
+      }
+      const found = GRADES.find((g) => matchesShortcut(e, bindings[g.bindingId]))
       if (found) {
         e.preventDefault()
         grade(found.quality)
       }
     }
-    window.addEventListener('keydown', handler)
-    return () => window.removeEventListener('keydown', handler)
-  }, [phase, grade])
+    window.addEventListener('keydown', handler, true)
+    return () => window.removeEventListener('keydown', handler, true)
+  }, [phase, grade, flipped, bindings, setFlipped])
 
   // achievement titles for the finish screen
   useEffect(() => {
@@ -371,7 +390,7 @@ export default function Learn() {
             <h3 className="text-[14px] font-black tracking-tight flex items-center gap-2">
               <FontAwesomeIcon icon={faPlay} className="text-[#5AD4B5]" /> Новый урок
             </h3>
-            <div className="text-xs opacity-40 mt-1">Сначала повторения, потом новые слова</div>
+            <div className="text-xs opacity-40 mt-1">Три шага — и погнали: что учим, сколько берём, жмём старт</div>
             {categoryId && (
               <div className="mt-3 inline-flex items-center gap-2 px-3 py-1.5 rounded-full bg-[#5B74FF]/10 border border-[#5B74FF]/30 text-xs font-bold text-[#8b9bff] w-fit">
                 <span>Тема: {categoryName ?? '…'}</span>
@@ -389,17 +408,21 @@ export default function Learn() {
                 </button>
               </div>
             )}
-            <div className="flex flex-wrap gap-1.5 mt-3">
+            <div className="text-[11px] font-black uppercase tracking-widest opacity-40 mt-4 mb-1.5">
+              Шаг 1 — что учим
+            </div>
+            <div className="flex flex-wrap gap-1.5">
               {(
                 [
-                  { id: 'mixed', label: 'Всё сразу' },
-                  { id: 'due', label: 'Повторение' },
-                  { id: 'new', label: 'Новые слова' },
+                  { id: 'mixed', label: 'Всё сразу', hint: 'повторения + новые' },
+                  { id: 'due', label: 'Повторение', hint: 'только долги' },
+                  { id: 'new', label: 'Новые слова', hint: 'то, что не видел' },
                 ] as const
               ).map((s) => (
                 <button
                   key={s.id}
                   onClick={() => setSource(s.id)}
+                  title={s.hint}
                   className={`px-3 py-1.5 rounded-full text-xs font-bold border transition-all ${source === s.id ? 'bg-[#5AD4B5] text-black border-[#5AD4B5]' : 'bg-white/[0.04] border-white/[0.06] hover:bg-white/[0.08]'}`}
                 >
                   {s.label}
@@ -411,7 +434,10 @@ export default function Learn() {
                 Повторения — по всем словам, новые — из выбранной темы
               </div>
             )}
-            <div className="flex items-center gap-2 mt-3">
+            <div className="text-[11px] font-black uppercase tracking-widest opacity-40 mt-4 mb-1.5">
+              Шаг 2 — сколько берём
+            </div>
+            <div className="flex items-center gap-2">
               <span className="text-xs opacity-40 font-bold">Слов в уроке:</span>
               {LIMITS.map((n) => (
                 <button
@@ -425,7 +451,7 @@ export default function Learn() {
             </div>
             {source !== 'due' && (
               <div className="flex items-center gap-2 mt-2.5 flex-wrap">
-                <span className="text-xs opacity-40 font-bold">Начать с N-го слова:</span>
+                <span className="text-xs opacity-40 font-bold" title="Пропустить первые N новых слов — например, начать со 120-го">Начать с N-го слова:</span>
                 <button
                   onClick={() => setOffset((v) => Math.max(0, v - limit))}
                   className="w-7 h-7 rounded-full bg-white/[0.06] border border-white/[0.06] grid place-items-center hover:bg-white/10 text-sm"
@@ -495,10 +521,23 @@ export default function Learn() {
                 <div className="text-xs opacity-50 mt-0.5">Повторений нет, новых слов нет — так держать</div>
               </div>
             ) : null}
+            <div className="rounded-2xl bg-white/[0.03] border border-white/[0.05] px-3.5 py-2.5 mt-3 flex flex-wrap items-center gap-x-4 gap-y-1.5 text-[11.5px] text-white/55">
+              <span className="font-black text-white/80 uppercase tracking-widest text-[10px]">Как отвечать</span>
+              <span>🖱️ клик — перевернуть</span>
+              <span>
+                <Kbd>Пробел</Kbd> — перевод, ещё раз — дальше ✓
+              </span>
+              <span>
+                <Kbd>{formatBinding(bindings.grade_again)}</Kbd>–<Kbd>{formatBinding(bindings.grade_easy)}</Kbd> — оценка
+              </span>
+            </div>
+            <div className="text-[11px] font-black uppercase tracking-widest opacity-40 mt-4 mb-1.5">
+              Шаг 3 — погнали
+            </div>
             <button
               onClick={() => beginSession()}
               disabled={starting || !profileId || (availability !== null && availability.due === 0 && availability.new === 0)}
-              className="mt-4 w-full py-3 rounded-2xl bg-[#5AD4B5] text-black text-sm font-black hover:brightness-110 transition disabled:opacity-50"
+              className="w-full py-3 rounded-2xl bg-[#5AD4B5] text-black text-sm font-black hover:brightness-110 transition disabled:opacity-50"
             >
               {starting ? 'Собираем колоду…' : 'Начать урок →'}
             </button>
@@ -568,7 +607,7 @@ export default function Learn() {
                     <div className="text-[13px] font-black" style={{ color: g.color }}>
                       {g.label}
                     </div>
-                    <div className="text-[11px] opacity-50">{g.sub} • {g.key}</div>
+                    <div className="text-[11px] opacity-50">{g.sub} • {formatBinding(bindings[g.bindingId])}</div>
                   </button>
                 ))}
               </div>
