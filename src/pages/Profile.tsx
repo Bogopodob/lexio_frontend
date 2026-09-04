@@ -27,20 +27,31 @@ import { useState, useEffect, useRef, useCallback, useMemo, memo, lazy, Suspense
 import { createPortal } from 'react-dom'
 import { useAuth } from '@/context/AuthContext'
 import {
+  answerFriendRequest,
   createGoal,
   createLearningProfile,
   deleteGoal,
   getProfile,
+  getStats,
   listAchievements,
+  listFriendRequests,
+  listFriends,
   listGoals,
   listLanguages,
   listLearningProfiles,
+  removeFriend,
+  searchUsers,
+  sendFriendRequest,
   updateGoal,
   updateLearningProfile,
   updateProfile,
+  type FriendRequestRow,
   type RemoteAchievement,
+  type RemoteFriend,
   type RemoteGoal,
   type RemoteLearningProfile,
+  type RemoteStat,
+  type UserSearchHit,
 } from '@/lib/profile-api'
 import { DatePicker, DateField, Calendar } from '@heroui/react'
 import { parseDate, getLocalTimeZone, today } from '@internationalized/date'
@@ -318,6 +329,7 @@ export default function Profile() {
   const [hasLearningProfile, setHasLearningProfile] = useState(false)
   const [activeProfileId, setActiveProfileId] = useState<string | null>(null)
   const [learningProfiles, setLearningProfiles] = useState<RemoteLearningProfile[]>([])
+  const [profileStats, setProfileStats] = useState<Record<string, RemoteStat>>({})
   const [goal, setGoal] = useState(20)
   const fileRef = useRef<HTMLInputElement>(null)
   const { user, token, ready: authReady } = useAuth()
@@ -340,6 +352,101 @@ export default function Profile() {
     { name: 'София', level: 'A1', streak: 3, avatar: 'С' },
   ])
   const [friendQuery, setFriendQuery] = useState('')
+  const [remoteFriends, setRemoteFriends] = useState<RemoteFriend[] | null>(null)
+  const [incoming, setIncoming] = useState<FriendRequestRow[]>([])
+  const [searchHits, setSearchHits] = useState<UserSearchHit[]>([])
+  const [searching, setSearching] = useState(false)
+
+  const isAuthed = Boolean(user && token)
+
+  // Friends from the server (guests keep mocks).
+  useEffect(() => {
+    if (!user || !token) {
+      setRemoteFriends(null)
+      setIncoming([])
+      return
+    }
+    let cancelled = false
+    const uid = user.id
+    const tk = token
+    listFriends(uid, tk)
+      .then((list) => {
+        if (!cancelled) setRemoteFriends(list)
+      })
+      .catch(() => undefined)
+    listFriendRequests(uid, tk, 'incoming')
+      .then((list) => {
+        if (!cancelled) setIncoming(list)
+      })
+      .catch(() => undefined)
+    return () => {
+      cancelled = true
+    }
+  }, [user, token])
+
+  // Debounced user search.
+  useEffect(() => {
+    if (!user || !token || friendQuery.trim().length < 2) {
+      setSearchHits([])
+      setSearching(false)
+      return
+    }
+    setSearching(true)
+    const timer = window.setTimeout(() => {
+      searchUsers(user.id, token, friendQuery.trim())
+        .then((hits) => {
+          setSearchHits(hits)
+          setSearching(false)
+        })
+        .catch(() => setSearching(false))
+    }, 450)
+    return () => window.clearTimeout(timer)
+  }, [friendQuery, user, token])
+
+  const reloadFriends = useCallback(() => {
+    if (!user || !token) return
+    listFriends(user.id, token)
+      .then(setRemoteFriends)
+      .catch(() => undefined)
+    listFriendRequests(user.id, token, 'incoming')
+      .then(setIncoming)
+      .catch(() => undefined)
+  }, [user, token])
+
+  const handleSendRequest = useCallback(
+    (hit: UserSearchHit) => {
+      if (!user || !token) return
+      sendFriendRequest(user.id, token, { user_id: hit.user_id })
+        .then(() => {
+          setSearchHits((prev) =>
+            prev.map((h) => (h.user_id === hit.user_id ? { ...h, relation: 'pending' } : h)),
+          )
+          setFriendQuery('')
+        })
+        .catch(() => undefined)
+    },
+    [user, token],
+  )
+
+  const handleAnswer = useCallback(
+    (requestId: string, accept: boolean) => {
+      if (!user || !token) return
+      answerFriendRequest(user.id, token, requestId, accept)
+        .then(() => reloadFriends())
+        .catch(() => undefined)
+    },
+    [user, token, reloadFriends],
+  )
+
+  const handleRemoveFriend = useCallback(
+    (friendshipId: string) => {
+      if (!user || !token) return
+      removeFriend(user.id, token, friendshipId)
+        .then(() => reloadFriends())
+        .catch(() => undefined)
+    },
+    [user, token, reloadFriends],
+  )
   const mockUsers = useMemo(
     () => {
       const lowerQuery = friendQuery.toLowerCase()
@@ -644,6 +751,29 @@ export default function Profile() {
     }
   }, [user, token, activeProfileId])
 
+  // Mini-stats for every language profile (shown under each language card).
+  useEffect(() => {
+    if (!user || !token || learningProfiles.length === 0) return
+    let cancelled = false
+    const uid = user.id
+    const tk = token
+    Promise.allSettled(
+      learningProfiles.map((p) =>
+        getStats(uid, tk, p.id).then((s) => ({ id: p.id, stat: s })),
+      ),
+    ).then((results) => {
+      if (cancelled) return
+      const map: Record<string, RemoteStat> = {}
+      for (const r of results) {
+        if (r.status === 'fulfilled') map[r.value.id] = r.value.stat
+      }
+      setProfileStats(map)
+    })
+    return () => {
+      cancelled = true
+    }
+  }, [user, token, learningProfiles])
+
   const goalKey = (g: { id?: string; title: string }) => g.id ?? g.title
 
   const removeGoal = useCallback(
@@ -823,10 +953,34 @@ export default function Profile() {
         <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
           {langOptions.map((l) => {
             const active = (isEditing ? draft.language : profile.language) === l.id
+            const langProfile = learningProfiles.find((p) => p.target_language_id === langIdByCode[l.id])
+            const stat = langProfile ? profileStats[langProfile.id] : undefined
             return (
               <button key={l.id} onClick={() => isEditing && setDraft({ ...draft, language: l.id })} disabled={!isEditing} className={`p-3 rounded-xl border text-left transition-all ${active ? 'bg-[#5AD4B5]/10 border-[#5AD4B5]/30 text-[#5AD4B5]' : 'bg-white/[0.03] border-white/[0.06] opacity-60 hover:opacity-100 hover:bg-white/[0.06]'} ${!isEditing ? 'cursor-default' : ''}`}>
-                <div className="text-sm font-black">{l.label}</div>
+                <div className="flex items-center justify-between gap-1.5">
+                  <div className="text-sm font-black truncate">{l.label}</div>
+                  {langProfile ? (
+                    <span className="px-1.5 py-0.5 rounded-md bg-white/[0.08] border border-white/[0.1] text-[10px] font-black shrink-0">
+                      {langProfile.level}
+                    </span>
+                  ) : (
+                    <span className="px-1.5 py-0.5 rounded-md border border-dashed border-white/[0.15] text-[10px] font-bold opacity-50 shrink-0">
+                      0
+                    </span>
+                  )}
+                </div>
                 <div className="text-xs opacity-60">{l.sub}</div>
+                {langProfile && stat && (stat.words_learned > 0 || stat.xp > 0 || stat.streak_days > 0) ? (
+                  <div className="text-[11px] mt-1.5 tabular-nums opacity-80 font-semibold">
+                    📚 {stat.words_learned} • 🔥 {stat.streak_days} • ⚡ {stat.xp}
+                  </div>
+                ) : langProfile ? (
+                  <div className="text-[11px] mt-1.5 opacity-50">Уровень {langProfile.level} • только старт</div>
+                ) : (
+                  <div className="text-[11px] mt-1.5 opacity-40 italic">
+                    {isEditing ? 'Выбери и сохрани, чтобы начать' : 'Не начат'}
+                  </div>
+                )}
               </button>
             )
           })}
@@ -992,47 +1146,133 @@ export default function Profile() {
         <div className="rounded-[20px] border border-white/[0.06] bg-[#171717] p-5">
           <div className="flex items-center justify-between">
             <h3 className="text-[14px] font-black tracking-tight flex items-center gap-2"><FontAwesomeIcon icon={faUsers} className="text-[#5B74FF]" /> Друзья учат</h3>
-            <span className="text-[11px] opacity-40 font-bold">{friends.length} друга</span>
+            <span className="text-[11px] opacity-40 font-bold">
+              {(remoteFriends ?? friends).length} друга
+              {incoming.length > 0 && <span className="ml-1.5 px-1.5 py-0.5 rounded-full bg-[#F5C16A]/15 border border-[#F5C16A]/25 text-[#F5C16A]">+{incoming.length} заявки</span>}
+            </span>
           </div>
-          {isEditing && (
+          {isAuthed ? (
             <div className="mt-3">
               <div className="relative">
-                <input value={friendQuery} onChange={(e) => setFriendQuery(e.target.value)} placeholder="Поиск — Анна, Дмитрий..." className="w-full pl-8 pr-3 py-2 rounded-xl bg-black/20 border border-white/[0.06] text-sm placeholder:text-white/30 focus:outline-none focus:border-white/15" />
+                <input value={friendQuery} onChange={(e) => setFriendQuery(e.target.value)} placeholder="Поиск по имени или email…" className="w-full pl-8 pr-3 py-2 rounded-xl bg-black/20 border border-white/[0.06] text-sm placeholder:text-white/30 focus:outline-none focus:border-white/15" />
                 <FontAwesomeIcon icon={faUsers} className="absolute left-3 top-1/2 -translate-y-1/2 text-white/30 text-xs" />
               </div>
-              {friendQuery && mockUsers.length > 0 && (
+              {searching && <div className="text-xs opacity-40 mt-2">Ищем…</div>}
+              {!searching && friendQuery.trim().length >= 2 && searchHits.length > 0 && (
                 <div className="mt-2 rounded-xl border border-white/[0.06] bg-[#0f0f0f] overflow-hidden">
-                  {mockUsers.map((u) => (
-                    <button key={u.name} onClick={() => { setFriends([...friends, { name: u.name, level: u.level, streak: Math.floor(Math.random() * 10) + 1, avatar: u.avatar }]); setFriendQuery('') }} className="w-full flex items-center gap-2.5 p-2.5 hover:bg-white/[0.04] text-left">
-                      <span className="w-7 h-7 rounded-full bg-white/[0.08] grid place-items-center font-bold text-xs">{u.avatar}</span>
-                      <span className="text-sm font-bold">{u.name}</span>
-                      <span className="text-xs opacity-40">• {u.level}</span>
-                      <span className="ml-auto text-xs font-black text-[#5AD4B5]">+ Добавить</span>
-                    </button>
+                  {searchHits.map((u) => (
+                    <div key={u.user_id} className="w-full flex items-center gap-2.5 p-2.5">
+                      <span className="w-7 h-7 rounded-full bg-white/[0.08] grid place-items-center font-bold text-xs">
+                        {(u.name?.[0] || u.email[0] || '?').toUpperCase()}
+                      </span>
+                      <span className="text-sm font-bold truncate">{u.name || u.email}</span>
+                      {u.relation === 'accepted' ? (
+                        <span className="ml-auto text-xs font-bold opacity-40">Уже друзья</span>
+                      ) : u.relation === 'pending' ? (
+                        <span className="ml-auto text-xs font-bold text-[#F5C16A]">Заявка отправлена</span>
+                      ) : (
+                        <button onClick={() => handleSendRequest(u)} className="ml-auto text-xs font-black text-[#5AD4B5] hover:text-white shrink-0">+ Добавить</button>
+                      )}
+                    </div>
                   ))}
                 </div>
               )}
-              {friendQuery && mockUsers.length === 0 && <div className="text-xs opacity-40 mt-2">Никого не нашли по “{friendQuery}”</div>}
+              {!searching && friendQuery.trim().length >= 2 && searchHits.length === 0 && (
+                <div className="text-xs opacity-40 mt-2">Никого не нашли по “{friendQuery.trim()}”</div>
+              )}
+            </div>
+          ) : (
+            isEditing && (
+              <div className="mt-3">
+                <div className="relative">
+                  <input value={friendQuery} onChange={(e) => setFriendQuery(e.target.value)} placeholder="Поиск — Анна, Дмитрий..." className="w-full pl-8 pr-3 py-2 rounded-xl bg-black/20 border border-white/[0.06] text-sm placeholder:text-white/30 focus:outline-none focus:border-white/15" />
+                  <FontAwesomeIcon icon={faUsers} className="absolute left-3 top-1/2 -translate-y-1/2 text-white/30 text-xs" />
+                </div>
+                {friendQuery && mockUsers.length > 0 && (
+                  <div className="mt-2 rounded-xl border border-white/[0.06] bg-[#0f0f0f] overflow-hidden">
+                    {mockUsers.map((u) => (
+                      <button key={u.name} onClick={() => { setFriends([...friends, { name: u.name, level: u.level, streak: Math.floor(Math.random() * 10) + 1, avatar: u.avatar }]); setFriendQuery('') }} className="w-full flex items-center gap-2.5 p-2.5 hover:bg-white/[0.04] text-left">
+                        <span className="w-7 h-7 rounded-full bg-white/[0.08] grid place-items-center font-bold text-xs">{u.avatar}</span>
+                        <span className="text-sm font-bold">{u.name}</span>
+                        <span className="text-xs opacity-40">• {u.level}</span>
+                        <span className="ml-auto text-xs font-black text-[#5AD4B5]">+ Добавить</span>
+                      </button>
+                    ))}
+                  </div>
+                )}
+                {friendQuery && mockUsers.length === 0 && <div className="text-xs opacity-40 mt-2">Никого не нашли по “{friendQuery}”</div>}
+              </div>
+            )
+          )}
+          {isAuthed && incoming.length > 0 && (
+            <div className="mt-3 rounded-xl border border-[#F5C16A]/20 bg-[#F5C16A]/[0.05] p-2.5">
+              <div className="text-[11px] font-black uppercase tracking-wide text-[#F5C16A] mb-1.5">Входящие заявки</div>
+              <div className="space-y-1.5">
+                {incoming.map((r) => (
+                  <div key={r.id} className="flex items-center gap-2.5">
+                    <span className="w-7 h-7 rounded-full bg-white/[0.08] grid place-items-center font-bold text-xs">
+                      {(r.name?.[0] || '?').toUpperCase()}
+                    </span>
+                    <span className="text-sm font-bold flex-1 truncate">{r.name || 'Пользователь'}</span>
+                    <button onClick={() => handleAnswer(r.id, true)} className="w-7 h-7 rounded-full bg-[#5AD4B5] text-black grid place-items-center hover:opacity-90" aria-label="Принять">
+                      <FontAwesomeIcon icon={faCheck} className="text-[11px]" />
+                    </button>
+                    <button onClick={() => handleAnswer(r.id, false)} className="w-7 h-7 rounded-full bg-white/[0.06] border border-white/[0.08] text-white/60 grid place-items-center hover:bg-[#f43f5e]/20 hover:text-[#f43f5e] hover:border-[#f43f5e]/30" aria-label="Отклонить">
+                      <FontAwesomeIcon icon={faTrash} className="text-[11px]" />
+                    </button>
+                  </div>
+                ))}
+              </div>
             </div>
           )}
           <div className="mt-4 space-y-2.5">
-            {friends.map((f) => (
-              <div key={f.name} className="flex items-center gap-3 rounded-xl bg-white/[0.03] border border-white/[0.04] p-3 group">
-                <span className="w-9 h-9 rounded-full bg-white/[0.08] border border-white/[0.08] grid place-items-center font-bold text-sm">{f.avatar}</span>
-                <div className="flex-1 min-w-0">
-                  <div className="text-sm font-bold leading-none">{f.name} • <span className="opacity-60 font-semibold">{f.level}</span></div>
-                  <div className="text-xs opacity-40">🔥 {f.streak} дней</div>
-                </div>
-                {isEditing ? (
-                  <button onClick={() => setFriends(friends.filter((x) => x.name !== f.name))} className="w-7 h-7 rounded-full bg-[#f43f5e]/10 border border-[#f43f5e]/20 text-[#f43f5e] grid place-items-center hover:bg-[#f43f5e]/20">
-                    <FontAwesomeIcon icon={faTrash} className="text-[11px]" />
-                  </button>
-                ) : (
-                  <span className="px-2.5 py-1 rounded-full bg-white/[0.06] border border-white/[0.06] text-xs font-bold opacity-60">•</span>
+            {isAuthed ? (
+              <>
+                {(remoteFriends ?? []).map((f) => (
+                  <div key={f.user_id} className="flex items-center gap-3 rounded-xl bg-white/[0.03] border border-white/[0.04] p-3 group">
+                    <span className="w-9 h-9 rounded-full bg-white/[0.08] border border-white/[0.08] grid place-items-center font-bold text-sm">
+                      {f.avatar || (f.name?.[0] || '?').toUpperCase()}
+                    </span>
+                    <div className="flex-1 min-w-0">
+                      <div className="text-sm font-bold leading-none truncate">
+                        {f.name || 'Пользователь'}
+                        {f.level && <> • <span className="opacity-60 font-semibold">{f.level}</span></>}
+                      </div>
+                      <div className="text-xs opacity-40">🔥 {f.streak_days} дней</div>
+                    </div>
+                    <button onClick={() => handleRemoveFriend(f.friendship_id)} className="w-7 h-7 rounded-full bg-[#f43f5e]/10 border border-[#f43f5e]/20 text-[#f43f5e] grid place-items-center hover:bg-[#f43f5e]/20 opacity-0 group-hover:opacity-100 transition-opacity" aria-label="Убрать из друзей">
+                      <FontAwesomeIcon icon={faTrash} className="text-[11px]" />
+                    </button>
+                  </div>
+                ))}
+                {remoteFriends !== null && remoteFriends.length === 0 && (
+                  <div className="text-xs opacity-40 text-center py-4">Пока нет друзей — найди их через поиск выше 👆</div>
                 )}
-              </div>
-            ))}
-            {friends.length === 0 && <div className="text-xs opacity-40 text-center py-4">Пока нет друзей — добавь через поиск выше</div>}
+                {remoteFriends === null && (
+                  <div className="text-xs opacity-40 text-center py-4 animate-pulse">Загружаем друзей…</div>
+                )}
+              </>
+            ) : (
+              <>
+                {friends.map((f) => (
+                  <div key={f.name} className="flex items-center gap-3 rounded-xl bg-white/[0.03] border border-white/[0.04] p-3 group">
+                    <span className="w-9 h-9 rounded-full bg-white/[0.08] border border-white/[0.08] grid place-items-center font-bold text-sm">{f.avatar}</span>
+                    <div className="flex-1 min-w-0">
+                      <div className="text-sm font-bold leading-none">{f.name} • <span className="opacity-60 font-semibold">{f.level}</span></div>
+                      <div className="text-xs opacity-40">🔥 {f.streak} дней</div>
+                    </div>
+                    {isEditing ? (
+                      <button onClick={() => setFriends(friends.filter((x) => x.name !== f.name))} className="w-7 h-7 rounded-full bg-[#f43f5e]/10 border border-[#f43f5e]/20 text-[#f43f5e] grid place-items-center hover:bg-[#f43f5e]/20">
+                        <FontAwesomeIcon icon={faTrash} className="text-[11px]" />
+                      </button>
+                    ) : (
+                      <span className="px-2.5 py-1 rounded-full bg-white/[0.06] border border-white/[0.06] text-xs font-bold opacity-60">•</span>
+                    )}
+                  </div>
+                ))}
+                {friends.length === 0 && <div className="text-xs opacity-40 text-center py-4">Пока нет друзей — добавь через поиск выше</div>}
+              </>
+            )}
           </div>
         </div>
         <div className="rounded-[20px] border border-white/[0.06] bg-[#171717] p-5">

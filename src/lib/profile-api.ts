@@ -183,6 +183,73 @@ export function getStats(userId: string, token: string, profileId: string): Prom
   return request(`/learning/users/${userId}/profiles/${profileId}/stats`, token)
 }
 
+export interface RemoteFriend {
+  user_id: string
+  name: string | null
+  avatar: string | null
+  level: string | null
+  streak_days: number
+  friendship_id: string
+}
+
+export function listFriends(userId: string, token: string): Promise<RemoteFriend[]> {
+  return request(`/users/${userId}/friends`, token)
+}
+
+export interface FriendRequestRow {
+  id: string
+  user_id: string
+  name: string | null
+  direction: string
+}
+
+export function listFriendRequests(
+  userId: string,
+  token: string,
+  direction: 'incoming' | 'outgoing' = 'incoming',
+): Promise<FriendRequestRow[]> {
+  return request(`/users/${userId}/friends/requests?direction=${direction}`, token)
+}
+
+export function sendFriendRequest(
+  userId: string,
+  token: string,
+  target: { user_id?: string; email?: string },
+): Promise<{ status: string; request_id: string }> {
+  return request(`/users/${userId}/friends/requests`, token, {
+    method: 'POST',
+    body: JSON.stringify(target),
+  })
+}
+
+export function answerFriendRequest(
+  userId: string,
+  token: string,
+  requestId: string,
+  accept: boolean,
+): Promise<{ status: string }> {
+  return request(`/users/${userId}/friends/requests/${requestId}/${accept ? 'accept' : 'decline'}`, token, {
+    method: 'POST',
+  })
+}
+
+export function removeFriend(userId: string, token: string, friendshipId: string): Promise<void> {
+  return request(`/users/${userId}/friends/${friendshipId}`, token, {
+    method: 'DELETE',
+  }).then(() => undefined)
+}
+
+export interface UserSearchHit {
+  user_id: string
+  name: string | null
+  email: string
+  relation: string | null
+}
+
+export function searchUsers(userId: string, token: string, query: string): Promise<UserSearchHit[]> {
+  return request(`/users/${userId}/friends/search?query=${encodeURIComponent(query)}`, token)
+}
+
 export function getDueCount(userId: string, token: string, profileId: string): Promise<number> {
   return request<Array<unknown>>(
     `/learning/users/${userId}/profiles/${profileId}/due?limit=100`,
