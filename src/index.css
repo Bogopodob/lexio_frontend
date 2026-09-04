@@ -4279,3 +4279,274 @@ button.app-header__avatar-wrap {
 [data-theme="light"] .nf-hint { color: rgba(20, 20, 20, 0.4); }
 [data-theme="light"] .nf-btn { color: #141414; background: rgba(20, 20, 20, 0.05); border-color: rgba(20, 20, 20, 0.1); }
 [data-theme="light"] .nf-btn--primary { color: #06281f; }
+
+/* ── 404 v2: hero + grid ── */
+.nf-page {
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  gap: 18px;
+}
+
+.nf-hero {
+  position: relative;
+  min-height: 540px;
+  display: grid;
+  place-items: center;
+  padding: 40px 16px;
+  overflow: hidden;
+}
+
+.nf-orbit {
+  position: absolute;
+  inset: 0;
+}
+
+.nf-grid {
+  position: relative;
+  z-index: 1;
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 14px;
+  width: 100%;
+  max-width: 920px;
+  margin: 0 auto;
+}
+
+@media (min-width: 900px) {
+  .nf-grid { grid-template-columns: 1.1fr 1fr; }
+}
+
+.nf-hint { align-self: center; }
+
+/* glitch digits */
+.nf-digits--glitch { position: relative; }
+
+.nf-digits--glitch::before,
+.nf-digits--glitch::after {
+  content: attr(data-text);
+  position: absolute;
+  inset: 0;
+  display: flex;
+  justify-content: center;
+  background: none;
+  -webkit-background-clip: initial;
+  background-clip: initial;
+  color: transparent;
+  opacity: 0;
+  pointer-events: none;
+}
+
+.nf-digits--glitch::before {
+  color: #5ad4b5;
+  animation: nf-glitch-a 9s infinite;
+}
+
+.nf-digits--glitch::after {
+  color: #f43f5e;
+  animation: nf-glitch-b 9s infinite;
+}
+
+@keyframes nf-glitch-a {
+  0%, 91%, 96%, 100% { opacity: 0; transform: none; clip-path: inset(0 0 100% 0); }
+  92% { opacity: 0.85; transform: translate(-7px, 3px); clip-path: inset(8% 0 58% 0); }
+  94% { opacity: 0.85; transform: translate(6px, -2px); clip-path: inset(52% 0 12% 0); }
+}
+
+@keyframes nf-glitch-b {
+  0%, 91%, 96%, 100% { opacity: 0; transform: none; clip-path: inset(0 0 100% 0); }
+  93% { opacity: 0.85; transform: translate(7px, 2px); clip-path: inset(62% 0 6% 0); }
+  95% { opacity: 0.85; transform: translate(-5px, -3px); clip-path: inset(18% 0 66% 0); }
+}
+
+/* terminal */
+.nf-terminal {
+  border-radius: 18px;
+  overflow: hidden;
+  background: rgba(8, 10, 12, 0.88);
+  border: 1px solid rgba(255, 255, 255, 0.09);
+  box-shadow: 0 18px 50px rgba(0, 0, 0, 0.45), inset 0 1px 0 rgba(255, 255, 255, 0.05);
+  backdrop-filter: blur(10px);
+}
+
+.nf-terminal__bar {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 10px 14px;
+  background: rgba(255, 255, 255, 0.04);
+  border-bottom: 1px solid rgba(255, 255, 255, 0.07);
+}
+
+.nf-terminal__dot { width: 10px; height: 10px; border-radius: 999px; }
+.nf-terminal__dot--r { background: #f43f5e; }
+.nf-terminal__dot--y { background: #F5C16A; }
+.nf-terminal__dot--g { background: #5AD4B5; }
+
+.nf-terminal__title {
+  margin-left: 8px;
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  font-size: 11.5px;
+  font-weight: 700;
+  color: rgba(255, 255, 255, 0.45);
+}
+
+.nf-terminal__body {
+  padding: 14px 16px 16px;
+  min-height: 236px;
+  font-family: ui-monospace, 'Cascadia Code', Menlo, Consolas, monospace;
+  font-size: 12.5px;
+  line-height: 1.75;
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+
+.nf-terminal__line { min-height: 1.75em; }
+
+.nf-terminal__caret {
+  display: inline-block;
+  width: 8px;
+  height: 14px;
+  margin-left: 3px;
+  vertical-align: -2px;
+  background: #5ad4b5;
+  animation: auth-caret 1s steps(2) infinite;
+}
+
+/* bug arena */
+.nf-arena {
+  border-radius: 18px;
+  padding: 16px;
+  background: rgba(23, 23, 23, 0.85);
+  border: 1px solid rgba(255, 255, 255, 0.09);
+  box-shadow: 0 18px 50px rgba(0, 0, 0, 0.45);
+  backdrop-filter: blur(10px);
+  display: flex;
+  flex-direction: column;
+}
+
+.nf-arena__head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 10px;
+}
+
+.nf-arena__title {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 13.5px;
+  font-weight: 900;
+  color: #fff;
+}
+
+.nf-arena__title svg { color: #f43f5e; }
+
+.nf-arena__score {
+  font-size: 12px;
+  color: rgba(255, 255, 255, 0.5);
+}
+
+.nf-arena__score b {
+  color: #5ad4b5;
+  font-size: 15px;
+  margin: 0 2px;
+}
+
+.nf-arena__best {
+  margin-left: 8px;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  color: #F5C16A;
+  font-weight: 800;
+}
+
+.nf-arena__field {
+  position: relative;
+  flex: 1;
+  min-height: 218px;
+  border-radius: 14px;
+  overflow: hidden;
+  background-image: radial-gradient(circle at 1px 1px, rgba(255, 255, 255, 0.07) 1px, transparent 0);
+  background-size: 22px 22px;
+  background-color: rgba(0, 0, 0, 0.3);
+  border: 1px dashed rgba(255, 255, 255, 0.1);
+  cursor: crosshair;
+}
+
+.nf-arena__bug {
+  position: absolute;
+  transform: translate(-50%, -50%);
+  background: none;
+  border: 0;
+  cursor: pointer;
+  padding: 6px;
+}
+
+.nf-arena__bug-emoji {
+  display: inline-block;
+  font-size: 30px;
+  filter: drop-shadow(0 0 12px rgba(244, 63, 94, 0.7));
+  animation: nf-bug-wobble 0.9s ease-in-out infinite;
+}
+
+@keyframes nf-bug-wobble {
+  0%, 100% { transform: rotate(-12deg) scale(1); }
+  50% { transform: rotate(12deg) scale(1.12); }
+}
+
+.nf-arena__pop {
+  position: absolute;
+  transform: translate(-50%, -50%);
+  font-size: 15px;
+  font-weight: 900;
+  color: #5ad4b5;
+  text-shadow: 0 0 12px rgba(90, 212, 181, 0.8);
+  pointer-events: none;
+}
+
+.nf-arena__hint {
+  position: absolute;
+  bottom: 8px;
+  left: 0;
+  right: 0;
+  text-align: center;
+  font-size: 11px;
+  color: rgba(255, 255, 255, 0.3);
+  pointer-events: none;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .nf-digits--glitch::before,
+  .nf-digits--glitch::after,
+  .nf-arena__bug-emoji {
+    animation: none;
+  }
+}
+
+[data-theme="light"] .nf-terminal {
+  background: rgba(20, 22, 26, 0.94);
+}
+
+[data-theme="light"] .nf-arena {
+  background: rgba(255, 255, 255, 0.85);
+  border-color: rgba(20, 20, 20, 0.09);
+}
+
+[data-theme="light"] .nf-arena__title { color: #141414; }
+[data-theme="light"] .nf-arena__score { color: rgba(20, 20, 20, 0.5); }
+[data-theme="light"] .nf-arena__field { background-color: rgba(20, 20, 20, 0.03); }
+[data-theme="light"] .nf-arena__hint { color: rgba(20, 20, 20, 0.35); }
+
+.nf-page {
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  justify-content: flex-start;
+  gap: 18px;
+  padding: 36px 20px;
+}
