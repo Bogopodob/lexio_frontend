@@ -4,6 +4,7 @@ import Profile from '@/pages/Profile'
 import Stats from '@/pages/Stats'
 import Settings from '@/pages/Settings'
 import Auth from '@/pages/Auth'
+import NotFound from '@/pages/NotFound'
 import RequireAuth from '@/components/RequireAuth'
 
 export default function Router() {
@@ -21,6 +22,7 @@ export default function Router() {
       />
       <Route path="/stats" element={<Stats />} />
       <Route path="/settings" element={<Settings />} />
+      <Route path="*" element={<NotFound />} />
     </Routes>
   )
 }
