@@ -614,6 +614,25 @@ export default function Learn() {
             )}
           </div>
 
+          <div className="rounded-2xl bg-white/[0.03] border border-white/[0.05] px-3.5 py-2.5 flex flex-wrap items-center justify-center gap-x-4 gap-y-1.5 text-[11.5px] text-white/55">
+            {!flipped ? (
+              <>
+                <span>
+                  <Kbd>Пробел</Kbd> — открыть перевод
+                </span>
+                <span>🖱️ или кликни по карточке</span>
+              </>
+            ) : (
+              <>
+                <span>
+                  <Kbd>Пробел</Kbd> — дальше ✓
+                </span>
+                <span>
+                  <Kbd>{formatBinding(bindings.grade_again)}</Kbd>–<Kbd>{formatBinding(bindings.grade_easy)}</Kbd> — оценка
+                </span>
+              </>
+            )}
+          </div>
           <div className="flex items-center justify-between text-xs opacity-40">
             <span>
               верно {sessionCorrect} • +{sessionXp} XP
