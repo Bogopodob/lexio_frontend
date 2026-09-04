@@ -379,14 +379,17 @@ export default function Learn() {
                 <button
                   key={s.id}
                   onClick={() => setSource(s.id)}
-                  disabled={Boolean(categoryId) && s.id !== 'new'}
-                  title={categoryId && s.id !== 'new' ? 'С выбранной темой — только новые слова' : undefined}
-                  className={`px-3 py-1.5 rounded-full text-xs font-bold border transition-all ${source === s.id ? 'bg-[#5AD4B5] text-black border-[#5AD4B5]' : 'bg-white/[0.04] border-white/[0.06] hover:bg-white/[0.08]'} ${categoryId && s.id !== 'new' ? 'opacity-30 cursor-not-allowed' : ''}`}
+                  className={`px-3 py-1.5 rounded-full text-xs font-bold border transition-all ${source === s.id ? 'bg-[#5AD4B5] text-black border-[#5AD4B5]' : 'bg-white/[0.04] border-white/[0.06] hover:bg-white/[0.08]'}`}
                 >
                   {s.label}
                 </button>
               ))}
             </div>
+            {categoryId && source !== 'new' && (
+              <div className="text-[11px] opacity-40 mt-2">
+                Повторения — по всем словам, новые — из выбранной темы
+              </div>
+            )}
             <div className="flex items-center gap-2 mt-3">
               <span className="text-xs opacity-40 font-bold">Слов в уроке:</span>
               {LIMITS.map((n) => (
