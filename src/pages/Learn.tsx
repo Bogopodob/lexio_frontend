@@ -71,6 +71,35 @@ export default function Learn() {
   const [categoryId, setCategoryId] = useState<string | null>(null)
   const [categoryName, setCategoryName] = useState<string | null>(null)
   const [availability, setAvailability] = useState<Availability | null>(null)
+  const [categoryNames, setCategoryNames] = useState<Record<string, string>>({})
+
+  const SOURCE_LABELS: Record<string, string> = {
+    mixed: 'Всё сразу',
+    due: 'Повторение',
+    new: 'Новые слова',
+  }
+
+  // Resolve the resume banner's category name.
+  useEffect(() => {
+    const id = activeSession?.category_id
+    if (!id || categoryNames[id]) return
+    let cancelled = false
+    listCategories()
+      .then((list) => {
+        if (cancelled) return
+        setCategoryNames((prev) => {
+          const next = { ...prev }
+          list.forEach((c) => {
+            next[c.id] = c.name ?? c.slug
+          })
+          return next
+        })
+      })
+      .catch(() => undefined)
+    return () => {
+      cancelled = true
+    }
+  }, [activeSession?.category_id, categoryNames])
 
   // Preselected category from topic/grammar cards (?category=<id>).
   useEffect(() => {
@@ -295,6 +324,12 @@ export default function Learn() {
         else grade(4)
         return
       }
+      if (flipped && matchesShortcut(e, bindings.flip_back)) {
+        e.preventDefault()
+        e.stopPropagation()
+        setFlipped(false)
+        return
+      }
       const found = GRADES.find((g) => matchesShortcut(e, bindings[g.bindingId]))
       if (found) {
         e.preventDefault()
@@ -373,6 +408,12 @@ export default function Learn() {
             >
               <div className="flex items-center gap-2 text-[#F5C16A] text-[12px] font-black uppercase tracking-wide">
                 <FontAwesomeIcon icon={faRotateRight} /> Продолжить с места остановки
+              </div>
+              <div className="text-[13px] font-bold text-white/70 mt-1">
+                {SOURCE_LABELS[activeSession.source] ?? activeSession.source}
+                {activeSession.category_id
+                  ? ` • ${categoryNames[activeSession.category_id] ?? 'тема'}`
+                  : ' • все слова'}
               </div>
               <div className="text-[22px] font-black mt-1 tabular-nums">
                 {activeSession.answered}/{activeSession.total}
@@ -573,16 +614,12 @@ export default function Learn() {
                 icon={faBookOpen}
                 title={card.card.front_text}
                 translation={backText}
+                transcription={card.card.front_transcription}
                 isFlipped={flipped}
                 isSpeaking={speaking}
                 onFlip={() => setFlipped((v) => !v)}
                 onSpeak={speakCard}
               />
-              {card.card.front_transcription && (
-                <div className="text-center text-sm opacity-50 mt-2 tabular-nums">
-                  [{card.card.front_transcription}]
-                </div>
-              )}
             </motion.div>
           </AnimatePresence>
 
@@ -626,6 +663,9 @@ export default function Learn() {
               <>
                 <span>
                   <Kbd>Пробел</Kbd> — дальше ✓
+                </span>
+                <span>
+                  <Kbd>{formatBinding(bindings.flip_back)}</Kbd> — назад к слову
                 </span>
                 <span>
                   <Kbd>{formatBinding(bindings.grade_again)}</Kbd>–<Kbd>{formatBinding(bindings.grade_easy)}</Kbd> — оценка

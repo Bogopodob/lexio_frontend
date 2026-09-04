@@ -3,6 +3,7 @@ import { useSyncExternalStore } from 'react'
 export type ShortcutId =
   | 'search'
   | 'flip'
+  | 'flip_back'
   | 'speak'
   | 'grade_again'
   | 'grade_hard'
@@ -12,6 +13,7 @@ export type ShortcutId =
 export const SHORTCUT_META: Record<ShortcutId, { label: string; hint: string }> = {
   search: { label: 'Поиск', hint: 'Открыть палитру команд' },
   flip: { label: 'Переворот карточки', hint: 'Показать перевод' },
+  flip_back: { label: 'Назад к слову', hint: 'Вернуть карточку без оценки' },
   speak: { label: 'Озвучить', hint: 'Произнести фразу вслух' },
   grade_again: { label: 'Оценка: Снова', hint: 'Не вспомнил — повторить' },
   grade_hard: { label: 'Оценка: Трудно', hint: 'Вспомнил с трудом' },
@@ -22,6 +24,7 @@ export const SHORTCUT_META: Record<ShortcutId, { label: string; hint: string }> 
 export const DEFAULT_SHORTCUTS: Record<ShortcutId, string> = {
   search: 'mod+k',
   flip: 'Enter',
+  flip_back: 'Backspace',
   speak: 'l',
   grade_again: '1',
   grade_hard: '2',

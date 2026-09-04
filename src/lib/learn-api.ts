@@ -4,6 +4,7 @@ export interface RemoteSession {
   id: string
   profile_id: string
   source: string
+  category_id: string | null
   status: 'active' | 'finished' | 'abandoned'
   total: number
   answered: number

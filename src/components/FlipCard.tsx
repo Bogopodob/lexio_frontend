@@ -11,6 +11,7 @@ interface FlipCardProps {
   icon: IconDefinition
   title: string
   translation: string
+  transcription?: string | null
   isFlipped: boolean
   isSpeaking: boolean
   onFlip: () => void
@@ -23,6 +24,7 @@ export default function FlipCard({
   icon,
   title,
   translation,
+  transcription,
   isFlipped,
   isSpeaking,
   onFlip,
@@ -63,6 +65,11 @@ export default function FlipCard({
           </div>
           <p className={`phrase-card__label ${labelAccent}`}>{label}</p>
           <h4>{title}</h4>
+          {transcription ? (
+            <p className="mt-1.5 text-[17px] font-bold text-[#5AD4B5] tabular-nums tracking-wide">
+              [{transcription}]
+            </p>
+          ) : null}
           <p className="phrase-card__hint">Нажмите чтобы увидеть перевод</p>
           <div className="phrase-card__actions">
             <button
