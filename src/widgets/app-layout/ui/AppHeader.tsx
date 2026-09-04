@@ -61,8 +61,17 @@ export default function AppHeader({
     '/stats': 'Статистика',
     '/profile': 'Профиль',
     '/settings': 'Настройки',
+    '/learn': 'Урок',
   }
-  const currentTitle = titleMap[pathname] ?? (pathname.startsWith('/stats') ? 'Статистика' : pathname.startsWith('/profile') ? 'Профиль' : 'Страница')
+  const currentTitle =
+    titleMap[pathname] ??
+    (pathname.startsWith('/stats')
+      ? 'Статистика'
+      : pathname.startsWith('/profile')
+        ? 'Профиль'
+        : pathname.startsWith('/learn')
+          ? 'Урок'
+          : 'Страница')
 
   return (
     <header className="app-header">

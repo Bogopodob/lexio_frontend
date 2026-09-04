@@ -23,6 +23,7 @@ function getActiveId(pathname: string) {
   if (pathname.startsWith('/stats')) return 'stats'
   if (pathname.startsWith('/profile')) return 'profile'
   if (pathname.startsWith('/settings')) return 'settings'
+  if (pathname.startsWith('/learn')) return 'learn'
   return 'home'
 }
 

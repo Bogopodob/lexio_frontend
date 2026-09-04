@@ -1,4 +1,5 @@
 import { useState, useCallback, useEffect, useMemo, memo, lazy, Suspense } from 'react'
+import { useNavigate } from 'react-router-dom'
 import { motion } from 'framer-motion'
 import { useAuth } from '@/context/AuthContext'
 import { listCategories, listCategoriesWithProgress, type RemoteCategory } from '@/lib/catalog-api'
@@ -109,6 +110,7 @@ const ProgressRing = memo(function ProgressRing({ value }: { value: number }) {
 })
 
 export interface TopicCardData {
+  id?: string
   icon?: keyof typeof topicIconMap
   emoji?: string
   title: string
@@ -127,6 +129,7 @@ const GRAMMAR_COLORS = [
 ]
 
 export interface GrammarCardData {
+  id?: string
   dot: string
   title: string
   subtitle: string
@@ -136,12 +139,18 @@ export interface GrammarCardData {
   color: string
 }
 
-const MemoTopicCard = memo(function MemoTopicCard({ card, index }: { card: TopicCardData; index: number }) {
+const MemoTopicCard = memo(function MemoTopicCard({ card, index, onOpen }: { card: TopicCardData; index: number; onOpen?: (id: string) => void }) {
   const Icon = card.icon ? topicIconMap[card.icon] : null
+  const clickable = Boolean(card.id && onOpen)
   return (
     <SpotlightCard spotlightColor={'rgba(255,255,255,0.06)' as unknown as `rgba(${number}, ${number}, ${number}, ${number})`} className="!p-0 !bg-transparent !border-0 h-full">
       <motion.div
-        className={`group relative rounded-[20px] border border-white/[0.06] p-[1px] h-full overflow-hidden ${card.tone}`}
+        role={clickable ? 'button' : undefined}
+        tabIndex={clickable ? 0 : undefined}
+        aria-label={clickable ? `Учить: ${card.title}` : undefined}
+        onClick={clickable ? () => onOpen!(card.id as string) : undefined}
+        onKeyDown={clickable ? (e) => { if (e.key === 'Enter') onOpen!(card.id as string) } : undefined}
+        className={`group relative rounded-[20px] border border-white/[0.06] p-[1px] h-full overflow-hidden ${card.tone} ${clickable ? 'cursor-pointer' : ''}`}
         initial={{ opacity: 0, y: 16 }}
         whileInView={{ opacity: 1, y: 0 }}
         viewport={{ once: true, margin: '-40px' }}
@@ -169,11 +178,17 @@ const MemoTopicCard = memo(function MemoTopicCard({ card, index }: { card: Topic
   )
 })
 
-const MemoGrammarCard = memo(function MemoGrammarCard({ card, index }: { card: GrammarCardData; index: number }) {
+const MemoGrammarCard = memo(function MemoGrammarCard({ card, index, onOpen }: { card: GrammarCardData; index: number; onOpen?: (id: string) => void }) {
+  const clickable = Boolean(card.id && onOpen)
   return (
     <SpotlightCard spotlightColor={(card.accent as unknown as `rgba(${number}, ${number}, ${number}, ${number})`)} className="!p-0 !bg-transparent !border-0 h-full">
       <motion.article
-        className="group relative rounded-[20px] border border-white/[0.06] bg-[#171717] p-4 flex flex-col gap-3 h-full overflow-hidden hover:border-white/10 transition-colors"
+        role={clickable ? 'button' : undefined}
+        tabIndex={clickable ? 0 : undefined}
+        aria-label={clickable ? `Учить: ${card.title}` : undefined}
+        onClick={clickable ? () => onOpen!(card.id as string) : undefined}
+        onKeyDown={clickable ? (e) => { if (e.key === 'Enter') onOpen!(card.id as string) } : undefined}
+        className={`group relative rounded-[20px] border border-white/[0.06] bg-[#171717] p-4 flex flex-col gap-3 h-full overflow-hidden hover:border-white/10 transition-colors ${clickable ? 'cursor-pointer' : ''}`}
         initial={{ opacity: 0, y: 16 }}
         whileInView={{ opacity: 1, y: 0 }}
         viewport={{ once: true, margin: '-40px' }}
@@ -222,6 +237,7 @@ const MemoPhraseCard = memo(function MemoPhraseCard({
 })
 
 export default function Home() {
+  const navigate = useNavigate()
   const [flippedId, setFlippedId] = useState<string | null>(null)
   const { speak, isSpeaking, cancel } = useSpeech({ lang: 'en-US', rate: 0.92 })
   const [speakingId, setSpeakingId] = useState<string | null>(null)
@@ -242,6 +258,10 @@ export default function Home() {
   )
   const handleFlip = useCallback((title: string) => setFlippedId((v) => (v === title ? null : title)), [])
   const memoWeeklyData = useMemo(() => weeklyData, [])
+  const openCategory = useCallback(
+    (categoryId: string) => navigate(`/learn?category=${encodeURIComponent(categoryId)}`),
+    [navigate],
+  )
   const { user, token, ready: authReady } = useAuth()
   const [themeCategories, setThemeCategories] = useState<RemoteCategory[]>([])
   const [grammarCategories, setGrammarCategories] = useState<RemoteCategory[]>([])
@@ -300,6 +320,7 @@ export default function Home() {
     const sorted = [...themeCategories].sort((a, b) => b.entries_count - a.entries_count)
     const shown = showAllTopics ? sorted : sorted.slice(0, 8)
     return shown.map((c, i) => ({
+      id: c.id,
       emoji: c.icon ?? '📚',
       title: c.name ?? c.slug,
       count: `${c.entries_count} слов`,
@@ -315,6 +336,7 @@ export default function Home() {
       const learned = c.learned_count ?? null
       const progress = learned !== null && c.entries_count > 0 ? Math.round((learned / c.entries_count) * 100) : 0
       return {
+        id: c.id,
         dot: palette.dot,
         title: c.name ?? c.slug,
         subtitle: `${c.entries_count} слов${learned !== null ? ` • ${learned} выучено` : ''}`,
@@ -384,7 +406,7 @@ export default function Home() {
                 <div className="text-[16px] font-black">A2</div>
               </div>
             </div>
-            <motion.button className="primary-action !m-0 lg:ml-auto group shrink-0" type="button" whileHover={{ y: -2, scale: 1.02 }} whileTap={{ scale: 0.97 }}>
+            <motion.button onClick={() => navigate('/learn')} className="primary-action !m-0 lg:ml-auto group shrink-0" type="button" whileHover={{ y: -2, scale: 1.02 }} whileTap={{ scale: 0.97 }}>
               Продолжить <FontAwesomeIcon icon={faArrowRight} className="ml-1.5 group-hover:translate-x-0.5 transition-transform" />
             </motion.button>
           </div>
@@ -438,7 +460,7 @@ export default function Home() {
         </div>
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
           {visibleTopics.map((card, index) => (
-            <MemoTopicCard key={card.title} card={card} index={index} />
+            <MemoTopicCard key={card.title} card={card} index={index} onOpen={openCategory} />
           ))}
         </div>
       </motion.section>
@@ -453,7 +475,7 @@ export default function Home() {
         </div>
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
           {visibleGrammar.map((card, index) => (
-            <MemoGrammarCard key={card.title} card={card} index={index} />
+            <MemoGrammarCard key={card.title} card={card} index={index} onOpen={openCategory} />
           ))}
         </div>
       </motion.section>
