@@ -22,8 +22,16 @@ import {
   faCamera,
   faTrash,
 } from '@fortawesome/free-solid-svg-icons'
-import { useState, useRef, useCallback, useMemo, memo, lazy, Suspense } from 'react'
+import { useState, useEffect, useRef, useCallback, useMemo, memo, lazy, Suspense } from 'react'
 import { createPortal } from 'react-dom'
+import { useAuth } from '@/context/AuthContext'
+import {
+  createLearningProfile,
+  getProfile,
+  listLanguages,
+  listLearningProfiles,
+  updateProfile,
+} from '@/lib/profile-api'
 import { DatePicker, DateField, Calendar } from '@heroui/react'
 import { parseDate, getLocalTimeZone, today } from '@internationalized/date'
 import type { DateValue } from '@internationalized/date'
@@ -264,7 +272,13 @@ export default function Profile() {
   })
   const [draft, setDraft] = useState(profile)
   const [customTag, setCustomTag] = useState('')
+  const [remote, setRemote] = useState<'idle' | 'loading' | 'ready' | 'error'>('idle')
+  const [saving, setSaving] = useState(false)
+  const [saveError, setSaveError] = useState<string | null>(null)
+  const [langIdByCode, setLangIdByCode] = useState<Record<string, string>>({})
+  const [hasLearningProfile, setHasLearningProfile] = useState(false)
   const fileRef = useRef<HTMLInputElement>(null)
+  const { user, token, ready: authReady } = useAuth()
   const tagOptions = ['Путешествия', 'Работа', 'Кино', 'Кофе', 'Еда', 'Эмоции', 'Музыка', 'Спорт', 'Книги', 'Технологии']
   const langOptions = [
     { id: 'en', label: 'English', sub: 'Английский' },
@@ -306,9 +320,85 @@ export default function Profile() {
     setDraft((p) => ({ ...p, birthDate: v }))
   }, [])
 
-  const startEdit = useCallback(() => { setDraft(profile); setIsEditing(true) }, [profile])
+  useEffect(() => {
+    if (!authReady || !user || !token) return
+    let cancelled = false
+    setRemote('loading')
+    Promise.allSettled([getProfile(user.id, token), listLanguages(), listLearningProfiles(user.id, token)])
+      .then(([profileRes, languagesRes, profilesRes]) => {
+        if (cancelled) return
+        if (profileRes.status === 'rejected' && profilesRes.status === 'rejected') {
+          setRemote('error')
+          return
+        }
+        const idByCode: Record<string, string> = {}
+        if (languagesRes.status === 'fulfilled') {
+          languagesRes.value.forEach((l) => { idByCode[l.code] = l.id })
+          setLangIdByCode(idByCode)
+        }
+        const profiles = profilesRes.status === 'fulfilled' ? profilesRes.value : []
+        const active = profiles.find((p) => p.is_active) ?? profiles[0] ?? null
+        setHasLearningProfile(active !== null)
+        const remoteProfile = profileRes.status === 'fulfilled' ? profileRes.value : null
+        const sessionName = user.name?.trim() || null
+        const applyProfile = <T extends { name: string; birthDate: string; city: string; tags: string[]; avatar: string | null }>(prev: T): T => {
+          if (!remoteProfile && !sessionName) return prev
+          const next = { ...prev }
+          if (remoteProfile?.name) next.name = remoteProfile.name
+          else if (sessionName) next.name = sessionName
+          if (remoteProfile?.birth_date) next.birthDate = remoteProfile.birth_date.slice(0, 10)
+          if (remoteProfile?.city) next.city = remoteProfile.city
+          if (Array.isArray(remoteProfile?.tags) && (remoteProfile?.tags?.length ?? 0) > 0) next.tags = remoteProfile.tags as string[]
+          if (remoteProfile?.avatar) next.avatar = remoteProfile.avatar
+          return next
+        }
+        setProfile((prev) => {
+          const next = applyProfile(prev)
+          if (active) {
+            const code = Object.keys(idByCode).find((c) => idByCode[c] === active.target_language_id)
+            if (code && ['en', 'es', 'de', 'fr'].includes(code)) next.language = code
+            if (active.level) next.level = active.level
+          }
+          return next
+        })
+        setDraft((prev) => applyProfile(prev))
+        setRemote('ready')
+      })
+    return () => { cancelled = true }
+  }, [authReady, user, token])
+
+  const startEdit = useCallback(() => { setDraft(profile); setIsEditing(true); setSaveError(null) }, [profile])
   const cancelEdit = useCallback(() => setIsEditing(false), [])
-  const saveEdit = useCallback(() => { setProfile(draft); setIsEditing(false) }, [draft])
+  const saveEdit = useCallback(() => {
+    const snapshot = draft
+    setProfile(snapshot)
+    setIsEditing(false)
+    setSaveError(null)
+    if (!user || !token) return
+    setSaving(true)
+    const payload: { name?: string; city?: string; birth_date?: string; tags?: string[]; avatar?: string | null } = {
+      name: snapshot.name,
+      city: snapshot.city,
+      birth_date: snapshot.birthDate,
+      tags: snapshot.tags,
+    }
+    if (snapshot.avatar && snapshot.avatar.length <= 2000) payload.avatar = snapshot.avatar
+    updateProfile(user.id, token, payload)
+      .then(() => {
+        if (!hasLearningProfile) {
+          const targetId = langIdByCode[snapshot.language]
+          const nativeId = langIdByCode.ru
+          if (targetId && nativeId) {
+            return createLearningProfile(user.id, token as string, targetId, nativeId)
+              .then(() => setHasLearningProfile(true))
+              .catch(() => undefined)
+          }
+        }
+        return undefined
+      })
+      .catch(() => setSaveError('Не сохранилось на сервер — проверь соединение'))
+      .finally(() => setSaving(false))
+  }, [draft, user, token, hasLearningProfile, langIdByCode])
   const onAvatarChange = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
     const f = e.target.files?.[0]
     if (!f) return
@@ -363,6 +453,9 @@ export default function Profile() {
                     <div className="flex flex-wrap items-center gap-2">
                       <h1 className="text-[26px] sm:text-[30px] font-black tracking-tight leading-none">{profile.name}</h1>
                       <span className="px-2.5 py-1 rounded-full bg-white text-black text-[11px] font-black">PRO</span>
+                      {remote === 'loading' && (
+                        <span className="px-2.5 py-1 rounded-full bg-white/[0.06] border border-white/[0.08] text-white/50 text-[11px] font-bold animate-pulse">Загрузка…</span>
+                      )}
                 <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-white/[0.06] border border-white/[0.08] text-white/60 text-xs font-medium">
                   <FontAwesomeIcon icon={faLocationDot} className="opacity-60" /> {(isEditing ? draft.city : profile.city) || 'Город'} • {age} лет
                 </span>
@@ -376,9 +469,12 @@ export default function Profile() {
                 )}
               </div>
             </div>
-            <button onClick={isEditing ? saveEdit : startEdit} className={`hidden sm:inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-black border shrink-0 ${isEditing ? 'bg-[#5AD4B5] text-black border-[#5AD4B5]' : 'bg-white text-black border-white'}`}>
-              <FontAwesomeIcon icon={isEditing ? faCheck : faPen} /> {isEditing ? 'Сохранить' : 'Редактировать'}
-            </button>
+            <div className="hidden sm:flex flex-col items-end gap-1.5 shrink-0">
+              <button onClick={isEditing ? saveEdit : startEdit} disabled={saving} className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-black border ${isEditing ? 'bg-[#5AD4B5] text-black border-[#5AD4B5]' : 'bg-white text-black border-white'} ${saving ? 'opacity-60' : ''}`}>
+                <FontAwesomeIcon icon={isEditing ? faCheck : faPen} /> {isEditing ? (saving ? 'Сохраняем…' : 'Сохранить') : 'Редактировать'}
+              </button>
+              {saveError && <span className="text-[11px] font-bold text-[#f43f5e]">{saveError}</span>}
+            </div>
           </div>
           {isEditing && (
             <div className="mt-4 p-3 rounded-2xl bg-white/[0.03] border border-white/[0.06]">
@@ -400,10 +496,13 @@ export default function Profile() {
             </div>
           )}
           {isEditing && (
-            <div className="mt-3 flex sm:hidden gap-2">
-              <button onClick={cancelEdit} className="flex-1 py-2 rounded-full bg-white/[0.06] border border-white/[0.06] text-xs font-bold">Отмена</button>
-              <button onClick={saveEdit} className="flex-1 py-2 rounded-full bg-[#5AD4B5] text-black text-xs font-black">Сохранить</button>
-            </div>
+            <>
+              <div className="mt-3 flex sm:hidden gap-2">
+                <button onClick={cancelEdit} className="flex-1 py-2 rounded-full bg-white/[0.06] border border-white/[0.06] text-xs font-bold">Отмена</button>
+                <button onClick={saveEdit} disabled={saving} className="flex-1 py-2 rounded-full bg-[#5AD4B5] text-black text-xs font-black disabled:opacity-60">{saving ? 'Сохраняем…' : 'Сохранить'}</button>
+              </div>
+              {saveError && <div className="sm:hidden text-[11px] font-bold text-[#f43f5e] mt-2">{saveError}</div>}
+            </>
           )}
 
         </div>
