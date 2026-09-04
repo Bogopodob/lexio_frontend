@@ -261,6 +261,35 @@ const BirthDatePicker = memo(function BirthDatePicker({ value, onChange }: { val
   )
 })
 
+const WEEKDAYS = [
+  { id: 'mon', label: 'Пн', full: 'Понедельник' },
+  { id: 'tue', label: 'Вт', full: 'Вторник' },
+  { id: 'wed', label: 'Ср', full: 'Среда' },
+  { id: 'thu', label: 'Чт', full: 'Четверг' },
+  { id: 'fri', label: 'Пт', full: 'Пятница' },
+  { id: 'sat', label: 'Сб', full: 'Суббота' },
+  { id: 'sun', label: 'Вс', full: 'Воскресенье' },
+] as const
+
+type DayKey = typeof WEEKDAYS[number]['id']
+
+function emptySchedule(): Record<DayKey, string[]> {
+  return { mon: [], tue: [], wed: [], thu: [], fri: [], sat: [], sun: [] }
+}
+
+function sanitizeSchedule(raw: unknown): Record<DayKey, string[]> {
+  const out = emptySchedule()
+  if (!raw || typeof raw !== 'object' || Array.isArray(raw)) return out
+  for (const d of WEEKDAYS) {
+    const list = (raw as Record<string, unknown>)[d.id]
+    if (!Array.isArray(list)) continue
+    out[d.id] = [...new Set(list.filter((t): t is string => typeof t === 'string' && /^([01]\d|2[0-3]):[0-5]\d$/.test(t.trim())))]
+      .sort()
+      .slice(0, 3)
+  }
+  return out
+}
+
 export default function Profile() {
   const [isEditing, setIsEditing] = useState(false)
   const [profile, setProfile] = useState({
@@ -281,7 +310,6 @@ export default function Profile() {
   const [hasLearningProfile, setHasLearningProfile] = useState(false)
   const [activeProfileId, setActiveProfileId] = useState<string | null>(null)
   const [goal, setGoal] = useState(20)
-  const [notifOn, setNotifOn] = useState(true)
   const fileRef = useRef<HTMLInputElement>(null)
   const { user, token, ready: authReady } = useAuth()
   const tagOptions = ['Путешествия', 'Работа', 'Кино', 'Кофе', 'Еда', 'Эмоции', 'Музыка', 'Спорт', 'Книги', 'Технологии']
@@ -383,6 +411,10 @@ export default function Profile() {
         }
         setProfile((prev) => ({ ...prev, ...serverFields, language, level }))
         setDraft((prev) => ({ ...prev, ...serverFields, language }))
+        if (remoteProfile?.reminder_schedule != null) {
+          setSchedule(sanitizeSchedule(remoteProfile.reminder_schedule))
+        }
+        setScheduleApplied(true)
         setRemote('ready')
       })
     return () => { cancelled = true }
@@ -440,6 +472,98 @@ export default function Profile() {
     setDraft((p) => ({ ...p, tags: [...p.tags, t] }))
     setCustomTag('')
   }, [customTag, draft.tags])
+  const [schedule, setSchedule] = useState<Record<DayKey, string[]>>(() => {
+    try {
+      const raw = localStorage.getItem('lexio:reminder-schedule')
+      if (raw) {
+        const parsed: unknown = JSON.parse(raw)
+        if (parsed && typeof parsed === 'object' && !Array.isArray(parsed)) {
+          const base: Record<DayKey, string[]> = { mon: [], tue: [], wed: [], thu: [], fri: [], sat: [], sun: [] }
+          let found = false
+          for (const d of (['mon', 'tue', 'wed', 'thu', 'fri', 'sat', 'sun'] as DayKey[])) {
+            const list = (parsed as Record<string, unknown>)[d]
+            if (Array.isArray(list)) {
+              base[d] = list.filter((t): t is string => typeof t === 'string').slice(0, 3)
+              if (base[d].length > 0) found = true
+            }
+          }
+          if (found) return base
+        }
+      }
+    } catch {
+      /* ignore */
+    }
+    return { mon: ['09:00'], tue: ['09:00'], wed: ['09:00'], thu: ['09:00'], fri: ['09:00'], sat: [], sun: [] }
+  })
+  const [scheduleApplied, setScheduleApplied] = useState(false)
+  const [timeDraft, setTimeDraft] = useState('09:00')
+
+  useEffect(() => {
+    try {
+      localStorage.setItem('lexio:reminder-schedule', JSON.stringify(schedule))
+    } catch {
+      /* ignore */
+    }
+    if (!scheduleApplied || !user || !token) return
+    const timer = window.setTimeout(() => {
+      updateProfile(user.id, token, { reminder_schedule: schedule }).catch(() => undefined)
+    }, 900)
+    return () => window.clearTimeout(timer)
+  }, [schedule, scheduleApplied, user, token])
+
+  const scheduleStats = useMemo(() => {
+    const days = WEEKDAYS.filter((d) => schedule[d.id].length > 0)
+    const total = days.reduce((n, d) => n + schedule[d.id].length, 0)
+    return { days: days.length, total }
+  }, [schedule, WEEKDAYS])
+
+  const scheduleSummary = useMemo(() => {
+    if (scheduleStats.days === 0) return 'выключены'
+    const first = WEEKDAYS.map((d) => schedule[d.id][0]).find(Boolean) ?? ''
+    const dayWord = scheduleStats.days === 1 ? 'день' : scheduleStats.days < 5 ? 'дня' : 'дней'
+    return `${scheduleStats.days} ${dayWord} • ${scheduleStats.total} в неделю${first ? ` • с ${first}` : ''}`
+  }, [schedule, scheduleStats, WEEKDAYS])
+
+  const toggleDay = useCallback((day: DayKey) => {
+    setSchedule((prev) => ({ ...prev, [day]: prev[day].length > 0 ? [] : ['09:00'] }))
+  }, [])
+
+  const addTime = useCallback((day: DayKey) => {
+    const t = timeDraft.trim()
+    if (!/^([01]\d|2[0-3]):[0-5]\d$/.test(t)) return
+    setSchedule((prev) => {
+      const list = prev[day]
+      if (list.includes(t) || list.length >= 3) return prev
+      return { ...prev, [day]: [...list, t].sort() }
+    })
+  }, [timeDraft])
+
+  const removeTime = useCallback((day: DayKey, time: string) => {
+    setSchedule((prev) => ({ ...prev, [day]: prev[day].filter((t) => t !== time) }))
+  }, [])
+
+  const applyPreset = useCallback((kind: 'weekdays' | 'everyday' | 'clear') => {
+    if (kind === 'clear') {
+      setSchedule(emptySchedule())
+      return
+    }
+    const days: DayKey[] = kind === 'everyday'
+      ? ['mon', 'tue', 'wed', 'thu', 'fri', 'sat', 'sun']
+      : ['mon', 'tue', 'wed', 'thu', 'fri']
+    setSchedule((prev) => {
+      const next = { ...prev }
+      for (const d of (['mon', 'tue', 'wed', 'thu', 'fri', 'sat', 'sun'] as DayKey[])) {
+        next[d] = days.includes(d) ? ['09:00'] : []
+      }
+      return next
+    })
+  }, [])
+
+  const goalMood = goal <= 10 ? '🐢 Спокойный темп — главное каждый день'
+    : goal <= 20 ? '💪 Уверенный темп — так держать'
+    : goal <= 30 ? '🔥 Серьёзный настрой — мозг скажет спасибо'
+    : '🚀 Режим полиглота — осторожно, затягивает'
+
   const changeGoal = useCallback((delta: number) => {
     setGoal((prev) => {
       const next = Math.min(50, Math.max(5, prev + delta))
@@ -615,7 +739,7 @@ export default function Profile() {
         )}
       </div>
 
-      {/* обучение — дневная цель, напоминание, сложность */}
+      {/* обучение — дневная цель и настроение темпа */}
       <div className="rounded-[20px] border border-white/[0.06] bg-[#171717] p-5">
         <div className="flex items-center justify-between">
           <h3 className="text-[14px] font-black tracking-tight flex items-center gap-2"><FontAwesomeIcon icon={faGraduationCap} className="text-[#5AD4B5]" /> Обучение</h3>
@@ -632,25 +756,80 @@ export default function Profile() {
         <div className="h-1.5 rounded-full bg-white/[0.06] overflow-hidden mt-3">
           <div className="h-full bg-[#5AD4B5] rounded-full transition-all" style={{ width: `${(goal / 50) * 100}%` }} />
         </div>
-        <div className="mt-3 settings-row !mx-0">
-          <span className="text-[13px]">Напоминание</span><span className="text-xs opacity-40 font-bold">09:00 • каждый день</span>
-        </div>
-        <div className="settings-row !mx-0">
-          <span className="text-[13px]">Сложность</span><span className="text-xs opacity-40 font-bold">Адаптивная</span>
+        <motion.div
+          key={goalMood}
+          initial={{ opacity: 0, y: 4 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.25 }}
+          className="text-xs opacity-60 mt-2.5 font-semibold"
+        >
+          {goalMood}
+        </motion.div>
+        <div className="mt-2 settings-row !mx-0">
+          <span className="text-[13px]">Напоминания</span><span className="text-xs opacity-40 font-bold">{scheduleSummary}</span>
         </div>
       </div>
 
-      {/* уведомления */}
+      {/* уведомления — расписание по дням недели, до 3 на день */}
       <div className="rounded-[20px] border border-white/[0.06] bg-[#171717] p-5">
         <div className="flex items-center justify-between">
           <h3 className="text-[14px] font-black tracking-tight flex items-center gap-2"><FontAwesomeIcon icon={faBell} className="text-[#F5C16A]" /> Уведомления</h3>
-          <button type="button" role="switch" aria-checked={notifOn} onClick={() => setNotifOn((v) => !v)} className={`settings-switch ${notifOn ? 'settings-switch--on' : ''}`}><span className="settings-switch__thumb" /></button>
+          <span className="text-[11px] opacity-40 font-bold">
+            {scheduleStats.total === 0 ? 'выключены' : `${scheduleStats.total} в неделю`}
+          </span>
         </div>
-        <div className="mt-3 settings-row !mx-0">
-          <span className="text-[13px]">Ежедневно 09:00</span><span className="text-xs opacity-40 font-bold">{notifOn ? 'включены' : 'выключены'}</span>
+        <div className="mt-3 flex flex-wrap gap-1.5">
+          <button onClick={() => applyPreset('everyday')} className="px-2.5 py-1.5 rounded-full text-xs font-bold border bg-white/[0.04] border-white/[0.06] hover:bg-white/[0.08]">Каждый день 09:00</button>
+          <button onClick={() => applyPreset('weekdays')} className="px-2.5 py-1.5 rounded-full text-xs font-bold border bg-white/[0.04] border-white/[0.06] hover:bg-white/[0.08]">Будни 09:00</button>
+          <button onClick={() => applyPreset('clear')} className="px-2.5 py-1.5 rounded-full text-xs font-bold border bg-transparent border-white/[0.06] text-white/50 hover:text-white">Очистить</button>
         </div>
-        <div className="settings-row !mx-0">
-          <span className="text-[13px]">Напоминание о серии</span><span className="text-xs opacity-40 font-bold">за 2 ч до сна</span>
+        <div className="mt-3 grid gap-1.5">
+          {WEEKDAYS.map((d) => {
+            const times = schedule[d.id]
+            const active = times.length > 0
+            return (
+              <div key={d.id} className={`rounded-xl border px-3 py-2 transition-colors ${active ? 'bg-white/[0.04] border-white/[0.08]' : 'bg-transparent border-white/[0.04] opacity-60'}`}>
+                <div className="flex items-center gap-2.5">
+                  <button
+                    type="button"
+                    role="switch"
+                    aria-checked={active}
+                    aria-label={d.full}
+                    onClick={() => toggleDay(d.id)}
+                    className={`settings-switch ${active ? 'settings-switch--on' : ''}`}
+                  >
+                    <span className="settings-switch__thumb" />
+                  </button>
+                  <span className="text-[13px] font-bold w-7">{d.label}</span>
+                  <div className="flex flex-wrap items-center gap-1.5 flex-1">
+                    {times.map((t) => (
+                      <span key={t} className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-[#F5C16A]/10 border border-[#F5C16A]/25 text-[#F5C16A] text-xs font-bold tabular-nums">
+                        {t}
+                        <button onClick={() => removeTime(d.id, t)} className="hover:text-white leading-none" aria-label={`Убрать ${t}`}>×</button>
+                      </span>
+                    ))}
+                    {active && times.length < 3 && (
+                      <span className="inline-flex items-center gap-1">
+                        <input
+                          type="time"
+                          value={timeDraft}
+                          onChange={(e) => setTimeDraft(e.target.value)}
+                          className="px-1.5 py-0.5 rounded-lg bg-black/20 border border-white/[0.08] text-xs text-white/80 focus:outline-none focus:border-white/20 [color-scheme:dark]"
+                        />
+                        <button onClick={() => addTime(d.id)} className="w-5 h-5 rounded-full bg-white text-black grid place-items-center text-xs font-black" aria-label="Добавить время">+</button>
+                      </span>
+                    )}
+                    {!active && <span className="text-xs opacity-30">выходной 😴</span>}
+                  </div>
+                </div>
+              </div>
+            )
+          })}
+        </div>
+        <div className="text-[11px] opacity-40 mt-2.5">
+          {scheduleStats.total === 0
+            ? 'Включи хотя бы один день — и мы напомним позаниматься 💌'
+            : 'Можно задать разным дням разное время — хоть каждому своё 🎯'}
         </div>
       </div>
 

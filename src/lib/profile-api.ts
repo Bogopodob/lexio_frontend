@@ -1,5 +1,7 @@
 const API_URL = (import.meta.env.VITE_API_URL as string | undefined) ?? '/api'
 
+export type ReminderSchedule = Partial<Record<string, string[]>>
+
 export interface RemoteProfile {
   user_id: string
   name: string | null
@@ -9,6 +11,7 @@ export interface RemoteProfile {
   city: string | null
   birth_date: string | null
   tags: string[] | null
+  reminder_schedule?: ReminderSchedule | unknown[] | null
 }
 
 export interface RemoteLanguage {
@@ -64,6 +67,7 @@ export interface UpdateProfilePayload {
   birth_date?: string | null
   tags?: string[]
   avatar?: string | null
+  reminder_schedule?: ReminderSchedule | null
 }
 
 export function updateProfile(
