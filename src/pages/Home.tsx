@@ -1,5 +1,8 @@
-import { useState, useCallback, useMemo, memo, lazy, Suspense } from 'react'
+import { useState, useCallback, useEffect, useMemo, memo, lazy, Suspense } from 'react'
 import { motion } from 'framer-motion'
+import { useAuth } from '@/context/AuthContext'
+import { listCategories, listCategoriesWithProgress, type RemoteCategory } from '@/lib/catalog-api'
+import { listLearningProfiles } from '@/lib/profile-api'
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome'
 import {
   faCircle,
@@ -27,7 +30,7 @@ const Grid = lazy(() => import('@/components/charts/grid').then((m) => ({ defaul
 const XAxis = lazy(() => import('@/components/charts/x-axis').then((m) => ({ default: m.XAxis })))
 const ChartTooltip = lazy(() => import('@/components/charts/tooltip').then((m) => ({ default: m.ChartTooltip })))
 
-const topicCards = [
+const topicCards: TopicCardData[] = [
   { icon: 'utensils', title: 'Еда', count: '48 слов', sub: 'ресторан • рынок', tone: 'topic-card--mint' },
   { icon: 'plane', title: 'Путешествия', count: '52 слова', sub: 'аэропорт • город', tone: 'topic-card--sky' },
   { icon: 'smile', title: 'Эмоции', count: '36 слов', sub: 'чувства • общение', tone: 'topic-card--rose' },
@@ -105,8 +108,36 @@ const ProgressRing = memo(function ProgressRing({ value }: { value: number }) {
   )
 })
 
-const MemoTopicCard = memo(function MemoTopicCard({ card, index }: { card: (typeof topicCards)[number]; index: number }) {
-  const Icon = topicIconMap[card.icon as keyof typeof topicIconMap]
+export interface TopicCardData {
+  icon?: keyof typeof topicIconMap
+  emoji?: string
+  title: string
+  count: string
+  sub: string
+  tone: string
+}
+
+const TOPIC_TONES = ['topic-card--mint', 'topic-card--sky', 'topic-card--rose', 'topic-card--sand']
+
+const GRAMMAR_COLORS = [
+  { dot: 'grammar-card__dot--mint', color: '#5AD4B5', accent: 'rgba(90,212,181,0.22)' },
+  { dot: 'grammar-card__dot--blue', color: '#5B74FF', accent: 'rgba(91,116,255,0.22)' },
+  { dot: 'grammar-card__dot--pink', color: '#F08AB4', accent: 'rgba(240,138,180,0.22)' },
+  { dot: 'grammar-card__dot--gold', color: '#DB9F3A', accent: 'rgba(219,159,58,0.22)' },
+]
+
+export interface GrammarCardData {
+  dot: string
+  title: string
+  subtitle: string
+  progress: number
+  level: string
+  accent: string
+  color: string
+}
+
+const MemoTopicCard = memo(function MemoTopicCard({ card, index }: { card: TopicCardData; index: number }) {
+  const Icon = card.icon ? topicIconMap[card.icon] : null
   return (
     <SpotlightCard spotlightColor={'rgba(255,255,255,0.06)' as unknown as `rgba(${number}, ${number}, ${number}, ${number})`} className="!p-0 !bg-transparent !border-0 h-full">
       <motion.div
@@ -120,8 +151,8 @@ const MemoTopicCard = memo(function MemoTopicCard({ card, index }: { card: (type
       >
         <div className="rounded-[19px] bg-[#171717] p-4 h-full flex flex-col gap-3 relative overflow-hidden">
           <div className="absolute -right-6 -top-6 w-24 h-24 rounded-full opacity-[0.07] group-hover:opacity-[0.12] transition-opacity blur-[18px]" style={{ background: card.tone.includes('mint') ? '#5AD4B5' : card.tone.includes('sky') ? '#5B74FF' : card.tone.includes('rose') ? '#F08AB4' : '#DB9F3A' }} />
-          <div className="w-10 h-10 rounded-xl bg-white/[0.06] border border-white/[0.06] grid place-items-center text-white/90 group-hover:bg-white group-hover:text-black transition-colors">
-            <FontAwesomeIcon icon={Icon} />
+          <div className="w-10 h-10 rounded-xl bg-white/[0.06] border border-white/[0.06] grid place-items-center text-white/90 group-hover:bg-white group-hover:text-black transition-colors text-[19px]">
+            {card.emoji ?? (Icon && <FontAwesomeIcon icon={Icon} />)}
           </div>
           <div className="mt-1">
             <h4 className="text-[17px] font-black tracking-tight leading-none">{card.title}</h4>
@@ -138,7 +169,7 @@ const MemoTopicCard = memo(function MemoTopicCard({ card, index }: { card: (type
   )
 })
 
-const MemoGrammarCard = memo(function MemoGrammarCard({ card, index }: { card: (typeof grammarCards)[number]; index: number }) {
+const MemoGrammarCard = memo(function MemoGrammarCard({ card, index }: { card: GrammarCardData; index: number }) {
   return (
     <SpotlightCard spotlightColor={(card.accent as unknown as `rgba(${number}, ${number}, ${number}, ${number})`)} className="!p-0 !bg-transparent !border-0 h-full">
       <motion.article
@@ -211,6 +242,89 @@ export default function Home() {
   )
   const handleFlip = useCallback((title: string) => setFlippedId((v) => (v === title ? null : title)), [])
   const memoWeeklyData = useMemo(() => weeklyData, [])
+  const { user, token, ready: authReady } = useAuth()
+  const [themeCategories, setThemeCategories] = useState<RemoteCategory[]>([])
+  const [grammarCategories, setGrammarCategories] = useState<RemoteCategory[]>([])
+  const [showAllTopics, setShowAllTopics] = useState(false)
+
+  // Real catalog categories (guests see them too — public endpoint).
+  useEffect(() => {
+    let cancelled = false
+    listCategories('theme')
+      .then((list) => {
+        if (!cancelled && list.length > 0) setThemeCategories(list)
+      })
+      .catch(() => undefined)
+    return () => {
+      cancelled = true
+    }
+  }, [])
+
+  useEffect(() => {
+    let cancelled = false
+    const load = async () => {
+      try {
+        if (authReady && user && token) {
+          const profiles = await listLearningProfiles(user.id, token)
+          const active = profiles.find((p) => p.is_active) ?? profiles[0]
+          if (active) {
+            const withProgress = await listCategoriesWithProgress(user.id, token, active.id, 'grammar')
+            if (!cancelled && withProgress.length > 0) {
+              setGrammarCategories(withProgress)
+              return
+            }
+          }
+        }
+        const pub = await listCategories('grammar')
+        if (!cancelled && pub.length > 0) setGrammarCategories(pub)
+      } catch {
+        /* keep mocks */
+      }
+    }
+    load()
+    return () => {
+      cancelled = true
+    }
+  }, [authReady, user, token])
+
+  const topicNameById = useMemo(() => {
+    const map: Record<string, string> = {}
+    themeCategories.forEach((c) => {
+      if (c.name) map[c.id] = c.name
+    })
+    return map
+  }, [themeCategories])
+
+  const visibleTopics: TopicCardData[] = useMemo(() => {
+    if (themeCategories.length === 0) return topicCards
+    const sorted = [...themeCategories].sort((a, b) => b.entries_count - a.entries_count)
+    const shown = showAllTopics ? sorted : sorted.slice(0, 8)
+    return shown.map((c, i) => ({
+      emoji: c.icon ?? '📚',
+      title: c.name ?? c.slug,
+      count: `${c.entries_count} слов`,
+      sub: c.parent_id && topicNameById[c.parent_id] ? topicNameById[c.parent_id] : 'словарь',
+      tone: TOPIC_TONES[i % TOPIC_TONES.length],
+    }))
+  }, [themeCategories, showAllTopics, topicNameById])
+
+  const visibleGrammar: GrammarCardData[] = useMemo(() => {
+    if (grammarCategories.length === 0) return grammarCards
+    return grammarCategories.map((c, i) => {
+      const palette = GRAMMAR_COLORS[i % GRAMMAR_COLORS.length]
+      const learned = c.learned_count ?? null
+      const progress = learned !== null && c.entries_count > 0 ? Math.round((learned / c.entries_count) * 100) : 0
+      return {
+        dot: palette.dot,
+        title: c.name ?? c.slug,
+        subtitle: `${c.entries_count} слов${learned !== null ? ` • ${learned} выучено` : ''}`,
+        progress,
+        level: learned !== null ? `${learned} ✓` : 'словарь',
+        accent: palette.accent,
+        color: palette.color,
+      }
+    })
+  }, [grammarCategories])
 
   return (
     <motion.div animate="animate" initial="initial" transition={{ staggerChildren: 0.08 }} className="relative">
@@ -316,10 +430,14 @@ export default function Home() {
       <motion.section className="content-section !mt-6" variants={fadeUp} transition={{ duration: 0.5 }}>
         <div className="section-header">
           <h3>По теме</h3>
-          <button className="text-link" type="button">Все темы</button>
+          {themeCategories.length > 8 && (
+            <button className="text-link" type="button" onClick={() => setShowAllTopics((v) => !v)}>
+              {showAllTopics ? 'Свернуть' : `Все темы (${themeCategories.length})`}
+            </button>
+          )}
         </div>
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
-          {topicCards.map((card, index) => (
+          {visibleTopics.map((card, index) => (
             <MemoTopicCard key={card.title} card={card} index={index} />
           ))}
         </div>
@@ -334,7 +452,7 @@ export default function Home() {
           </div>
         </div>
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
-          {grammarCards.map((card, index) => (
+          {visibleGrammar.map((card, index) => (
             <MemoGrammarCard key={card.title} card={card} index={index} />
           ))}
         </div>
