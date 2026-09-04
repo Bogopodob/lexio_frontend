@@ -69,7 +69,13 @@ export function startSession(
   userId: string,
   token: string,
   profileId: string,
-  opts: { source?: 'due' | 'new' | 'mixed'; category_id?: string; level?: string; limit?: number } = {},
+  opts: {
+    source?: 'due' | 'new' | 'mixed'
+    category_id?: string
+    level?: string
+    limit?: number
+    offset?: number
+  } = {},
 ): Promise<RemoteSession> {
   return request(`/learning/users/${userId}/profiles/${profileId}/sessions`, token, {
     method: 'POST',
@@ -78,6 +84,7 @@ export function startSession(
       category_id: opts.category_id,
       level: opts.level,
       limit: opts.limit ?? 20,
+      offset: opts.offset ?? 0,
     }),
   })
 }
@@ -105,6 +112,24 @@ export function answerCard(
     method: 'POST',
     body: JSON.stringify({ learnable_id: learnableId, quality }),
   })
+}
+
+export interface Availability {
+  due: number
+  new: number
+}
+
+export function getAvailability(
+  userId: string,
+  token: string,
+  profileId: string,
+  opts: { category_id?: string; level?: string } = {},
+): Promise<Availability> {
+  const params = new URLSearchParams()
+  if (opts.category_id) params.set('category_id', opts.category_id)
+  if (opts.level) params.set('level', opts.level)
+  const query = params.toString()
+  return request(`/learning/users/${userId}/profiles/${profileId}/availability${query ? `?${query}` : ''}`, token)
 }
 
 export function finishSession(userId: string, token: string, sessionId: string): Promise<RemoteSession> {

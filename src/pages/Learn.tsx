@@ -18,9 +18,11 @@ import { useAuth } from '@/context/AuthContext'
 import {
   answerCard,
   finishSession,
+  getAvailability,
   getNextCard,
   listSessions,
   startSession,
+  type Availability,
   type NextCardData,
   type RemoteSession,
 } from '@/lib/learn-api'
@@ -56,8 +58,10 @@ export default function Learn() {
   const [activeSession, setActiveSession] = useState<RemoteSession | null>(null)
   const [source, setSource] = useState<'mixed' | 'due' | 'new'>('mixed')
   const [limit, setLimit] = useState(20)
+  const [offset, setOffset] = useState(0)
   const [categoryId, setCategoryId] = useState<string | null>(null)
   const [categoryName, setCategoryName] = useState<string | null>(null)
+  const [availability, setAvailability] = useState<Availability | null>(null)
 
   // Preselected category from topic/grammar cards (?category=<id>).
   useEffect(() => {
@@ -70,6 +74,7 @@ export default function Learn() {
     let cancelled = false
     setCategoryId(id)
     setSource('new')
+    setOffset(0)
     listCategories()
       .then((list) => {
         if (cancelled) return
@@ -136,6 +141,21 @@ export default function Learn() {
     }
   }, [authReady, user, token])
 
+  const refreshAvailability = useCallback(() => {
+    if (!user || !token || !profileId) {
+      setAvailability(null)
+      return
+    }
+    getAvailability(user.id, token, profileId, categoryId ? { category_id: categoryId } : {})
+      .then(setAvailability)
+      .catch(() => setAvailability(null))
+  }, [user, token, profileId, categoryId])
+
+  useEffect(() => {
+    if (phase !== 'menu') return
+    refreshAvailability()
+  }, [phase, refreshAvailability])
+
   const loadCard = useCallback(
     async (uid: string, tk: string, sessionId: string) => {
       const next = await getNextCard(uid, tk, sessionId)
@@ -177,6 +197,7 @@ export default function Learn() {
           source,
           limit,
           category_id: categoryId ?? undefined,
+          offset: source === 'due' ? 0 : offset,
         })
         setSession(created)
         setActiveSession(created.status === 'active' ? created : null)
@@ -191,7 +212,7 @@ export default function Learn() {
         setStarting(false)
       }
     },
-    [user, token, profileId, source, limit, categoryId, loadCard],
+    [user, token, profileId, source, limit, categoryId, offset, loadCard],
   )
 
   const grade = useCallback(
@@ -402,6 +423,41 @@ export default function Learn() {
                 </button>
               ))}
             </div>
+            {source !== 'due' && (
+              <div className="flex items-center gap-2 mt-2.5 flex-wrap">
+                <span className="text-xs opacity-40 font-bold">Начать с N-го слова:</span>
+                <button
+                  onClick={() => setOffset((v) => Math.max(0, v - limit))}
+                  className="w-7 h-7 rounded-full bg-white/[0.06] border border-white/[0.06] grid place-items-center hover:bg-white/10 text-sm"
+                  aria-label="Назад"
+                >
+                  −
+                </button>
+                <input
+                  type="number"
+                  min={0}
+                  max={Math.max(0, (availability?.new ?? 1) - 1)}
+                  value={offset}
+                  onChange={(e) => {
+                    const v = Math.floor(Number(e.target.value))
+                    setOffset(Number.isFinite(v) ? Math.max(0, v) : 0)
+                  }}
+                  className="w-[76px] px-2.5 py-1.5 rounded-xl bg-black/20 border border-white/[0.06] text-xs font-black tabular-nums text-center focus:outline-none focus:border-white/20"
+                />
+                <button
+                  onClick={() => setOffset((v) => v + limit)}
+                  className="w-7 h-7 rounded-full bg-white/[0.06] border border-white/[0.06] grid place-items-center hover:bg-white/10 text-sm font-black"
+                  aria-label="Вперёд"
+                >
+                  +
+                </button>
+                {availability && availability.new > 0 && (
+                  <span className="text-[11px] opacity-40 tabular-nums">
+                    слова {Math.min(offset + 1, availability.new)}–{Math.min(offset + limit, availability.new)} из {availability.new}
+                  </span>
+                )}
+              </div>
+            )}
             {profiles.length > 1 && (
               <div className="flex flex-wrap gap-1.5 mt-3">
                 {profiles.map((p) => (
@@ -410,6 +466,7 @@ export default function Learn() {
                     onClick={() => {
                       setProfileId(p.id)
                       setActiveSession(null)
+                      setOffset(0)
                       if (user && token) {
                         listSessions(user.id, token, p.id)
                           .then((list) => setActiveSession(list.find((s) => s.status === 'active') ?? null))
@@ -424,9 +481,23 @@ export default function Learn() {
               </div>
             )}
             {error && <div className="text-xs font-bold text-[#f43f5e] mt-3">{error}</div>}
+            {availability && (availability.due > 0 || availability.new > 0) ? (
+              <div className="text-xs opacity-60 mt-3">
+                Доступно: <span className="font-black text-white">{availability.due} на повторение</span>
+                {' • '}
+                <span className="font-black text-white">{availability.new} новых</span>
+                <span className="opacity-60"> — остальное продолжишь в следующих уроках</span>
+              </div>
+            ) : availability ? (
+              <div className="rounded-2xl border border-[#5AD4B5]/25 bg-[#5AD4B5]/[0.06] p-4 mt-3 text-center">
+                <div className="text-2xl">🎉</div>
+                <div className="text-[13px] font-black mt-1">Всё выучено!</div>
+                <div className="text-xs opacity-50 mt-0.5">Повторений нет, новых слов нет — так держать</div>
+              </div>
+            ) : null}
             <button
               onClick={() => beginSession()}
-              disabled={starting || !profileId}
+              disabled={starting || !profileId || (availability !== null && availability.due === 0 && availability.new === 0)}
               className="mt-4 w-full py-3 rounded-2xl bg-[#5AD4B5] text-black text-sm font-black hover:brightness-110 transition disabled:opacity-50"
             >
               {starting ? 'Собираем колоду…' : 'Начать урок →'}
