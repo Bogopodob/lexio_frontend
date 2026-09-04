@@ -311,10 +311,28 @@ export default function Profile() {
   )
 
   const age = useMemo(() => {
-    const d = new Date(draft.birthDate || profile.birthDate)
-    const diff = Date.now() - d.getTime()
-    return Math.max(0, Math.floor(diff / (1000 * 60 * 60 * 24 * 365.25)))
+    const raw = draft.birthDate || profile.birthDate
+    if (!raw) return null
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(raw)) return null
+    const d = new Date(`${raw}T00:00:00`)
+    if (Number.isNaN(d.getTime())) return null
+    const now = new Date()
+    if (d.getTime() > now.getTime()) return null
+    const years = now.getFullYear() - d.getFullYear()
+    const hadBirthday =
+      now.getMonth() > d.getMonth() || (now.getMonth() === d.getMonth() && now.getDate() >= d.getDate())
+    return hadBirthday ? years : years - 1
   }, [draft.birthDate, profile.birthDate])
+
+  const birthDateError = useMemo(() => {
+    if (!isEditing || !draft.birthDate) return null
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(draft.birthDate)) return 'Некорректная дата'
+    const d = new Date(`${draft.birthDate}T00:00:00`)
+    if (Number.isNaN(d.getTime())) return 'Некорректная дата'
+    if (d.getTime() > Date.now()) return 'Дата рождения не может быть в будущем'
+    if (d.getFullYear() < 1900) return 'Год должен быть не раньше 1900'
+    return null
+  }, [isEditing, draft.birthDate])
 
   const handleBirthDateChange = useCallback((v: string) => {
     setDraft((p) => ({ ...p, birthDate: v }))
@@ -340,28 +358,24 @@ export default function Profile() {
         const active = profiles.find((p) => p.is_active) ?? profiles[0] ?? null
         setHasLearningProfile(active !== null)
         const remoteProfile = profileRes.status === 'fulfilled' ? profileRes.value : null
-        const sessionName = user.name?.trim() || null
-        const applyProfile = <T extends { name: string; birthDate: string; city: string; tags: string[]; avatar: string | null }>(prev: T): T => {
-          if (!remoteProfile && !sessionName) return prev
-          const next = { ...prev }
-          if (remoteProfile?.name) next.name = remoteProfile.name
-          else if (sessionName) next.name = sessionName
-          if (remoteProfile?.birth_date) next.birthDate = remoteProfile.birth_date.slice(0, 10)
-          if (remoteProfile?.city) next.city = remoteProfile.city
-          if (Array.isArray(remoteProfile?.tags) && (remoteProfile?.tags?.length ?? 0) > 0) next.tags = remoteProfile.tags as string[]
-          if (remoteProfile?.avatar) next.avatar = remoteProfile.avatar
-          return next
+        // Authed users get honest server state: missing fields stay EMPTY,
+        // mocks remain for guests only.
+        const serverFields = {
+          name: remoteProfile?.name || user.name?.trim() || '',
+          birthDate: remoteProfile?.birth_date ? remoteProfile.birth_date.slice(0, 10) : '',
+          city: remoteProfile?.city || '',
+          tags: Array.isArray(remoteProfile?.tags) ? (remoteProfile.tags as string[]) : [],
+          avatar: remoteProfile?.avatar ?? null,
         }
-        setProfile((prev) => {
-          const next = applyProfile(prev)
-          if (active) {
-            const code = Object.keys(idByCode).find((c) => idByCode[c] === active.target_language_id)
-            if (code && ['en', 'es', 'de', 'fr'].includes(code)) next.language = code
-            if (active.level) next.level = active.level
-          }
-          return next
-        })
-        setDraft((prev) => applyProfile(prev))
+        let language = 'en'
+        let level = 'A2'
+        if (active) {
+          const code = Object.keys(idByCode).find((c) => idByCode[c] === active.target_language_id)
+          if (code && ['en', 'es', 'de', 'fr'].includes(code)) language = code
+          if (active.level) level = active.level
+        }
+        setProfile((prev) => ({ ...prev, ...serverFields, language, level }))
+        setDraft((prev) => ({ ...prev, ...serverFields, language }))
         setRemote('ready')
       })
     return () => { cancelled = true }
@@ -370,16 +384,20 @@ export default function Profile() {
   const startEdit = useCallback(() => { setDraft(profile); setIsEditing(true); setSaveError(null) }, [profile])
   const cancelEdit = useCallback(() => setIsEditing(false), [])
   const saveEdit = useCallback(() => {
+    if (birthDateError) {
+      setSaveError(birthDateError)
+      return
+    }
     const snapshot = draft
     setProfile(snapshot)
     setIsEditing(false)
     setSaveError(null)
     if (!user || !token) return
     setSaving(true)
-    const payload: { name?: string; city?: string; birth_date?: string; tags?: string[]; avatar?: string | null } = {
-      name: snapshot.name,
-      city: snapshot.city,
-      birth_date: snapshot.birthDate,
+    const payload: { name?: string | null; city?: string | null; birth_date?: string | null; tags?: string[]; avatar?: string | null } = {
+      name: snapshot.name.trim() || null,
+      city: snapshot.city.trim() || null,
+      birth_date: snapshot.birthDate || null,
       tags: snapshot.tags,
     }
     if (snapshot.avatar && snapshot.avatar.length <= 2000) payload.avatar = snapshot.avatar
@@ -398,7 +416,7 @@ export default function Profile() {
       })
       .catch(() => setSaveError('Не сохранилось на сервер — проверь соединение'))
       .finally(() => setSaving(false))
-  }, [draft, user, token, hasLearningProfile, langIdByCode])
+  }, [draft, user, token, hasLearningProfile, langIdByCode, birthDateError])
   const onAvatarChange = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
     const f = e.target.files?.[0]
     if (!f) return
@@ -428,7 +446,7 @@ export default function Profile() {
               <div className="relative shrink-0 group/avatar">
                 <div className="w-[84px] h-[84px] rounded-[20px] bg-gradient-to-br from-[#5AD4B5] to-[#5B74FF] p-[2px] shadow-[0_12px_32px_rgba(91,116,255,0.22)]">
                   <div className="w-full h-full rounded-[18px] bg-[#0f0f0f] grid place-items-center text-[28px] overflow-hidden">
-                    {isEditing && draft.avatar ? <img src={draft.avatar} alt="avatar" className="w-full h-full object-cover" /> : !isEditing && profile.avatar ? <img src={profile.avatar} alt="avatar" className="w-full h-full object-cover" /> : draft.name[0] || 'А'}
+                    {isEditing && draft.avatar ? <img src={draft.avatar} alt="avatar" className="w-full h-full object-cover" /> : !isEditing && profile.avatar ? <img src={profile.avatar} alt="avatar" className="w-full h-full object-cover" /> : draft.name[0] || '?'}
                   </div>
                 </div>
                 <span className="absolute -bottom-1 -right-1 w-7 h-7 rounded-full bg-[#5AD4B5] text-black grid place-items-center text-[11px] font-black border-2 border-[#171717]">{profile.level}</span>
@@ -447,23 +465,29 @@ export default function Profile() {
                       <BirthDatePicker value={draft.birthDate} onChange={handleBirthDateChange} />
                       <input value={draft.city} onChange={(e) => setDraft({ ...draft, city: e.target.value })} placeholder="Город" className="px-2.5 py-1.5 rounded-full bg-white/[0.06] border border-white/[0.08] text-xs focus:outline-none w-[120px]" />
                     </div>
+                    {birthDateError && (
+                      <div className="text-[11px] font-bold text-[#f43f5e]">{birthDateError}</div>
+                    )}
                   </div>
                 ) : (
                   <>
                     <div className="flex flex-wrap items-center gap-2">
-                      <h1 className="text-[26px] sm:text-[30px] font-black tracking-tight leading-none">{profile.name}</h1>
+                      <h1 className="text-[26px] sm:text-[30px] font-black tracking-tight leading-none">{profile.name || 'Без имени'}</h1>
                       <span className="px-2.5 py-1 rounded-full bg-white text-black text-[11px] font-black">PRO</span>
                       {remote === 'loading' && (
                         <span className="px-2.5 py-1 rounded-full bg-white/[0.06] border border-white/[0.08] text-white/50 text-[11px] font-bold animate-pulse">Загрузка…</span>
                       )}
                 <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-white/[0.06] border border-white/[0.08] text-white/60 text-xs font-medium">
-                  <FontAwesomeIcon icon={faLocationDot} className="opacity-60" /> {(isEditing ? draft.city : profile.city) || 'Город'} • {age} лет
+                  <FontAwesomeIcon icon={faLocationDot} className="opacity-60" /> {(isEditing ? draft.city : profile.city) || 'Город не указан'}{age !== null ? ` • ${age} лет` : ''}
                 </span>
                     </div>
                     <div className="flex flex-wrap gap-1.5 mt-3">
                       {(isEditing ? draft.tags : profile.tags).map((t) => (
                         <span key={t} className="px-2.5 py-1 rounded-full bg-white/[0.06] border border-white/[0.06] text-white/70 text-xs font-semibold">{t}</span>
                       ))}
+                      {(isEditing ? draft.tags : profile.tags).length === 0 && (
+                        <span className="px-2.5 py-1 rounded-full border border-dashed border-white/[0.12] text-white/35 text-xs font-semibold">Нет тегов — добавь через «Редактировать»</span>
+                      )}
                     </div>
                   </>
                 )}
