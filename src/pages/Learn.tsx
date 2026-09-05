@@ -59,7 +59,7 @@ import {
   type RemoteLearningProfile,
 } from '@/lib/profile-api'
 import { formatBinding, matchesShortcut, useShortcuts, type ShortcutId } from '@/lib/shortcuts'
-import { listCategories } from '@/lib/catalog-api'
+import { listCategories, listCategoriesWithProgress } from '@/lib/catalog-api'
 import { useT } from '@/lib/i18n'
 
 type Phase = 'loading' | 'menu' | 'study' | 'finished'
@@ -186,27 +186,37 @@ export default function Learn() {
       .catch(() => undefined)
   }, [user, token, profileId])
 
+  const loadCategoryNames = useCallback(async (): Promise<Record<string, string>> => {
+    try {
+      const list =
+        user && token && profileId
+          ? await listCategoriesWithProgress(user.id, token, profileId)
+          : await listCategories()
+      const map: Record<string, string> = {}
+      list.forEach((c) => {
+        map[c.id] = c.name ?? c.slug
+      })
+      return map
+    } catch {
+      return {}
+    }
+  }, [user, token, profileId])
+
   // Resolve the resume banner's category name.
   useEffect(() => {
     const id = resumeSession?.category_id
     if (!id || categoryNames[id]) return
     let cancelled = false
-    listCategories()
-      .then((list) => {
-        if (cancelled) return
-        setCategoryNames((prev) => {
-          const next = { ...prev }
-          list.forEach((c) => {
-            next[c.id] = c.name ?? c.slug
-          })
-          return next
-        })
+    loadCategoryNames()
+      .then((map) => {
+        if (cancelled || Object.keys(map).length === 0) return
+        setCategoryNames((prev) => ({ ...prev, ...map }))
       })
       .catch(() => undefined)
     return () => {
       cancelled = true
     }
-  }, [resumeSession?.category_id, categoryNames])
+  }, [resumeSession?.category_id, categoryNames, loadCategoryNames])
 
   // Preselected category from topic/grammar cards (?category=<id>).
   useEffect(() => {
@@ -225,11 +235,11 @@ export default function Learn() {
     setSession(null)
     setCard(null)
     resetRound()
-    listCategories()
-      .then((list) => {
-        if (cancelled) return
-        const found = list.find((c) => c.id === id)
-        setCategoryName(found?.name ?? found?.slug ?? null)
+    loadCategoryNames()
+      .then((map) => {
+        if (cancelled || Object.keys(map).length === 0) return
+        setCategoryName(map[id] ?? null)
+        setCategoryNames((prev) => ({ ...prev, ...map }))
       })
       .catch(() => {
         if (!cancelled) setCategoryName(null)

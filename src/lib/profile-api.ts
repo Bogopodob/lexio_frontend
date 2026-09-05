@@ -271,6 +271,19 @@ export function removeFriend(userId: string, token: string, friendshipId: string
   }).then(() => undefined)
 }
 
+export interface LeaderboardRow {
+  user_id: string
+  name: string | null
+  avatar: string | null
+  level: string | null
+  streak_days: number
+  is_self: boolean
+}
+
+export function listLeaderboard(userId: string, token: string): Promise<LeaderboardRow[]> {
+  return request<LeaderboardRow[]>(`/users/${userId}/friends/leaderboard`, token)
+}
+
 export interface UserSearchHit {
   user_id: string
   name: string | null

@@ -12,6 +12,7 @@ import notfound from './notfound'
 import widgets from './widgets'
 import components from './components'
 import lib from './lib'
+import premium from './premium'
 
 const en: RuDict = {
   common,
@@ -27,6 +28,7 @@ const en: RuDict = {
   widgets,
   components,
   lib,
+  premium,
 }
 
 export default en

@@ -19,6 +19,7 @@ interface AuthContextValue {
   login: (email: string, password: string) => Promise<void>
   register: (email: string, password: string, name?: string) => Promise<void>
   logout: () => Promise<void>
+  refresh: () => Promise<void>
 }
 
 const AuthContext = createContext<AuthContextValue | null>(null)
@@ -38,6 +39,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       .then((fresh) => {
         setUser(fresh)
         setToken(session.token)
+        try {
+          saveSession({ token: session.token, expires_at: '', expires_in: 0, user: fresh })
+        } catch {
+          /* ignore */
+        }
       })
       .catch((err) => {
         // Drop the session only when the backend rejects the token.
@@ -81,9 +87,18 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     setToken(null)
   }, [])
 
+  const refresh = useCallback(async () => {
+    const current = loadSession()
+    if (!current?.token) return
+    const fresh = await meRequest(current.token)
+    saveSession({ token: current.token, expires_at: '', expires_in: 0, user: fresh })
+    setUser(fresh)
+    setToken(current.token)
+  }, [])
+
   const value = useMemo(
-    () => ({ user, token, ready, login, register, logout }),
-    [user, token, ready, login, register, logout],
+    () => ({ user, token, ready, login, register, logout, refresh }),
+    [user, token, ready, login, register, logout, refresh],
   )
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>

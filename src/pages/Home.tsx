@@ -2,9 +2,10 @@ import { useState, useCallback, useEffect, useMemo, memo, lazy, Suspense } from 
 import { useNavigate } from 'react-router-dom'
 import { motion } from 'framer-motion'
 import { useAuth } from '@/context/AuthContext'
-import { getWordOfDay, listCategories, listCategoriesWithProgress, type RemoteCategory, type WordOfDay } from '@/lib/catalog-api'
+import { createCategory, deleteCategory, getWordOfDay, listCategories, listCategoriesWithProgress, updateCategory, type RemoteCategory, type WordOfDay } from '@/lib/catalog-api'
 import { getAvailability, getWeekly, listSessions, type WeeklyDay } from '@/lib/learn-api'
-import { getStats, listLearningProfiles } from '@/lib/profile-api'
+import { getStats, listLanguages, listLearningProfiles } from '@/lib/profile-api'
+import { createUserEntry } from '@/lib/library-api'
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome'
 import {
   faCircle,
@@ -404,6 +405,134 @@ export default function Home() {
     }
   }, [authReady, user, token])
 
+  const [topicsTab, setTopicsTab] = useState<'system' | 'mine'>('system')
+  const [ownCats, setOwnCats] = useState<RemoteCategory[]>([])
+  const [ownDone, setOwnDone] = useState(false)
+  const [catDialog, setCatDialog] = useState<
+    | { mode: 'create' }
+    | { mode: 'rename'; id: string; name: string }
+    | { mode: 'delete'; id: string; name: string }
+    | null
+  >(null)
+  const [catName, setCatName] = useState('')
+  const [catBusy, setCatBusy] = useState(false)
+  const [catError, setCatError] = useState<string | null>(null)
+  const [wordForm, setWordForm] = useState(false)
+  const [wordEn, setWordEn] = useState('')
+  const [wordRu, setWordRu] = useState('')
+  const [wordCat, setWordCat] = useState('')
+  const [wordBusy, setWordBusy] = useState(false)
+  const [wordError, setWordError] = useState<string | null>(null)
+  const [wordAdded, setWordAdded] = useState(false)
+  const [langIds, setLangIds] = useState<{ en: string; ru: string } | null>(null)
+
+  // Own categories (authed only).
+  useEffect(() => {
+    if (!authReady || !user || !token) {
+      setOwnCats([])
+      setOwnDone(false)
+      return
+    }
+    let cancelled = false
+    const uid = user.id
+    const tk = token
+    listLearningProfiles(uid, tk)
+      .then((profiles) => {
+        const active = profiles.find((p) => p.is_active) ?? profiles[0]
+        if (!active) return null
+        return listCategoriesWithProgress(uid, tk, active.id, 'theme')
+      })
+      .then((list) => {
+        if (cancelled || !list) return
+        setOwnCats(list.filter((c) => c.user_id === uid))
+      })
+      .catch(() => undefined)
+      .finally(() => {
+        if (!cancelled) setOwnDone(true)
+      })
+    return () => {
+      cancelled = true
+    }
+  }, [authReady, user, token])
+
+  const openCatDialog = (d: NonNullable<typeof catDialog>) => {
+    setCatError(null)
+    setCatName(d.mode === 'create' ? '' : (d as { name?: string }).name ?? '')
+    setCatDialog(d)
+  }
+
+  const submitCatDialog = async () => {
+    if (!user || !token || catBusy || !catDialog) return
+    const name = catName.trim()
+    if (catDialog.mode !== 'delete' && name === '') return
+    setCatBusy(true)
+    setCatError(null)
+    try {
+      if (catDialog.mode === 'create') {
+        const created = await createCategory(user.id, token, { name })
+        setOwnCats((prev) => [created, ...prev])
+        setTopicsTab('mine')
+      } else if (catDialog.mode === 'rename') {
+        const updated = await updateCategory(user.id, token, catDialog.id, { name })
+        setOwnCats((prev) => prev.map((c) => (c.id === updated.id ? { ...c, name: updated.name } : c)))
+      } else {
+        await deleteCategory(user.id, token, catDialog.id)
+        setOwnCats((prev) => prev.filter((c) => c.id !== catDialog.id))
+      }
+      setCatDialog(null)
+    } catch (e) {
+      setCatError(e instanceof Error ? e.message : 'Error')
+    } finally {
+      setCatBusy(false)
+    }
+  }
+
+  const ensureLangIds = async (): Promise<{ en: string; ru: string } | null> => {
+    if (langIds) return langIds
+    try {
+      const langs = await listLanguages()
+      const en = langs.find((l) => l.code === 'en')?.id
+      const ru = langs.find((l) => l.code === 'ru')?.id
+      if (!en || !ru) return null
+      const ids = { en, ru }
+      setLangIds(ids)
+      return ids
+    } catch {
+      return null
+    }
+  }
+
+  const submitWord = async () => {
+    if (!user || !token || wordBusy) return
+    const targetCat = wordCat || ownCats[0]?.id
+    if (!targetCat || wordEn.trim() === '' || wordRu.trim() === '') {
+      setWordError(t('home.addWord.needCategory'))
+      return
+    }
+    setWordBusy(true)
+    setWordError(null)
+    setWordAdded(false)
+    try {
+      const ids = await ensureLangIds()
+      if (!ids) throw new Error('Error')
+      await createUserEntry(user.id, token, {
+        category_id: targetCat,
+        translations: [
+          { language_id: ids.en, text: wordEn.trim() },
+          { language_id: ids.ru, text: wordRu.trim() },
+        ],
+      })
+      setOwnCats((prev) => prev.map((c) => (c.id === targetCat ? { ...c, entries_count: c.entries_count + 1 } : c)))
+      setWordEn('')
+      setWordRu('')
+      setWordAdded(true)
+    } catch (e) {
+      setWordError(e instanceof Error ? e.message : 'Error')
+    } finally {
+      setWordBusy(false)
+    }
+  }
+
   const verbCoverage = useMemo(
     () => ({
       'irr-50': t('home.verbs.coverage.irr-50'),
@@ -589,6 +718,18 @@ export default function Home() {
     [t],
   )
 
+  const mineTopics: TopicCardData[] = useMemo(() => {
+    const sorted = [...ownCats].sort((a, b) => b.entries_count - a.entries_count)
+    return sorted.map((c, i) => ({
+      id: c.id,
+      emoji: c.icon ?? '📁',
+      title: c.name ?? c.slug,
+      count: `${c.entries_count} ${pickPlural(c.entries_count, heroWordsForms)}`,
+      sub: t('home.myTopics.mineSub'),
+      tone: TOPIC_TONES[i % TOPIC_TONES.length],
+    }))
+  }, [ownCats, t, heroWordsForms])
+
   const visibleTopics: TopicCardData[] = useMemo(() => {
     if (themeCategories.length === 0) return isAuthed ? [] : fallbackTopics
     const sorted = [...themeCategories].sort((a, b) => b.entries_count - a.entries_count)
@@ -751,24 +892,195 @@ export default function Home() {
       <motion.section className="content-section !mt-6" variants={fadeUp} transition={{ duration: 0.5 }}>
         <div className="section-header">
           <h3>{t('home.topics.title')}</h3>
-          {themeCategories.length > 8 && (
+          {themeCategories.length > 8 && topicsTab === 'system' && (
             <button className="text-link" type="button" onClick={() => setShowAllTopics((v) => !v)}>
               {showAllTopics ? t('home.topics.collapse') : t('home.topics.all', { n: themeCategories.length })}
             </button>
           )}
         </div>
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
-          {!isGuest && !themesDone ? (
-            topicSkeletons.map((i) => <SkeletonCard key={i} />)
-          ) : visibleTopics.length > 0 ? (
-            visibleTopics.map((card, index) => (
-              <MemoTopicCard key={card.title} card={card} index={index} onOpen={openCategory} />
-            ))
-          ) : isAuthed ? (
-            <p className="text-[13px] opacity-40 col-span-full">{t('home.topics.empty')}</p>
-          ) : null}
-        </div>
+        {isAuthed && (
+          <div className="flex gap-1.5 mb-3">
+            {(['system', 'mine'] as const).map((tab) => (
+              <button
+                key={tab}
+                onClick={() => setTopicsTab(tab)}
+                className={`px-3 py-1.5 rounded-full text-xs font-bold border transition-all ${topicsTab === tab ? 'bg-white text-black border-white' : 'bg-white/[0.04] border-white/[0.06] hover:bg-white/[0.08]'}`}
+              >
+                {tab === 'system' ? t('home.myTopics.tabSystem') : `${t('home.myTopics.tabMine')} • ${ownCats.length}`}
+              </button>
+            ))}
+          </div>
+        )}
+        {topicsTab === 'mine' && isAuthed ? (
+          <>
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
+              {!ownDone ? (
+                topicSkeletons.map((i) => <SkeletonCard key={i} />)
+              ) : mineTopics.length > 0 ? (
+                mineTopics.map((card, index) => (
+                  <div key={card.id ?? card.title} className="relative">
+                    <MemoTopicCard card={card} index={index} onOpen={openCategory} />
+                    <div className="absolute top-2 right-2 flex gap-1">
+                      <button
+                        onClick={(e) => {
+                          e.stopPropagation()
+                          const src = ownCats.find((c) => c.id === card.id)
+                          openCatDialog({ mode: 'rename', id: card.id as string, name: src?.name ?? card.title })
+                        }}
+                        aria-label={t('home.myTopics.renameTitle')}
+                        className="w-7 h-7 rounded-full bg-black/60 border border-white/15 grid place-items-center text-[11px] hover:bg-black/80"
+                      >
+                        ✎
+                      </button>
+                      <button
+                        onClick={(e) => {
+                          e.stopPropagation()
+                          openCatDialog({ mode: 'delete', id: card.id as string, name: card.title })
+                        }}
+                        aria-label={t('home.myTopics.deleteBtn')}
+                        className="w-7 h-7 rounded-full bg-black/60 border border-white/15 grid place-items-center text-[11px] hover:bg-[#f43f5e]/40"
+                      >
+                        ×
+                      </button>
+                    </div>
+                  </div>
+                ))
+              ) : (
+                <p className="text-[13px] opacity-40 col-span-full">{t('home.myTopics.empty')}</p>
+              )}
+            </div>
+            <div className="flex flex-wrap gap-2 mt-3">
+              <button
+                onClick={() => openCatDialog({ mode: 'create' })}
+                className="px-3.5 py-2 rounded-full bg-white text-black text-xs font-black hover:brightness-110"
+              >
+                {t('home.myTopics.create')}
+              </button>
+              {ownCats.length > 0 && (
+                <button
+                  onClick={() => {
+                    setWordForm((v) => !v)
+                    setWordError(null)
+                    setWordAdded(false)
+                    if (wordCat === '') setWordCat(ownCats[0]?.id ?? '')
+                  }}
+                  className="px-3.5 py-2 rounded-full bg-white/[0.06] border border-white/[0.08] text-xs font-black hover:bg-white/[0.1]"
+                >
+                  {t('home.addWord.open')}
+                </button>
+              )}
+            </div>
+            {wordForm && ownCats.length > 0 && (
+              <div className="mt-3 rounded-2xl border border-white/[0.06] bg-[#171717] p-4 flex flex-col gap-2">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                  <input
+                    value={wordEn}
+                    onChange={(e) => setWordEn(e.target.value)}
+                    placeholder={t('home.addWord.wordPh')}
+                    className="px-3 py-2 rounded-xl bg-black/20 border border-white/[0.06] text-sm focus:outline-none focus:border-white/20"
+                  />
+                  <input
+                    value={wordRu}
+                    onChange={(e) => setWordRu(e.target.value)}
+                    placeholder={t('home.addWord.translationPh')}
+                    className="px-3 py-2 rounded-xl bg-black/20 border border-white/[0.06] text-sm focus:outline-none focus:border-white/20"
+                  />
+                </div>
+                <div className="flex flex-wrap items-center gap-2">
+                  <select
+                    value={wordCat || (ownCats[0]?.id ?? '')}
+                    onChange={(e) => setWordCat(e.target.value)}
+                    className="px-3 py-2 rounded-xl bg-black/20 border border-white/[0.06] text-sm focus:outline-none"
+                  >
+                    {ownCats.map((c) => (
+                      <option key={c.id} value={c.id}>{c.name ?? c.slug}</option>
+                    ))}
+                  </select>
+                  <button
+                    onClick={() => void submitWord()}
+                    disabled={wordBusy}
+                    className="px-4 py-2 rounded-xl bg-[#5AD4B5] text-black text-xs font-black hover:brightness-110 disabled:opacity-50"
+                  >
+                    {wordBusy ? '…' : t('home.addWord.add')}
+                  </button>
+                  {wordAdded && <span className="text-xs font-bold text-[#5AD4B5]">{t('home.addWord.added')}</span>}
+                  {wordError && <span className="text-xs font-bold text-[#f43f5e]">{wordError}</span>}
+                </div>
+              </div>
+            )}
+          </>
+        ) : (
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
+            {!isGuest && !themesDone ? (
+              topicSkeletons.map((i) => <SkeletonCard key={i} />)
+            ) : visibleTopics.length > 0 ? (
+              visibleTopics.map((card, index) => (
+                <MemoTopicCard key={card.title} card={card} index={index} onOpen={openCategory} />
+              ))
+            ) : isAuthed ? (
+              <p className="text-[13px] opacity-40 col-span-full">{t('home.topics.empty')}</p>
+            ) : null}
+          </div>
+        )}
       </motion.section>
+
+      {catDialog && (
+        <div
+          className="fixed inset-0 z-50 grid place-items-center bg-black/60 p-4"
+          onClick={() => {
+            if (!catBusy) setCatDialog(null)
+          }}
+        >
+          <div
+            className="w-full max-w-[380px] rounded-[20px] border border-white/[0.08] bg-[#171717] p-5"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <h4 className="text-[15px] font-black">
+              {catDialog.mode === 'create'
+                ? t('home.myTopics.create')
+                : catDialog.mode === 'rename'
+                  ? t('home.myTopics.renameTitle')
+                  : t('home.myTopics.deleteTitle', { name: catDialog.name })}
+            </h4>
+            {catDialog.mode !== 'delete' && (
+              <input
+                autoFocus
+                value={catName}
+                onChange={(e) => setCatName(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter') void submitCatDialog()
+                }}
+                placeholder={t('home.myTopics.namePh')}
+                maxLength={60}
+                className="mt-3 w-full px-3 py-2.5 rounded-xl bg-black/20 border border-white/[0.08] text-sm focus:outline-none focus:border-white/20"
+              />
+            )}
+            {catError && <div className="text-xs font-bold text-[#f43f5e] mt-2">{catError}</div>}
+            <div className="flex gap-2 mt-4">
+              <button
+                onClick={() => setCatDialog(null)}
+                disabled={catBusy}
+                className="flex-1 py-2.5 rounded-xl bg-white/[0.06] border border-white/[0.08] text-xs font-black hover:bg-white/[0.1] disabled:opacity-50"
+              >
+                {t('home.myTopics.cancel')}
+              </button>
+              <button
+                onClick={() => void submitCatDialog()}
+                disabled={catBusy}
+                className={`flex-1 py-2.5 rounded-xl text-xs font-black disabled:opacity-50 ${catDialog.mode === 'delete' ? 'bg-[#f43f5e] text-white hover:brightness-110' : 'bg-white text-black hover:brightness-110'}`}
+              >
+                {catBusy
+                  ? '…'
+                  : catDialog.mode === 'create'
+                    ? t('home.myTopics.createBtn')
+                    : catDialog.mode === 'rename'
+                      ? t('home.myTopics.save')
+                      : t('home.myTopics.deleteBtn')}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* GRAMMAR — мемоизированы */}
       <motion.section className="content-section !mt-6" variants={fadeUp} transition={{ duration: 0.5 }}>

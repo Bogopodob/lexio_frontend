@@ -27,7 +27,9 @@ import {
 } from '@fortawesome/free-solid-svg-icons'
 import { useState, useEffect, useRef, useCallback, useMemo, memo, lazy, Suspense } from 'react'
 import { createPortal } from 'react-dom'
+import { Link } from 'react-router-dom'
 import { useAuth } from '@/context/AuthContext'
+import Paywall from '@/components/Paywall'
 import {
   answerFriendRequest,
   createGoal,
@@ -40,6 +42,7 @@ import {
   listFriends,
   listGoals,
   listLanguages,
+  listLeaderboard,
   listLearningProfiles,
   removeFriend,
   searchUsers,
@@ -49,6 +52,7 @@ import {
   updateProfile,
   uploadAvatar,
   type FriendRequestRow,
+  type LeaderboardRow,
   type RemoteAchievement,
   type RemoteFriend,
   type RemoteGoal,
@@ -396,8 +400,13 @@ export default function Profile() {
   const [incoming, setIncoming] = useState<FriendRequestRow[]>([])
   const [searchHits, setSearchHits] = useState<UserSearchHit[]>([])
   const [searching, setSearching] = useState(false)
+  const [friendsTab, setFriendsTab] = useState<'friends' | 'leaderboard'>('friends')
+  const [leaderboard, setLeaderboard] = useState<LeaderboardRow[] | null>(null)
+  const [leaderboardLoading, setLeaderboardLoading] = useState(false)
+  const [addPaywallVisible, setAddPaywallVisible] = useState(false)
 
   const isAuthed = Boolean(user && token)
+  const isPremium = Boolean(user?.is_premium)
   // Settled flags: authed users see skeletons until server data arrives,
   // mocks are for guests only — no mock flash.
   const [goalsLoaded, setGoalsLoaded] = useState(false)
@@ -463,6 +472,12 @@ export default function Profile() {
   const handleSendRequest = useCallback(
     (hit: UserSearchHit) => {
       if (!user || !token) return
+      // Client-side premium gate: adding friends is premium-only.
+      // Reading list/requests stays free; no failed-request UX.
+      if (!user.is_premium) {
+        setAddPaywallVisible(true)
+        return
+      }
       sendFriendRequest(user.id, token, { user_id: hit.user_id })
         .then(() => {
           setSearchHits((prev) =>
@@ -494,6 +509,31 @@ export default function Profile() {
     },
     [user, token, reloadFriends],
   )
+
+  // Leaderboard (premium-only for authed users; guests see the paywall).
+  useEffect(() => {
+    if (friendsTab !== 'leaderboard') return
+    if (!user || !token || !user.is_premium) {
+      setLeaderboard(null)
+      setLeaderboardLoading(false)
+      return
+    }
+    let cancelled = false
+    setLeaderboardLoading(true)
+    listLeaderboard(user.id, token)
+      .then((rows) => {
+        if (!cancelled) setLeaderboard(rows)
+      })
+      .catch(() => {
+        if (!cancelled) setLeaderboard([])
+      })
+      .finally(() => {
+        if (!cancelled) setLeaderboardLoading(false)
+      })
+    return () => {
+      cancelled = true
+    }
+  }, [friendsTab, user, token])
   const mockUsers = useMemo(
     () => {
       const lowerQuery = friendQuery.toLowerCase()
@@ -1048,7 +1088,14 @@ export default function Profile() {
                       {profile.gender === 'male' && (
                         <span title={t('profile.header.male')} className="w-7 h-7 rounded-full grid place-items-center border bg-[#5B74FF]/10 border-[#5B74FF]/30 text-[#5B74FF] text-sm"><FontAwesomeIcon icon={faMars} /></span>
                       )}
-                      <span className="px-2.5 py-1 rounded-full bg-white text-black text-[11px] font-black">PRO</span>
+                      {user?.is_premium && (
+                        <Link
+                          to="/premium"
+                          className="px-2.5 py-1 rounded-full bg-white text-black text-[11px] font-black hover:bg-[#F5C16A]"
+                        >
+                          PRO
+                        </Link>
+                      )}
                       {remote === 'loading' && (
                         <span className="px-2.5 py-1 rounded-full bg-white/[0.06] border border-white/[0.08] text-white/50 text-[11px] font-bold animate-pulse">{t('profile.header.loading')}</span>
                       )}
@@ -1360,6 +1407,63 @@ export default function Profile() {
               {incoming.length > 0 && <span className="ml-1.5 px-1.5 py-0.5 rounded-full bg-[#F5C16A]/15 border border-[#F5C16A]/25 text-[#F5C16A]">{t('profile.friends.requests', { n: incoming.length })}</span>}
             </span>
           </div>
+          <div className="mt-3 flex gap-1 p-1 rounded-xl border border-white/[0.06] bg-white/[0.03]">
+            <button
+              onClick={() => setFriendsTab('friends')}
+              className={`flex-1 px-3 py-1.5 rounded-lg text-[12px] font-bold border transition-all ${friendsTab === 'friends' ? 'bg-white/[0.08] text-white border-white/[0.10]' : 'bg-transparent text-white/45 border-transparent hover:text-white'}`}
+            >
+              {t('premium.friends.tab_friends')}
+            </button>
+            <button
+              onClick={() => setFriendsTab('leaderboard')}
+              className={`flex-1 px-3 py-1.5 rounded-lg text-[12px] font-bold border transition-all ${friendsTab === 'leaderboard' ? 'bg-white/[0.08] text-white border-white/[0.10]' : 'bg-transparent text-white/45 border-transparent hover:text-white'}`}
+            >
+              {t('premium.friends.tab_leaderboard')}
+            </button>
+          </div>
+          {friendsTab === 'leaderboard' ? (
+            <div className="mt-3">
+              {!isAuthed || !isPremium ? (
+                <Paywall compact title={t('premium.leaderboard.title')} text={t('premium.leaderboard.text')} />
+              ) : leaderboardLoading ? (
+                <div className="text-xs opacity-40 text-center py-4 animate-pulse">{t('premium.leaderboard.loading')}</div>
+              ) : !leaderboard || leaderboard.length === 0 ? (
+                <div className="text-xs opacity-40 text-center py-4">{t('premium.leaderboard.empty')}</div>
+              ) : (
+                <div className="space-y-2">
+                  {leaderboard.map((row, idx) => {
+                    const medal = idx === 0 ? '#ffd76a' : idx === 1 ? '#b8c4d4' : idx === 2 ? '#d08a5a' : '#6b7280'
+                    return (
+                      <div
+                        key={row.user_id}
+                        className={`flex items-center gap-3 rounded-xl border p-3 ${row.is_self ? 'bg-[#5AD4B5]/[0.07] border-[#5AD4B5]/40' : 'bg-white/[0.03] border-white/[0.04]'}`}
+                      >
+                        <span className="font-mono text-[12px] font-black w-5 text-center shrink-0" style={{ color: medal }}>
+                          {idx + 1}
+                        </span>
+                        <span className="w-9 h-9 rounded-full bg-white/[0.08] border border-white/[0.08] grid place-items-center font-bold text-sm shrink-0 overflow-hidden">
+                          {row.avatar || (row.name?.[0] || '?').toUpperCase()}
+                        </span>
+                        <div className="flex-1 min-w-0">
+                          <div className="text-sm font-bold leading-none truncate">
+                            {row.name || t('premium.leaderboard.fallback_name')}
+                            {row.level && <> • <span className="opacity-60 font-semibold">{row.level}</span></>}
+                            {row.is_self && (
+                              <span className="ml-1.5 px-1.5 py-0.5 rounded-full bg-[#5AD4B5]/15 border border-[#5AD4B5]/25 text-[#5AD4B5] text-[10px] font-black">
+                                {t('premium.leaderboard.you')}
+                              </span>
+                            )}
+                          </div>
+                          <div className="text-xs opacity-40 mt-0.5">{t('premium.leaderboard.streak', { n: row.streak_days })}</div>
+                        </div>
+                      </div>
+                    )
+                  })}
+                </div>
+              )}
+            </div>
+          ) : (
+          <>
           {isAuthed ? (
             <div className="mt-3">
               <div className="relative">
@@ -1388,6 +1492,11 @@ export default function Profile() {
               )}
               {!searching && friendQuery.trim().length >= 2 && searchHits.length === 0 && (
                 <div className="text-xs opacity-40 mt-2">{t('profile.friends.not_found', { q: friendQuery.trim() })}</div>
+              )}
+              {isAuthed && !isPremium && addPaywallVisible && (
+                <div className="mt-2">
+                  <Paywall compact title={t('premium.friends.add_locked_title')} text={t('premium.friends.add_locked_text')} />
+                </div>
               )}
             </div>
           ) : (
@@ -1483,6 +1592,8 @@ export default function Profile() {
               </>
             )}
           </div>
+          </>
+          )}
         </div>
         <div className="rounded-[20px] border border-white/[0.06] bg-[#171717] p-5">
           <h3 className="text-[14px] font-black tracking-tight flex items-center gap-2"><FontAwesomeIcon icon={faRocket} className="text-[#5AD4B5]" /> {t('profile.quickstart.title')}</h3>

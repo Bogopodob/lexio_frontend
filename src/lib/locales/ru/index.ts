@@ -11,6 +11,7 @@ import notfound from './notfound'
 import widgets from './widgets'
 import components from './components'
 import lib from './lib'
+import premium from './premium'
 
 const ru = {
   common,
@@ -26,6 +27,7 @@ const ru = {
   widgets,
   components,
   lib,
+  premium,
 }
 
 export default ru

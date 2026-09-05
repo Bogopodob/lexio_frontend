@@ -26,6 +26,7 @@ import { Ring } from '@/components/charts/ring'
 import { RingCenter } from '@/components/charts/ring-center'
 import { useTheme } from '@/context/ThemeContext'
 import { getUiLang, translate, useList, useT } from '@/lib/i18n'
+import Paywall from '@/components/Paywall'
 
 type Period = 'day' | 'week' | 'month' | 'year' | 'custom'
 
@@ -243,6 +244,16 @@ export default function Stats() {
 
   const mainIsBar = period === 'day' || period === 'year'
   const mainData = period === 'day' ? hourly : period === 'year' ? monthly : daily
+
+  // Premium gate: logged-in non-premium users see the paywall,
+  // guests keep the demo content untouched.
+  if (authReady && user && !user.is_premium) {
+    return (
+      <div className="w-full flex flex-col gap-5">
+        <Paywall title={t('premium.stats.title')} text={t('premium.stats.text')} />
+      </div>
+    )
+  }
 
   return (
     <div className="w-full flex flex-col gap-5">

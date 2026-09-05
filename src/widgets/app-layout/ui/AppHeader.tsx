@@ -64,6 +64,7 @@ export default function AppHeader({
     '/profile': t('widgets.header.titles.profile'),
     '/settings': t('widgets.header.titles.settings'),
     '/learn': t('widgets.header.titles.learn'),
+    '/premium': t('premium.page.title'),
   }
   const currentTitle =
     titleMap[pathname] ??
@@ -73,7 +74,9 @@ export default function AppHeader({
         ? t('widgets.header.titles.profile')
         : pathname.startsWith('/learn')
           ? t('widgets.header.titles.learn')
-          : t('widgets.header.titles.page'))
+          : pathname.startsWith('/premium')
+            ? t('premium.page.title')
+            : t('widgets.header.titles.page'))
 
   return (
     <header className="app-header">
@@ -196,9 +199,26 @@ export default function AppHeader({
                 aria-expanded={menuOpen}
                 title={displayName}
                 onClick={() => setMenuOpen((v) => !v)}
+                style={{ position: 'relative' }}
               >
                 <div className="app-header__avatar">{avatarLetter}</div>
                 <span className="app-header__avatar-status" aria-hidden="true" />
+                {user?.is_premium && (
+                  <span
+                    aria-hidden="true"
+                    title={t('premium.paywall.badge')}
+                    style={{
+                      position: 'absolute',
+                      top: -2,
+                      right: -2,
+                      width: 12,
+                      height: 12,
+                      borderRadius: '50%',
+                      background: '#F5C16A',
+                      border: '2px solid #0f0f0f',
+                    }}
+                  />
+                )}
               </button>
               <AnimatePresence>
                 {menuOpen && (
