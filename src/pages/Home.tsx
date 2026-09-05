@@ -140,11 +140,29 @@ const ProgressRing = memo(function ProgressRing({ value }: { value: number }) {
         />
       </svg>
       <span className="relative z-10 flex items-center justify-center w-full h-full text-[15px] font-black tracking-tight tabular-nums">
-        {Math.round(value * 100)}%
+        {loading ? '–' : `${Math.round(value * 100)}%`}
       </span>
     </motion.div>
   )
 })
+
+function SkeletonBars() {
+  return (
+    <div className="flex flex-col gap-2.5 animate-pulse" aria-hidden>
+      <div className="h-5 w-40 rounded-lg bg-white/[0.07]" />
+      <div className="h-11 w-64 max-w-full rounded-xl bg-white/[0.07]" />
+      <div className="h-4 w-48 max-w-full rounded-lg bg-white/[0.06]" />
+    </div>
+  )
+}
+
+function SkeletonCard() {
+  return (
+    <div className="rounded-[20px] border border-white/[0.06] bg-[#171717] p-4 min-h-[150px]" aria-hidden>
+      <SkeletonBars />
+    </div>
+  )
+}
 
 export interface TopicCardData {
   id?: string
@@ -299,10 +317,16 @@ export default function Home() {
     [navigate],
   )
   const { user, token, ready: authReady } = useAuth()
+  const isAuthed = authReady && !!user && !!token
   const [themeCategories, setThemeCategories] = useState<RemoteCategory[]>([])
   const [grammarCategories, setGrammarCategories] = useState<RemoteCategory[]>([])
   const [verbsCategories, setVerbsCategories] = useState<RemoteCategory[]>([])
   const [showAllTopics, setShowAllTopics] = useState(false)
+  // Settled flags: while authed data is loading we show skeletons,
+  // never mock content that gets swapped afterwards.
+  const [themesDone, setThemesDone] = useState(false)
+  const [grammarDone, setGrammarDone] = useState(false)
+  const [verbsDone, setVerbsDone] = useState(false)
 
   // Real catalog categories (guests see them too — public endpoint).
   useEffect(() => {
@@ -312,6 +336,9 @@ export default function Home() {
         if (!cancelled && list.length > 0) setThemeCategories(list)
       })
       .catch(() => undefined)
+      .finally(() => {
+        if (!cancelled) setThemesDone(true)
+      })
     return () => {
       cancelled = true
     }
@@ -336,6 +363,8 @@ export default function Home() {
         if (!cancelled && pub.length > 0) setGrammarCategories(pub)
       } catch {
         /* keep mocks */
+      } finally {
+        if (!cancelled) setGrammarDone(true)
       }
     }
     load()
@@ -363,6 +392,8 @@ export default function Home() {
         if (!cancelled && pub.length > 0) setVerbsCategories(pub)
       } catch {
         /* section stays hidden */
+      } finally {
+        if (!cancelled) setVerbsDone(true)
       }
     }
     load()
@@ -407,6 +438,10 @@ export default function Home() {
   const [live, setLive] = useState<LiveHome | null>(null)
   const [wotd, setWotd] = useState<WordOfDay | null>(null)
   const [weekly, setWeekly] = useState<WeeklyDay[] | null>(null)
+  const [liveDone, setLiveDone] = useState(false)
+  const [wotdDone, setWotdDone] = useState(false)
+  // Authed users see skeletons until their data settles — no mock flash.
+  const heroLoading = isAuthed && !liveDone
 
   const greeting = useMemo(() => greetingByHour(new Date().getHours()), [])
 
@@ -463,6 +498,8 @@ export default function Home() {
         })
       } catch {
         /* keep demo numbers */
+      } finally {
+        if (!cancelled) setLiveDone(true)
       }
     }
     load()
@@ -479,6 +516,9 @@ export default function Home() {
         if (!cancelled) setWotd(w)
       })
       .catch(() => undefined)
+      .finally(() => {
+        if (!cancelled) setWotdDone(true)
+      })
     return () => {
       cancelled = true
     }
@@ -514,8 +554,12 @@ export default function Home() {
     return map
   }, [themeCategories])
 
+  // Skeleton card placeholders (no mock content flash for authed users).
+  const topicSkeletons = useMemo(() => [0, 1, 2, 3], [])
+  const grammarSkeletons = useMemo(() => [0, 1, 2, 3], [])
+
   const visibleTopics: TopicCardData[] = useMemo(() => {
-    if (themeCategories.length === 0) return topicCards
+    if (themeCategories.length === 0) return isAuthed ? [] : topicCards
     const sorted = [...themeCategories].sort((a, b) => b.entries_count - a.entries_count)
     const shown = showAllTopics ? sorted : sorted.slice(0, 8)
     return shown.map((c, i) => ({
@@ -526,10 +570,10 @@ export default function Home() {
       sub: c.parent_id && topicNameById[c.parent_id] ? topicNameById[c.parent_id] : 'словарь',
       tone: TOPIC_TONES[i % TOPIC_TONES.length],
     }))
-  }, [themeCategories, showAllTopics, topicNameById])
+  }, [themeCategories, showAllTopics, topicNameById, isAuthed])
 
   const visibleGrammar: GrammarCardData[] = useMemo(() => {
-    if (grammarCategories.length === 0) return grammarCards
+    if (grammarCategories.length === 0) return isAuthed ? [] : grammarCards
     return grammarCategories.map((c, i) => {
       const palette = GRAMMAR_COLORS[i % GRAMMAR_COLORS.length]
       const learned = c.learned_count ?? null
@@ -545,7 +589,7 @@ export default function Home() {
         color: palette.color,
       }
     })
-  }, [grammarCategories])
+  }, [grammarCategories, isAuthed])
 
   return (
     <motion.div animate="animate" initial="initial" transition={{ staggerChildren: 0.08 }} className="relative">
@@ -570,7 +614,11 @@ export default function Home() {
           <span className="streak-badge__fire">
             <FontAwesomeIcon icon={faFire} />
           </span>
-          {live?.streak ?? 7} {plural(live?.streak ?? 7, ['день', 'дня', 'дней'])} подряд
+          {heroLoading ? (
+            <span className="inline-block w-20 h-4 rounded bg-white/10 animate-pulse" aria-hidden />
+          ) : (
+            <>{live?.streak ?? 7} {plural(live?.streak ?? 7, ['день', 'дня', 'дней'])} подряд</>
+          )}
         </motion.div>
       </motion.header>
 
@@ -586,23 +634,27 @@ export default function Home() {
                   <FontAwesomeIcon icon={faBolt} className="text-[#5AD4B5]" /> Дневная цель
                 </p>
                 <h2 className="text-[18px] sm:text-[20px] font-black tracking-tight leading-tight mt-1">
-                  <CountUp to={live?.wordsToday ?? 12} /> из <CountUp to={DAILY_WORD_TARGET} /> слов • <span className="text-white/60 font-semibold">{dailyPct}%</span>
+                  {heroLoading ? (
+                    <span className="inline-block w-44 h-6 rounded-lg bg-white/10 animate-pulse" aria-hidden />
+                  ) : (
+                    <><CountUp to={live?.wordsToday ?? 12} /> из <CountUp to={DAILY_WORD_TARGET} /> слов • <span className="text-white/60 font-semibold">{dailyPct}%</span></>
+                  )}
                 </h2>
-                <p className="text-white/50 text-[13px] leading-snug mt-1">{focusLine}</p>
+                <p className="text-white/50 text-[13px] leading-snug mt-1">{heroLoading ? 'Загружаем статистику…' : focusLine}</p>
               </div>
             </div>
             <div className="flex gap-2.5 flex-wrap lg:flex-nowrap">
               <div className="flex-1 lg:flex-none min-w-[110px] rounded-2xl bg-white/[0.04] border border-white/[0.06] px-4 py-3 text-center">
                 <div className="text-[11px] tracking-[0.10em] uppercase opacity-50 font-bold">Сегодня</div>
-                <div className="text-[18px] font-black"><CountUp to={live?.wordsToday ?? 18} /> {live ? plural(live.wordsToday, ['слово', 'слова', 'слов']) : 'мин'}</div>
+                <div className="text-[18px] font-black">{heroLoading ? '–' : <><CountUp to={live?.wordsToday ?? 18} /> {live ? plural(live.wordsToday, ['слово', 'слова', 'слов']) : 'мин'}</>}</div>
               </div>
               <div className="flex-1 lg:flex-none min-w-[110px] rounded-2xl bg-[#5AD4B5]/[0.08] border border-[#5AD4B5]/20 px-4 py-3 text-center">
                 <div className="text-[11px] tracking-[0.10em] uppercase opacity-60 font-bold text-[#5AD4B5]">{live ? 'Точность' : 'Серия'}</div>
-                <div className="text-[18px] font-black text-[#5AD4B5]"><CountUp to={live ? Math.round(live.accuracy * 100) : 92} />%</div>
+                <div className="text-[18px] font-black text-[#5AD4B5]">{heroLoading ? '–' : <><CountUp to={live ? Math.round(live.accuracy * 100) : 92} />%</>}</div>
               </div>
               <div className="hidden sm:flex min-w-[90px] rounded-2xl bg-white/[0.04] border border-white/[0.06] px-4 py-3 flex-col items-center justify-center">
                 <div className="text-[11px] tracking-[0.10em] uppercase opacity-50 font-bold flex items-center gap-1"><FontAwesomeIcon icon={faTrophy} className="text-[#DB9F3A]" /> Уровень</div>
-                <div className="text-[16px] font-black">{live?.level ?? 'A2'}</div>
+                <div className="text-[16px] font-black">{heroLoading ? '–' : (live?.level ?? 'A2')}</div>
               </div>
             </div>
             <motion.button onClick={() => navigate('/learn')} className="primary-action !m-0 lg:ml-auto group shrink-0" type="button" whileHover={{ y: -2, scale: 1.02 }} whileTap={{ scale: 0.97 }}>
@@ -624,6 +676,12 @@ export default function Home() {
           <div className="group relative rounded-[24px] border border-white/[0.06] bg-[#171717] p-6 sm:p-7 overflow-hidden">
             <div className="absolute -right-10 -top-10 w-40 h-40 rounded-full bg-[#5AD4B5]/[0.06] blur-2xl pointer-events-none" />
             <div className="absolute inset-0 opacity-[0.02]" style={{ backgroundImage: `radial-gradient(circle at 1px 1px, white 1px, transparent 0)`, backgroundSize: '20px 20px' }} />
+            {!wotdDone ? (
+              <div className="relative py-2">
+                <SkeletonBars />
+              </div>
+            ) : (
+            <>
             <div className="relative flex flex-wrap items-start justify-between gap-4">
               <div className="min-w-0">
                 <div className="inline-flex items-center gap-2 px-2.5 py-1 rounded-full bg-white/[0.06] border border-white/[0.06] text-[11px] font-bold tracking-widest uppercase">
@@ -652,6 +710,8 @@ export default function Home() {
                 <span className="px-3 py-1.5 rounded-full bg-white/[0.06] border border-white/[0.08] text-white/50 text-xs">Синонимы: luck, chance</span>
               )}
             </div>
+            </>
+            )}
           </div>
         </SpotlightCard>
       </motion.section>
@@ -667,9 +727,15 @@ export default function Home() {
           )}
         </div>
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
-          {visibleTopics.map((card, index) => (
-            <MemoTopicCard key={card.title} card={card} index={index} onOpen={openCategory} />
-          ))}
+          {isAuthed && !themesDone ? (
+            topicSkeletons.map((i) => <SkeletonCard key={i} />)
+          ) : visibleTopics.length > 0 ? (
+            visibleTopics.map((card, index) => (
+              <MemoTopicCard key={card.title} card={card} index={index} onOpen={openCategory} />
+            ))
+          ) : isAuthed ? (
+            <p className="text-[13px] opacity-40 col-span-full">Тем пока нет — загляни позже.</p>
+          ) : null}
         </div>
       </motion.section>
 
@@ -682,14 +748,20 @@ export default function Home() {
           </div>
         </div>
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
-          {visibleGrammar.map((card, index) => (
-            <MemoGrammarCard key={card.title} card={card} index={index} onOpen={openCategory} />
-          ))}
+          {isAuthed && !grammarDone ? (
+            grammarSkeletons.map((i) => <SkeletonCard key={i} />)
+          ) : visibleGrammar.length > 0 ? (
+            visibleGrammar.map((card, index) => (
+              <MemoGrammarCard key={card.title} card={card} index={index} onOpen={openCategory} />
+            ))
+          ) : isAuthed ? (
+            <p className="text-[13px] opacity-40 col-span-full">Разделов пока нет — загляни позже.</p>
+          ) : null}
         </div>
       </motion.section>
 
       {/* IRREGULAR VERBS — отдельная секция */}
-      {visibleVerbs.length > 0 && (
+      {(visibleVerbs.length > 0 || (isAuthed && !verbsDone)) && (
         <motion.section className="content-section !mt-6" variants={fadeUp} transition={{ duration: 0.5 }}>
           <div className="section-header section-header--stacked">
             <div>
@@ -698,9 +770,13 @@ export default function Home() {
             </div>
           </div>
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
-            {visibleVerbs.map((card, index) => (
-              <MemoGrammarCard key={card.title} card={card} index={index} onOpen={openCategory} />
-            ))}
+            {isAuthed && !verbsDone ? (
+              grammarSkeletons.map((i) => <SkeletonCard key={i} />)
+            ) : (
+              visibleVerbs.map((card, index) => (
+                <MemoGrammarCard key={card.title} card={card} index={index} onOpen={openCategory} />
+              ))
+            )}
           </div>
         </motion.section>
       )}
@@ -714,19 +790,23 @@ export default function Home() {
           <span className="text-[11px] tracking-[0.12em] uppercase opacity-50 font-bold">интерактив • наведи</span>
         </div>
         <div className="rounded-[24px] border border-white/[0.06] bg-white/[0.02] p-3 sm:p-5 backdrop-blur">
-          <Suspense fallback={<div className="h-[220px] w-full animate-pulse rounded-xl bg-white/[0.04]" />}>
-            <div className="h-[220px] w-full">
-              <AreaChart data={memoWeeklyData as unknown as Record<string, unknown>[]} xDataKey="date" aspectRatio="3 / 1" className="w-full h-full">
-                <Grid horizontal numTicksRows={4} stroke="rgba(255,255,255,0.06)" />
-                <Area dataKey="minutes" fill="var(--chart-line-primary)" stroke="var(--chart-line-primary)" fillOpacity={0.24} strokeWidth={2.5} />
-                <XAxis numTicks={7} />
-                <ChartTooltip />
-              </AreaChart>
-            </div>
-          </Suspense>
+          {isAuthed && !liveDone ? (
+            <div className="h-[220px] w-full animate-pulse rounded-xl bg-white/[0.04]" aria-hidden />
+          ) : (
+            <Suspense fallback={<div className="h-[220px] w-full animate-pulse rounded-xl bg-white/[0.04]" />}>
+              <div className="h-[220px] w-full">
+                <AreaChart data={memoWeeklyData as unknown as Record<string, unknown>[]} xDataKey="date" aspectRatio="3 / 1" className="w-full h-full">
+                  <Grid horizontal numTicksRows={4} stroke="rgba(255,255,255,0.06)" />
+                  <Area dataKey="minutes" fill="var(--chart-line-primary)" stroke="var(--chart-line-primary)" fillOpacity={0.24} strokeWidth={2.5} />
+                  <XAxis numTicks={7} />
+                  <ChartTooltip />
+                </AreaChart>
+              </div>
+            </Suspense>
+          )}
           <div className="flex gap-2 mt-3 flex-wrap">
-            <span className="px-3 py-1 rounded-full bg-[#5AD4B5]/15 text-[#5AD4B5] text-xs font-bold border border-[#5AD4B5]/20">{live?.minutesToday ?? 18} мин сегодня</span>
-            <span className="px-3 py-1 rounded-full bg-white/5 text-white/60 text-xs font-semibold border border-white/10">{weekPeak ? `Пик: ${weekPeak.minutes} мин в ${weekPeak.day}` : 'Пик: 30 мин в субботу'}</span>
+            <span className="px-3 py-1 rounded-full bg-[#5AD4B5]/15 text-[#5AD4B5] text-xs font-bold border border-[#5AD4B5]/20">{heroLoading ? '–' : `${live?.minutesToday ?? 18} мин сегодня`}</span>
+            <span className="px-3 py-1 rounded-full bg-white/5 text-white/60 text-xs font-semibold border border-white/10">{heroLoading ? 'Считаем…' : (weekPeak ? `Пик: ${weekPeak.minutes} мин в ${weekPeak.day}` : 'Пик: 30 мин в субботу')}</span>
             <span className="px-3 py-1 rounded-full bg-[#5B74FF]/15 text-[#8b9bff] text-xs font-semibold border border-[#5B74FF]/20">Цель: 20 мин/день</span>
           </div>
         </div>
@@ -744,8 +824,14 @@ export default function Home() {
             <div key={s.label} className="rounded-[20px] border border-white/[0.06] bg-white/[0.03] p-4 backdrop-blur flex flex-col items-center gap-1 text-center">
               <span className="text-[11px] tracking-[0.10em] uppercase opacity-50 font-bold">{s.label}</span>
               <span className="text-[28px] font-black tracking-tight leading-none flex items-baseline justify-center gap-0.5" style={{ color: s.color }}>
-                <CountUp to={s.value} duration={1} className="tabular-nums" />
-                <span className="text-[22px] font-black">{s.suffix || ''}</span>
+                {heroLoading ? (
+                  <span className="inline-block w-16 h-8 rounded-lg bg-white/10 animate-pulse" aria-hidden />
+                ) : (
+                  <>
+                    <CountUp to={s.value} duration={1} className="tabular-nums" />
+                    <span className="text-[22px] font-black">{s.suffix || ''}</span>
+                  </>
+                )}
               </span>
               <span className="text-xs opacity-60">{s.sub}</span>
             </div>
