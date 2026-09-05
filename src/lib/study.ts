@@ -1,4 +1,4 @@
-export type BaseMode = 'f2n' | 'n2f' | 'typing' | 'audio' | 'choice' | 'anagram' | 'bool'
+export type BaseMode = 'f2n' | 'n2f' | 'typing' | 'audio' | 'choice' | 'anagram' | 'bool' | 'forms'
 
 export type Direction = BaseMode | 'mixed' | 'smart'
 
@@ -66,21 +66,28 @@ export function fuzzyMatch(input: string, targets: readonly string[]): { kind: F
 const ALL_BASE: BaseMode[] = ['f2n', 'n2f', 'typing', 'audio', 'choice', 'anagram', 'bool']
 
 function needsNative(m: BaseMode): boolean {
-  return m === 'n2f' || m === 'typing' || m === 'bool' || m === 'choice'
+  return m === 'n2f' || m === 'typing' || m === 'bool' || m === 'choice' || m === 'forms'
 }
 
-function withFallback(m: BaseMode, hasNative: boolean): BaseMode {
+function withFallback(m: BaseMode, hasNative: boolean, hasForms: boolean): BaseMode {
+  if (m === 'forms') return hasForms && hasNative ? 'forms' : 'typing'
   if (!hasNative && needsNative(m)) return 'f2n'
   return m
 }
 
-export function pickSmart(learnableId: string, p: WordProgress | null): BaseMode {
+export function pickSmart(learnableId: string, p: WordProgress | null, hasForms: boolean): BaseMode {
   const h = hashOf(learnableId)
   const rep = p?.repetition ?? 0
   if (rep <= 0) return 'f2n'
   if (rep <= 2) return (['typing', 'f2n', 'audio'] as const)[h % 3]
-  if (rep <= 5) return (['n2f', 'choice', 'audio'] as const)[h % 3]
-  return (['n2f', 'audio', 'bool', 'anagram', 'choice'] as const)[h % 5]
+  if (rep <= 5) {
+    const pool: BaseMode[] = hasForms ? ['n2f', 'choice', 'audio', 'forms'] : ['n2f', 'choice', 'audio']
+    return pool[h % pool.length]
+  }
+  const pool: BaseMode[] = hasForms
+    ? ['n2f', 'audio', 'bool', 'anagram', 'choice', 'forms']
+    : ['n2f', 'audio', 'bool', 'anagram', 'choice']
+  return pool[h % pool.length]
 }
 
 /** Sync mode resolution (distractor sufficiency for choice/bool is checked async later). */
@@ -89,14 +96,17 @@ export function resolveMode(
   learnableId: string,
   progress: WordProgress | null,
   hasNative: boolean,
+  hasForms = false,
 ): BaseMode {
   switch (d) {
-    case 'mixed':
-      return withFallback(ALL_BASE[hashOf(`mix:${learnableId}`) % ALL_BASE.length], hasNative)
+    case 'mixed': {
+      const pool: BaseMode[] = hasForms ? [...ALL_BASE, 'forms'] : ALL_BASE
+      return withFallback(pool[hashOf(`mix:${learnableId}`) % pool.length], hasNative, hasForms)
+    }
     case 'smart':
-      return withFallback(pickSmart(learnableId, progress), hasNative)
+      return withFallback(pickSmart(learnableId, progress, hasForms), hasNative, hasForms)
     default:
-      return withFallback(d, hasNative)
+      return withFallback(d, hasNative, hasForms)
   }
 }
 

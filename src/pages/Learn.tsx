@@ -12,6 +12,7 @@ import {
   faFlag,
   faHeadphones,
   faKeyboard,
+  faListCheck,
   faListUl,
   faPlay,
   faPuzzlePiece,
@@ -25,6 +26,7 @@ import StudyFlashcard from '@/components/StudyFlashcard'
 import ChoiceCard from '@/components/ChoiceCard'
 import BoolCard from '@/components/BoolCard'
 import AnagramCard from '@/components/AnagramCard'
+import FormsCard from '@/components/FormsCard'
 import BlitzBar from '@/components/BlitzBar'
 import { useSpeech } from '@/hooks/useSpeech'
 import { useAuth } from '@/context/AuthContext'
@@ -72,7 +74,7 @@ const LIMITS = [10, 20, 30]
 
 const BLITZ_SECONDS = 12
 
-const AUTO_MODES: BaseMode[] = ['typing', 'choice', 'bool', 'anagram']
+const AUTO_MODES: BaseMode[] = ['typing', 'choice', 'bool', 'anagram', 'forms']
 
 interface DirectionInfo {
   id: Direction
@@ -90,6 +92,7 @@ const DIRECTIONS: DirectionInfo[] = [
   { id: 'choice', label: 'Выбор из 4', hint: 'слово + 4 варианта перевода', group: 'game', icon: faListUl },
   { id: 'anagram', label: 'Собери слово', hint: 'буквы перемешаны — собери слово обратно', group: 'game', icon: faPuzzlePiece },
   { id: 'bool', label: 'Верно / нет', hint: 'пара «слово — перевод»: правда или ложь?', group: 'game', icon: faScaleBalanced },
+  { id: 'forms', label: 'Формы', hint: 'цепочка v1 → v2 → v3 со случайным пропуском — впиши форму', group: 'game', icon: faListCheck },
   { id: 'mixed', label: 'Микс', hint: 'режим случаен для каждой карточки', group: 'auto', icon: faShuffle },
   { id: 'smart', label: 'Умный микс', hint: 'режим по зрелости слова: новое — карточки, зрелое — игры', group: 'auto', icon: faBrain },
 ]
@@ -538,8 +541,17 @@ export default function Learn() {
           }
         : null,
       cardTexts.native.length > 0,
+      (c?.forms?.length ?? 0) > 0,
     )
   }, [direction, card, cardTexts])
+
+  const formsData = useMemo(() => {
+    const forms = card?.card.forms ?? []
+    return {
+      past: forms.filter((f) => f.form_type === 'past').map((f) => f.form),
+      participle: forms.filter((f) => f.form_type === 'past_participle').map((f) => f.form),
+    }
+  }, [card])
 
   const cardBadge = useMemo(
     () =>
@@ -1085,6 +1097,18 @@ export default function Learn() {
                   onAnswer={(ok) => scheduleAuto(ok ? 4 : 1, 900)}
                 />
               )}
+              {cardMode === 'forms' && (
+                <FormsCard
+                  v1forms={cardTexts.target}
+                  past={formsData.past}
+                  participle={formsData.participle}
+                  native={cardTexts.native[0] ?? ''}
+                  wordSpeak={{ text: cardTexts.target[0] ?? '', lang: voiceLangs.target }}
+                  speakingKey={speakingKey}
+                  onSpeak={(text, lang, key) => speakCard(text, lang, key)}
+                  onAnswer={(kind, hints) => scheduleAuto(autoQuality(kind, hints), 1200)}
+                />
+              )}
               {cardMode === 'anagram' && (
                 <AnagramCard
                   word={cardTexts.target[0] ?? ''}
@@ -1102,7 +1126,7 @@ export default function Learn() {
                   <span className="text-sm opacity-50 animate-pulse">Подбираем варианты…</span>
                 </div>
               )}
-              {(cardMode !== 'choice' && cardMode !== 'bool' && cardMode !== 'anagram') || choiceFallback || boolFallback ? (
+              {(cardMode !== 'choice' && cardMode !== 'bool' && cardMode !== 'anagram' && cardMode !== 'forms') || choiceFallback || boolFallback ? (
                 <StudyFlashcard
                   mode={cardMode === 'choice' || cardMode === 'bool' ? 'f2n' : cardMode}
                   targetTexts={cardTexts.target}
@@ -1183,6 +1207,8 @@ export default function Learn() {
                   'Выбери верный вариант ↑ — оценка сама'
                 ) : cardMode === 'bool' ? (
                   'Пара верна? Ответь ↑ — оценка сама'
+                ) : cardMode === 'forms' ? (
+                  'Впиши пропущенную форму ↑ — оценка сама'
                 ) : (
                   'Собери слово из букв ↑ — оценка сама'
                 )}
@@ -1224,6 +1250,13 @@ export default function Learn() {
                 <>
                   <span>печатай буквы • <Kbd>⌫</Kbd> — убрать</span>
                   <span>клик — тоже работает</span>
+                </>
+              ) : cardMode === 'forms' ? (
+                <>
+                  <span>
+                    <Kbd>Enter</Kbd> — проверить форму
+                  </span>
+                  <span>💡 — подсказать букву</span>
                 </>
               ) : (
                 <>
