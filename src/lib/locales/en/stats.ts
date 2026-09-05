@@ -1,0 +1,82 @@
+import type ruStats from '../ru/stats'
+
+const en: typeof ruStats = {
+  periods: { day: 'Day', week: 'Week', month: 'Month', year: 'Year' },
+  weekdays: ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'],
+  months: ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'],
+  units: { min: 'min', h: 'h', daysShort: 'd' },
+  periodLabel: 'period • {sub}',
+  profileStats: 'profile stats',
+  real: {
+    words: 'Words learned',
+    streak: 'Streak',
+    best: 'Best streak',
+    xp: 'XP',
+    accuracy: 'Accuracy',
+  },
+  dueToday: 'Due for review today:',
+  pills: {
+    today: 'Today',
+    wordsUnit: 'words',
+    goal: 'Goal',
+    peakHour: 'Peak hour',
+    streak: 'Streak',
+    streakValue: '7 days',
+    streakRecord: '🔥 record',
+    wordsFor: 'Words per {w}',
+    weekGen: 'week',
+    monthGen: 'month',
+    yearGen: 'year',
+    perDay: '{n}/day',
+    minutesTotal: 'Minutes total',
+    bestDay: 'Best day',
+    accuracySub: '92% accuracy',
+  },
+  main: {
+    hours: 'Hourly focus',
+    week: 'Weekly trend',
+    month: 'Monthly trend',
+    year: 'Yearly trend',
+    today: 'today',
+    wordsSub: '{n} words',
+    totalSub: '{dur} total',
+  },
+  topics: {
+    title: 'Topics',
+    sub: 'word distribution',
+    centerFallback: 'words',
+    names: ['Food', 'Travel', 'Emotions', 'Work'],
+  },
+  days: {
+    plan: 'Day plan',
+    byWeekday: 'By weekday',
+    avg: 'average',
+    planRows: ['Morning • new words', 'Day • review', 'Evening • phrases'],
+  },
+  goals: {
+    title: 'Goals',
+    centerFallback: 'Words',
+    ring: ['Words', 'Minutes', 'Accuracy'],
+  },
+  activity: {
+    title: 'Activity',
+    daysTotal: '{n} d • {dur}',
+    none: 'none',
+    less: 'less',
+    more: 'more',
+  },
+  top: {
+    title: 'Best days',
+    top5: 'top 5',
+    summary: '{n} d hit the goal • avg {dur}',
+  },
+  goalBlock: {
+    title: 'Goal progress',
+    goalPerDay: 'goal {dur}/day',
+    avgDay: 'average day — {dur}',
+    exceeded: 'Goal exceeded by {dur}',
+    missing: '{dur} short of goal',
+  },
+}
+
+export default en
