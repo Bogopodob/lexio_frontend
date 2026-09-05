@@ -47,6 +47,10 @@ export default function AnagramCard({
   const [flash, setFlash] = useState(false)
   const [givenUp, setGivenUp] = useState(false)
   const done = useRef(false)
+  // NB: mistakes lives in a ref for the check effect — keeping it in state
+  // deps restarts the effect on every increment and kills the clear timer,
+  // which used to pile up mistakes forever on a wrong assembly.
+  const mistakesRef = useRef(0)
   const cbSolved = useRef(onSolved)
   cbSolved.current = onSolved
   const cbGiveUp = useRef(onGiveUp)
@@ -103,22 +107,28 @@ export default function AnagramCard({
   placedRef.current = placed
 
   useEffect(() => {
-    if (done.current || givenUp || placed.some((p) => p === null)) return
+    if (done.current || givenUp) return
+    if (placed.some((p) => p === null)) {
+      // Same-value set bails out, so no render loop here.
+      setFlash(false)
+      return
+    }
     const byId = new Map(tiles.map((t) => [t.id, t.ch]))
     const assembled = placed.map((id) => byId.get(id!) ?? '').join('')
     if (assembled.toLowerCase() === word.replace(/ /g, '').toLowerCase()) {
       done.current = true
-      cbSolved.current(mistakes)
+      cbSolved.current(mistakesRef.current)
       return
     }
-    setMistakes((m) => m + 1)
+    mistakesRef.current += 1
+    setMistakes(mistakesRef.current)
     setFlash(true)
     const t = window.setTimeout(() => {
       setPlaced(Array(slotCount).fill(null))
       setFlash(false)
     }, 550)
     return () => window.clearTimeout(t)
-  }, [placed, tiles, word, mistakes, slotCount, givenUp])
+  }, [placed, tiles, word, slotCount, givenUp])
 
   const giveUp = () => {
     if (done.current || givenUp) return
