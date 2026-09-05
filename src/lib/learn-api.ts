@@ -72,6 +72,7 @@ async function request<T>(path: string, token: string, init: RequestInit = {}): 
     ...init,
     headers: {
       'Content-Type': 'application/json',
+      'Accept-Language': 'ru',
       Authorization: `Bearer ${token}`,
       ...(init.headers ?? {}),
     },

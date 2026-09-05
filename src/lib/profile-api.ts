@@ -42,6 +42,7 @@ async function request<T>(path: string, token: string, init: RequestInit = {}): 
     ...init,
     headers: {
       'Content-Type': 'application/json',
+      'Accept-Language': 'ru',
       Authorization: `Bearer ${token}`,
       ...(init.headers ?? {}),
     },
@@ -92,7 +93,7 @@ export async function uploadAvatar(userId: string, token: string, blob: Blob): P
   form.append('avatar', blob, blob.type === 'image/png' ? 'avatar.png' : 'avatar.jpg')
   const res = await fetch(`${API_URL}/users/${userId}/avatar`, {
     method: 'POST',
-    headers: { Authorization: `Bearer ${token}` },
+    headers: { Authorization: `Bearer ${token}`, 'Accept-Language': 'ru' },
     body: form,
   })
   const body = (await res.json().catch(() => null)) as {

@@ -30,7 +30,7 @@ async function request<T>(path: string, init: RequestInit = {}): Promise<T> {
   try {
     res = await fetch(`${API_URL}${path}`, {
       ...init,
-      headers: { 'Content-Type': 'application/json', ...(init.headers ?? {}) },
+      headers: { 'Content-Type': 'application/json', 'Accept-Language': 'ru', ...(init.headers ?? {}) },
     })
   } catch {
     throw new AuthError('Сервер недоступен. Проверь соединение.', 0)

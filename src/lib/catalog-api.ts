@@ -15,7 +15,7 @@ export interface RemoteCategory {
 
 async function get<T>(path: string, token?: string): Promise<T> {
   const res = await fetch(`${API_URL}${path}`, {
-    headers: token ? { Authorization: `Bearer ${token}` } : {},
+    headers: token ? { Authorization: `Bearer ${token}`, 'Accept-Language': 'ru' } : { 'Accept-Language': 'ru' },
   })
   const body = (await res.json().catch(() => null)) as {
     success?: boolean
