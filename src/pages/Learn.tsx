@@ -4,11 +4,14 @@ import { AnimatePresence, motion } from 'framer-motion'
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome'
 import {
   faArrowLeft,
+  faArrowRightArrowLeft,
   faBolt,
   faCheck,
   faFlag,
+  faKeyboard,
   faPlay,
   faRotateRight,
+  faShuffle,
   faTrophy,
 } from '@fortawesome/free-solid-svg-icons'
 import StudyFlashcard from '@/components/StudyFlashcard'
@@ -48,11 +51,19 @@ const LIMITS = [10, 20, 30]
 type Direction = 'f2n' | 'n2f' | 'typing' | 'mixed'
 
 const DIRECTIONS: { id: Direction; label: string; hint: string }[] = [
-  { id: 'f2n', label: 'EN → RU', hint: 'видишь слово, вспоминаешь перевод' },
-  { id: 'n2f', label: 'RU → EN', hint: 'видишь перевод, вспоминаешь слово' },
-  { id: 'typing', label: '⌨️ Ввод', hint: 'печатаешь слово на английском' },
-  { id: 'mixed', label: '🔀 Микс', hint: 'направление случайно для каждой карточки' },
+  { id: 'f2n', label: 'Слово — перевод', hint: 'видишь слово, вспоминаешь перевод' },
+  { id: 'n2f', label: 'Перевод — слово', hint: 'видишь перевод, вспоминаешь слово' },
+  { id: 'typing', label: 'Ввод слова', hint: 'печатаешь слово на английском' },
+  { id: 'mixed', label: 'Микс', hint: 'направление случайно для каждой карточки' },
 ]
+
+function LangChip({ code }: { code: string }) {
+  return (
+    <span className="px-1.5 py-0.5 rounded-md bg-black/25 border border-white/15 text-[10.5px] font-black tracking-wide leading-none">
+      {code}
+    </span>
+  )
+}
 
 function Kbd({ children }: { children: React.ReactNode }) {
   return (
@@ -451,6 +462,14 @@ export default function Learn() {
     return `${langMap[p.target_language_id] ?? ''} • ${p.level}`.trim()
   }, [profiles, profileId, langMap])
 
+  const langCodes = useMemo(() => {
+    const p = profiles.find((x) => x.id === profileId)
+    return {
+      target: (p && langMap[p.target_language_id]) || 'EN',
+      native: (p && langMap[p.native_language_id]) || 'RU',
+    }
+  }, [profiles, profileId, langMap])
+
   return (
     <motion.div
       initial={{ opacity: 0, y: 12 }}
@@ -567,10 +586,20 @@ export default function Learn() {
                 <button
                   key={d.id}
                   onClick={() => setDirection(d.id)}
-                  title={d.hint}
-                  className={`px-3 py-1.5 rounded-full text-xs font-bold border transition-all ${direction === d.id ? 'bg-[#5B74FF]/20 border-[#5B74FF]/50 text-[#8b9bff]' : 'bg-white/[0.04] border-white/[0.06] hover:bg-white/[0.08]'}`}
+                  title={`${d.label} — ${d.hint}`}
+                  aria-pressed={direction === d.id}
+                  className={`h-9 px-3 rounded-full text-xs font-bold border transition-all flex items-center gap-1.5 ${direction === d.id ? 'bg-[#5B74FF]/20 border-[#5B74FF]/60 text-white shadow-[0_0_18px_rgba(91,116,255,0.3)]' : 'bg-white/[0.04] border-white/[0.06] hover:bg-white/[0.08]'}`}
                 >
-                  {d.label}
+                  {(d.id === 'f2n' || d.id === 'n2f') && (
+                    <>
+                      <LangChip code={d.id === 'f2n' ? langCodes.target : langCodes.native} />
+                      <FontAwesomeIcon icon={faArrowRightArrowLeft} className="text-[10px] opacity-60" />
+                      <LangChip code={d.id === 'f2n' ? langCodes.native : langCodes.target} />
+                    </>
+                  )}
+                  {d.id === 'typing' && <FontAwesomeIcon icon={faKeyboard} className="text-xs opacity-80" />}
+                  {d.id === 'mixed' && <FontAwesomeIcon icon={faShuffle} className="text-xs opacity-80" />}
+                  <span>{d.label}</span>
                 </button>
               ))}
             </div>

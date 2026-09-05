@@ -5,7 +5,7 @@ import {
   useTransform,
 } from 'framer-motion'
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome'
-import { faVolumeHigh, faCheck, faRotateLeft, faEye, faLanguage, faKeyboard } from '@fortawesome/free-solid-svg-icons'
+import { faVolumeHigh, faCheck, faXmark, faRotateLeft, faEye, faLanguage, faKeyboard } from '@fortawesome/free-solid-svg-icons'
 
 export type CardMode = 'f2n' | 'n2f' | 'typing'
 
@@ -65,6 +65,10 @@ export default function StudyFlashcard({
 
   const firstLetter = (displayText.trim()[0] ?? '?').toUpperCase()
 
+  // No inner scrolls ever: show at most 6 variants, rest as a counter line.
+  const visibleAnswers = answers.slice(0, 6)
+  const hiddenCount = answers.length - visibleAnswers.length
+
   const check = () => {
     const v = normalize(value)
     if (!v || flipped) return
@@ -78,7 +82,7 @@ export default function StudyFlashcard({
       <motion.div style={{ transformStyle: 'preserve-3d' }}>
         <motion.div
           data-testid="study-card"
-          className="relative min-h-[320px] sm:min-h-[360px] cursor-pointer select-none"
+          className="relative grid cursor-pointer select-none"
           style={{ transformStyle: 'preserve-3d', x: dragX, touchAction: flipped ? 'pan-y' : 'auto' }}
           animate={{ rotateY: flipped ? 180 : 0 }}
           transition={{ type: 'spring', stiffness: 240, damping: 24 }}
@@ -119,7 +123,7 @@ export default function StudyFlashcard({
         >
           {/* FRONT */}
           <div
-            className="absolute inset-0 overflow-hidden rounded-[24px] border border-white/[0.08] bg-[#171717] p-6 sm:p-8 flex flex-col"
+            className="col-start-1 row-start-1 w-full min-h-[320px] sm:min-h-[360px] overflow-hidden rounded-[24px] border border-white/[0.08] bg-[#171717] p-6 sm:p-8 flex flex-col"
             style={{ backfaceVisibility: 'hidden' }}
           >
             <div className="absolute -right-14 -top-14 w-52 h-52 rounded-full bg-[#5AD4B5]/[0.09] blur-3xl pointer-events-none" />
@@ -160,8 +164,8 @@ export default function StudyFlashcard({
             </div>
 
             <div className="flex-1 grid place-items-center py-6 relative">
-              <div className="text-center w-full max-w-[420px]">
-                <h2 className="text-[40px] sm:text-[52px] font-black tracking-tight leading-none">
+              <div className="text-center w-full max-w-[420px] min-w-0">
+                <h2 className="text-[40px] sm:text-[52px] font-black tracking-tight leading-none break-words">
                   {displayText}
                 </h2>
                 {mode === 'f2n' && transcription ? (
@@ -206,7 +210,7 @@ export default function StudyFlashcard({
 
           {/* BACK */}
           <div
-            className="absolute inset-0 overflow-hidden rounded-[24px] border border-[#5AD4B5]/25 bg-[#141a18] p-6 sm:p-8 flex flex-col"
+            className="col-start-1 row-start-1 w-full min-h-[320px] sm:min-h-[360px] overflow-hidden rounded-[24px] border border-[#5AD4B5]/25 bg-[#141a18] p-6 sm:p-8 flex flex-col"
             style={{ backfaceVisibility: 'hidden', transform: 'rotateY(180deg)' }}
           >
             <div className="absolute -left-14 -top-14 w-52 h-52 rounded-full bg-[#5AD4B5]/[0.1] blur-3xl pointer-events-none" />
@@ -217,32 +221,45 @@ export default function StudyFlashcard({
               <span className="text-[11px] text-white/40 font-bold flex items-center gap-1.5">
                 <FontAwesomeIcon icon={faLanguage} /> {answers.length > 1 ? `${answers.length} варианта` : '1 вариант'}
               </span>
-              {isTyping && result !== null && (
-                <span
-                  className={`px-2.5 py-1 rounded-full text-[11px] font-black uppercase tracking-widest ${
-                    result
-                      ? 'bg-[#5AD4B5]/15 border border-[#5AD4B5]/40 text-[#5AD4B5]'
-                      : 'bg-[#f43f5e]/15 border border-[#f43f5e]/40 text-[#fb7185]'
-                  }`}
-                >
-                  {result ? 'Верно 🎉' : 'Мимо'}
-                </span>
-              )}
             </div>
 
-            <div className="flex-1 flex flex-col justify-center gap-2 py-4 relative overflow-y-auto">
-              {isTyping && result === false && (
-                <div className="text-[13px] font-bold text-white/50">
-                  Ты написал: <span className="text-[#fb7185]">«{value.trim()}»</span>
+            <div className="flex-1 flex flex-col justify-center gap-2 py-4 relative">
+              {isTyping && result !== null && (
+                <div
+                  className={`rounded-2xl border px-4 py-3 text-center ${
+                    result
+                      ? 'bg-[#5AD4B5]/[0.1] border-[#5AD4B5]/50 shadow-[0_0_28px_rgba(90,212,181,0.25)]'
+                      : 'bg-[#f43f5e]/[0.1] border-[#f43f5e]/50 shadow-[0_0_28px_rgba(244,63,94,0.25)]'
+                  }`}
+                >
+                  <div
+                    className={`text-[22px] font-black flex items-center justify-center gap-2 ${
+                      result ? 'text-[#5AD4B5]' : 'text-[#fb7185]'
+                    }`}
+                  >
+                    <FontAwesomeIcon icon={result ? faCheck : faXmark} />
+                    {result ? 'Правильно!' : 'Неправильно'}
+                  </div>
+                  <div className="mt-2 text-[10.5px] font-black uppercase tracking-[0.18em] text-white/40">
+                    Твой ответ
+                  </div>
+                  <div className="mt-0.5 text-[19px] font-black text-white break-words leading-snug">
+                    «{value.trim()}»
+                  </div>
                 </div>
               )}
-              {answers.length > 0 ? (
-                answers.map((t, i) => (
+              {isTyping && (
+                <div className="text-[10.5px] font-black uppercase tracking-[0.18em] text-white/40 mt-1">
+                  Правильно так
+                </div>
+              )}
+              {visibleAnswers.length > 0 ? (
+                visibleAnswers.map((t, i) => (
                   <div
                     key={`${t}-${i}`}
                     className={`flex items-center gap-3 rounded-2xl bg-white/[0.05] border border-white/[0.07] px-4 ${answers.length > 3 ? 'py-1.5' : 'py-2.5'}`}
                   >
-                    <span className={`flex-1 font-black leading-snug ${answers.length > 3 ? 'text-[15px]' : 'text-[19px] sm:text-[22px]'}`}>{t}</span>
+                    <span className={`flex-1 min-w-0 font-black leading-snug break-words ${answers.length > 3 ? 'text-[15px]' : 'text-[19px] sm:text-[22px]'}`}>{t}</span>
                     <button
                       onClick={(e) => {
                         e.stopPropagation()
@@ -261,6 +278,9 @@ export default function StudyFlashcard({
                 ))
               ) : (
                 <div className="text-white/40 text-sm">Перевода пока нет</div>
+              )}
+              {hiddenCount > 0 && (
+                <div className="text-center text-[12px] font-bold text-white/35">…и ещё {hiddenCount}</div>
               )}
               {mode !== 'f2n' && transcription ? (
                 <div className="text-[13px] font-bold text-[#5AD4B5]/80 tabular-nums">[{transcription}]</div>
