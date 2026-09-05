@@ -58,17 +58,11 @@ import {
   listLearningProfiles,
   type RemoteLearningProfile,
 } from '@/lib/profile-api'
-import { formatBinding, matchesShortcut, useShortcuts } from '@/lib/shortcuts'
+import { formatBinding, matchesShortcut, useShortcuts, type ShortcutId } from '@/lib/shortcuts'
 import { listCategories } from '@/lib/catalog-api'
+import { useT } from '@/lib/i18n'
 
 type Phase = 'loading' | 'menu' | 'study' | 'finished'
-
-const GRADES = [
-  { quality: 1, bindingId: 'grade_again', label: 'Снова', sub: 'не помню', color: '#f43f5e' },
-  { quality: 3, bindingId: 'grade_hard', label: 'Трудно', sub: 'еле вспомнил', color: '#ff9d5c' },
-  { quality: 4, bindingId: 'grade_good', label: 'Хорошо', sub: 'вспомнил', color: '#5AD4B5' },
-  { quality: 5, bindingId: 'grade_easy', label: 'Легко', sub: 'сразу', color: '#5B74FF' },
-] as const
 
 const LIMITS = [10, 20, 30]
 
@@ -82,25 +76,6 @@ interface DirectionInfo {
   hint: string
   group: 'flip' | 'game' | 'auto'
   icon?: IconDefinition
-}
-
-const DIRECTIONS: DirectionInfo[] = [
-  { id: 'f2n', label: 'Слово — перевод', hint: 'видишь слово, вспоминаешь перевод', group: 'flip' },
-  { id: 'n2f', label: 'Перевод — слово', hint: 'видишь перевод, вспоминаешь слово', group: 'flip' },
-  { id: 'typing', label: 'Ввод слова', hint: 'печатаешь слово на английском, опечатки прощаются', group: 'flip', icon: faKeyboard },
-  { id: 'audio', label: 'На слух', hint: 'слышишь слово, вспоминаешь значение', group: 'flip', icon: faHeadphones },
-  { id: 'choice', label: 'Выбор из 4', hint: 'слово + 4 варианта перевода', group: 'game', icon: faListUl },
-  { id: 'anagram', label: 'Собери слово', hint: 'буквы перемешаны — собери слово обратно', group: 'game', icon: faPuzzlePiece },
-  { id: 'bool', label: 'Верно / нет', hint: 'пара «слово — перевод»: правда или ложь?', group: 'game', icon: faScaleBalanced },
-  { id: 'forms', label: 'Формы', hint: 'цепочка v1 → v2 → v3 со случайным пропуском — впиши форму', group: 'game', icon: faListCheck },
-  { id: 'mixed', label: 'Микс', hint: 'режим случаен для каждой карточки', group: 'auto', icon: faShuffle },
-  { id: 'smart', label: 'Умный микс', hint: 'режим по зрелости слова: новое — карточки, зрелое — игры', group: 'auto', icon: faBrain },
-]
-
-const GROUP_LABELS: Record<DirectionInfo['group'], string> = {
-  flip: 'Карточки',
-  game: 'Игры',
-  auto: 'Автомикс',
 }
 
 const BLITZ_OK_MODES: Direction[] = ['choice', 'bool', 'mixed', 'smart']
@@ -126,6 +101,35 @@ export default function Learn() {
   const [searchParams, setSearchParams] = useSearchParams()
   const { user, token, ready: authReady } = useAuth()
   const { speak, isSpeaking, cancel } = useSpeech({ lang: 'en-US', rate: 0.92 })
+  const t = useT()
+
+  // Text-bearing constants live in the body (not module scope) so they
+  // re-render in the active language. Pure id/number constants stay out.
+  const GRADES: { quality: number; bindingId: ShortcutId; label: string; sub: string; color: string }[] = [
+    { quality: 1, bindingId: 'grade_again', label: t('learn.grades.again'), sub: t('learn.grades.again_sub'), color: '#f43f5e' },
+    { quality: 3, bindingId: 'grade_hard', label: t('learn.grades.hard'), sub: t('learn.grades.hard_sub'), color: '#ff9d5c' },
+    { quality: 4, bindingId: 'grade_good', label: t('learn.grades.good'), sub: t('learn.grades.good_sub'), color: '#5AD4B5' },
+    { quality: 5, bindingId: 'grade_easy', label: t('learn.grades.easy'), sub: t('learn.grades.easy_sub'), color: '#5B74FF' },
+  ]
+
+  const DIRECTIONS: DirectionInfo[] = [
+    { id: 'f2n', label: t('learn.directions.f2n_label'), hint: t('learn.directions.f2n_hint'), group: 'flip' },
+    { id: 'n2f', label: t('learn.directions.n2f_label'), hint: t('learn.directions.n2f_hint'), group: 'flip' },
+    { id: 'typing', label: t('learn.directions.typing_label'), hint: t('learn.directions.typing_hint'), group: 'flip', icon: faKeyboard },
+    { id: 'audio', label: t('learn.directions.audio_label'), hint: t('learn.directions.audio_hint'), group: 'flip', icon: faHeadphones },
+    { id: 'choice', label: t('learn.directions.choice_label'), hint: t('learn.directions.choice_hint'), group: 'game', icon: faListUl },
+    { id: 'anagram', label: t('learn.directions.anagram_label'), hint: t('learn.directions.anagram_hint'), group: 'game', icon: faPuzzlePiece },
+    { id: 'bool', label: t('learn.directions.bool_label'), hint: t('learn.directions.bool_hint'), group: 'game', icon: faScaleBalanced },
+    { id: 'forms', label: t('learn.directions.forms_label'), hint: t('learn.directions.forms_hint'), group: 'game', icon: faListCheck },
+    { id: 'mixed', label: t('learn.directions.mixed_label'), hint: t('learn.directions.mixed_hint'), group: 'auto', icon: faShuffle },
+    { id: 'smart', label: t('learn.directions.smart_label'), hint: t('learn.directions.smart_hint'), group: 'auto', icon: faBrain },
+  ]
+
+  const GROUP_LABELS: Record<DirectionInfo['group'], string> = {
+    flip: t('learn.groups.flip'),
+    game: t('learn.groups.game'),
+    auto: t('learn.groups.auto'),
+  }
 
   const [phase, setPhase] = useState<Phase>('loading')
   const [profiles, setProfiles] = useState<RemoteLearningProfile[]>([])
@@ -170,9 +174,9 @@ export default function Learn() {
     ) ?? null
 
   const SOURCE_LABELS: Record<string, string> = {
-    mixed: 'Всё сразу',
-    due: 'Повторение',
-    new: 'Новые слова',
+    mixed: t('learn.menu.sources.mixed'),
+    due: t('learn.menu.sources.due'),
+    new: t('learn.menu.sources.new'),
   }
 
   const refreshSessions = useCallback(() => {
@@ -351,7 +355,7 @@ export default function Learn() {
           return
         }
         if (!profileId) {
-          setError('Сначала выбери язык в профиле')
+          setError(t('learn.errors.need_profile'))
           return
         }
         setStarting(true)
@@ -380,7 +384,7 @@ export default function Learn() {
         await loadCard(user.id, token, created.id)
         setPhase('study')
       } catch (e) {
-        setError(e instanceof Error ? e.message : 'Не получилось начать урок')
+        setError(e instanceof Error ? e.message : t('learn.errors.start_failed'))
       } finally {
         setStarting(false)
       }
@@ -434,7 +438,7 @@ export default function Learn() {
           setRequeuedFlash(false)
         }
       } catch (e) {
-        setError(e instanceof Error ? e.message : 'Не получилось ответить')
+        setError(e instanceof Error ? e.message : t('learn.errors.answer_failed'))
       } finally {
         setAnswering(false)
       }
@@ -564,7 +568,7 @@ export default function Learn() {
             }
           : null,
       ),
-    [card],
+    [card, t],
   )
 
   const saveOwnHint = useCallback(
@@ -580,7 +584,7 @@ export default function Learn() {
           prev ? { ...prev, card: { ...prev.card, own_hint: res.own_hint } } : prev,
         )
       } catch {
-        setError('Не получилось сохранить подсказку')
+        setError(t('learn.errors.hint_failed'))
       }
     },
     [user, token, profileId, card],
@@ -773,12 +777,12 @@ export default function Learn() {
         <button
           onClick={() => (phase === 'study' ? finishEarly() : navigate('/'))}
           className="w-9 h-9 rounded-full bg-white/[0.06] border border-white/[0.06] grid place-items-center hover:bg-white/10"
-          aria-label="Назад"
+          aria-label={t('learn.header.back')}
         >
           <FontAwesomeIcon icon={faArrowLeft} className="text-xs" />
         </button>
         <div>
-          <h1 className="text-[22px] font-black tracking-tight leading-none">Урок</h1>
+          <h1 className="text-[22px] font-black tracking-tight leading-none">{t('learn.header.title')}</h1>
           {profileLabel !== '' && <p className="text-xs opacity-40 mt-1">{profileLabel}</p>}
         </div>
         {phase === 'study' && session && (
@@ -790,7 +794,7 @@ export default function Learn() {
 
       {phase === 'loading' && (
         <div className="rounded-[20px] border border-white/[0.06] bg-[#171717] p-10 grid place-items-center">
-          <span className="text-sm opacity-50 animate-pulse">Готовим слова…</span>
+          <span className="text-sm opacity-50 animate-pulse">{t('learn.loading')}</span>
         </div>
       )}
 
@@ -802,13 +806,13 @@ export default function Learn() {
               className="rounded-[20px] border border-[#F5C16A]/30 bg-[#F5C16A]/[0.07] p-5 text-left hover:bg-[#F5C16A]/[0.1] transition-colors"
             >
               <div className="flex items-center gap-2 text-[#F5C16A] text-[12px] font-black uppercase tracking-wide">
-                <FontAwesomeIcon icon={faRotateRight} /> Продолжить с места остановки
+                <FontAwesomeIcon icon={faRotateRight} /> {t('learn.resume.cta')}
               </div>
               <div className="text-[13px] font-bold text-white/70 mt-1">
                 {SOURCE_LABELS[resumeSession.source] ?? resumeSession.source}
                 {resumeSession.category_id
-                  ? ` • ${categoryNames[resumeSession.category_id] ?? 'тема'}`
-                  : ' • все слова'}
+                  ? ` • ${categoryNames[resumeSession.category_id] ?? t('learn.resume.topic_fallback')}`
+                  : t('learn.resume.all_words')}
               </div>
               <div className="text-[22px] font-black mt-1 tabular-nums">
                 {resumeSession.answered}/{resumeSession.total}
@@ -824,12 +828,12 @@ export default function Learn() {
 
           <div className="rounded-[20px] border border-white/[0.06] bg-[#171717] p-5">
             <h3 className="text-[14px] font-black tracking-tight flex items-center gap-2">
-              <FontAwesomeIcon icon={faPlay} className="text-[#5AD4B5]" /> Новый урок
+              <FontAwesomeIcon icon={faPlay} className="text-[#5AD4B5]" /> {t('learn.menu.new_lesson')}
             </h3>
-            <div className="text-xs opacity-40 mt-1">Пара шагов — и погнали: что учим, как спрашиваем, сколько берём, жмём старт</div>
+            <div className="text-xs opacity-40 mt-1">{t('learn.menu.subtitle')}</div>
             {categoryId && (
               <div className="mt-3 inline-flex items-center gap-2 px-3 py-1.5 rounded-full bg-[#5B74FF]/10 border border-[#5B74FF]/30 text-xs font-bold text-[#8b9bff] w-fit">
-                <span>Тема: {categoryName ?? '…'}</span>
+                <span>{t('learn.menu.topic', { name: categoryName ?? '…' })}</span>
                 <button
                   onClick={() => {
                     setCategoryId(null)
@@ -838,21 +842,21 @@ export default function Learn() {
                     setSource('mixed')
                   }}
                   className="hover:text-white"
-                  aria-label="Убрать тему"
+                  aria-label={t('learn.menu.remove_topic')}
                 >
                   ×
                 </button>
               </div>
             )}
             <div className="text-[11px] font-black uppercase tracking-widest opacity-40 mt-4 mb-1.5">
-              Шаг 1 — что учим
+              {t('learn.menu.step1')}
             </div>
             <div className="flex flex-wrap gap-1.5">
               {(
                 [
-                  { id: 'mixed', label: 'Всё сразу', hint: 'повторения + новые' },
-                  { id: 'due', label: 'Повторение', hint: 'только долги' },
-                  { id: 'new', label: 'Новые слова', hint: 'то, что не видел' },
+                  { id: 'mixed', label: t('learn.menu.sources.mixed'), hint: t('learn.menu.sources.mixed_hint') },
+                  { id: 'due', label: t('learn.menu.sources.due'), hint: t('learn.menu.sources.due_hint') },
+                  { id: 'new', label: t('learn.menu.sources.new'), hint: t('learn.menu.sources.new_hint') },
                 ] as const
               ).map((s) => (
                 <button
@@ -867,11 +871,11 @@ export default function Learn() {
             </div>
             {categoryId && source !== 'new' && (
               <div className="text-[11px] opacity-40 mt-2">
-                Повторения — по всем словам, новые — из выбранной темы
+                {t('learn.menu.topic_note')}
               </div>
             )}
             <div className="text-[11px] font-black uppercase tracking-widest opacity-40 mt-4 mb-1.5">
-              Шаг 2 — как спрашиваем
+              {t('learn.menu.step2')}
             </div>
             {(['flip', 'game', 'auto'] as const).map((group) => (
               <div key={group} className="mb-1.5">
@@ -910,28 +914,28 @@ export default function Learn() {
               <button
                 onClick={() => setBlitz((v) => !v)}
                 disabled={!BLITZ_OK_MODES.includes(direction)}
-                title={BLITZ_OK_MODES.includes(direction) ? 'Таймер 12 сек + серия верных ответов' : 'Блиц работает с выбором, парами и миксом'}
+                title={BLITZ_OK_MODES.includes(direction) ? t('learn.menu.blitz_title_on', { s: BLITZ_SECONDS }) : t('learn.menu.blitz_title_off')}
                 aria-pressed={blitz}
                 className={`h-9 px-3 rounded-full text-xs font-bold border transition-all flex items-center gap-1.5 disabled:opacity-30 ${blitz && BLITZ_OK_MODES.includes(direction) ? 'bg-[#F5C16A]/20 border-[#F5C16A]/60 text-[#F5C16A]' : 'bg-white/[0.04] border-white/[0.06] hover:bg-white/[0.08]'}`}
               >
                 <FontAwesomeIcon icon={faBolt} className="text-xs" />
-                <span>Блиц ⏱ {BLITZ_SECONDS}с</span>
+                <span>{t('learn.menu.blitz', { s: BLITZ_SECONDS })}</span>
               </button>
               <button
                 onClick={() => setHideTr((v) => !v)}
-                title="Транскрипция скрыта — открывается по тапу"
+                title={t('learn.menu.hide_tr_title')}
                 aria-pressed={hideTr}
                 className={`h-9 px-3 rounded-full text-xs font-bold border transition-all flex items-center gap-1.5 ${hideTr ? 'bg-white/[0.12] border-white/25 text-white' : 'bg-white/[0.04] border-white/[0.06] hover:bg-white/[0.08]'}`}
               >
                 <FontAwesomeIcon icon={faEyeSlash} className="text-xs opacity-80" />
-                <span>Спрятать транскрипцию</span>
+                <span>{t('learn.menu.hide_tr')}</span>
               </button>
             </div>
             <div className="text-[11px] font-black uppercase tracking-widest opacity-40 mt-4 mb-1.5">
-              Шаг 3 — сколько берём
+              {t('learn.menu.step3')}
             </div>
             <div className="flex items-center gap-2">
-              <span className="text-xs opacity-40 font-bold">Слов в уроке:</span>
+              <span className="text-xs opacity-40 font-bold">{t('learn.menu.words_in_lesson')}</span>
               {LIMITS.map((n) => (
                 <button
                   key={n}
@@ -944,11 +948,11 @@ export default function Learn() {
             </div>
             {source !== 'due' && (
               <div className="flex items-center gap-2 mt-2.5 flex-wrap">
-                <span className="text-xs opacity-40 font-bold" title="Пропустить первые N новых слов — например, начать со 120-го">Начать с N-го слова:</span>
+                <span className="text-xs opacity-40 font-bold" title={t('learn.menu.start_from_title')}>{t('learn.menu.start_from')}</span>
                 <button
                   onClick={() => setOffset((v) => Math.max(0, v - limit))}
                   className="w-7 h-7 rounded-full bg-white/[0.06] border border-white/[0.06] grid place-items-center hover:bg-white/10 text-sm"
-                  aria-label="Назад"
+                  aria-label={t('learn.header.back')}
                 >
                   −
                 </button>
@@ -966,13 +970,13 @@ export default function Learn() {
                 <button
                   onClick={() => setOffset((v) => v + limit)}
                   className="w-7 h-7 rounded-full bg-white/[0.06] border border-white/[0.06] grid place-items-center hover:bg-white/10 text-sm font-black"
-                  aria-label="Вперёд"
+                  aria-label={t('learn.header.forward')}
                 >
                   +
                 </button>
                 {availability && availability.new > 0 && (
                   <span className="text-[11px] opacity-40 tabular-nums">
-                    слова {Math.min(offset + 1, availability.new)}–{Math.min(offset + limit, availability.new)} из {availability.new}
+                    {t('learn.menu.range', { a: Math.min(offset + 1, availability.new), b: Math.min(offset + limit, availability.new), c: availability.new })}
                   </span>
                 )}
               </div>
@@ -1002,41 +1006,41 @@ export default function Learn() {
             {error && <div className="text-xs font-bold text-[#f43f5e] mt-3">{error}</div>}
             {availability && (availability.due > 0 || availability.new > 0) ? (
               <div className="text-xs opacity-60 mt-3">
-                Доступно: <span className="font-black text-white">{availability.due} на повторение</span>
+                {t('learn.menu.available_prefix')} <span className="font-black text-white">{t('learn.menu.due', { n: availability.due })}</span>
                 {' • '}
-                <span className="font-black text-white">{availability.new} новых</span>
-                <span className="opacity-60"> — остальное продолжишь в следующих уроках</span>
+                <span className="font-black text-white">{t('learn.menu.new_words', { n: availability.new })}</span>
+                <span className="opacity-60"> {t('learn.menu.available_suffix')}</span>
               </div>
             ) : availability ? (
               <div className="rounded-2xl border border-[#5AD4B5]/25 bg-[#5AD4B5]/[0.06] p-4 mt-3 text-center">
                 <div className="text-2xl">🎉</div>
-                <div className="text-[13px] font-black mt-1">Всё выучено!</div>
-                <div className="text-xs opacity-50 mt-0.5">Повторений нет, новых слов нет — так держать</div>
+                <div className="text-[13px] font-black mt-1">{t('learn.menu.done_title')}</div>
+                <div className="text-xs opacity-50 mt-0.5">{t('learn.menu.done_sub')}</div>
               </div>
             ) : null}
             <div className="rounded-2xl bg-white/[0.03] border border-white/[0.05] px-3.5 py-2.5 mt-3 flex flex-wrap items-center gap-x-4 gap-y-1.5 text-[11.5px] text-white/55">
-              <span className="font-black text-white/80 uppercase tracking-widest text-[10px]">Как отвечать</span>
-              <span>🖱️ клик — перевернуть</span>
+              <span className="font-black text-white/80 uppercase tracking-widest text-[10px]">{t('learn.howto.title')}</span>
+              <span>{t('learn.howto.click_flip')}</span>
               <span>
-                <Kbd>Пробел</Kbd> — перевод, ещё раз — дальше ✓
+                <Kbd>{t('learn.howto.space')}</Kbd> {t('learn.howto.space_flip')}
               </span>
               <span>
-                <Kbd>{formatBinding(bindings.grade_again)}</Kbd>–<Kbd>{formatBinding(bindings.grade_easy)}</Kbd> — оценка
+                <Kbd>{formatBinding(bindings.grade_again)}</Kbd>–<Kbd>{formatBinding(bindings.grade_easy)}</Kbd> {t('learn.howto.grade')}
               </span>
-              <span>🎮 игры и ввод оцениваются сами</span>
+              <span>{t('learn.howto.auto')}</span>
             </div>
             <div className="text-[11px] font-black uppercase tracking-widest opacity-40 mt-4 mb-1.5">
-              Шаг 4 — погнали
+              {t('learn.menu.step4')}
             </div>
             <button
               onClick={() => beginSession()}
               disabled={starting || !profileId || (availability !== null && availability.due === 0 && availability.new === 0)}
               className="w-full py-3 rounded-2xl bg-[#5AD4B5] text-black text-sm font-black hover:brightness-110 transition disabled:opacity-50"
             >
-              {starting ? 'Собираем колоду…' : 'Начать урок →'}
+              {starting ? t('learn.menu.starting') : t('learn.menu.start')}
             </button>
             {!profileId && (
-              <div className="text-xs opacity-40 mt-2">Выбери язык в профиле, чтобы начать учиться</div>
+              <div className="text-xs opacity-40 mt-2">{t('learn.menu.no_profile')}</div>
             )}
           </div>
         </div>
@@ -1123,7 +1127,7 @@ export default function Learn() {
               )}
               {(choiceLoading || boolLoading) && (
                 <div className="rounded-[24px] border border-white/[0.08] bg-[#171717] p-10 grid place-items-center min-h-[320px]">
-                  <span className="text-sm opacity-50 animate-pulse">Подбираем варианты…</span>
+                  <span className="text-sm opacity-50 animate-pulse">{t('learn.study.picking')}</span>
                 </div>
               )}
               {(cardMode !== 'choice' && cardMode !== 'bool' && cardMode !== 'anagram' && cardMode !== 'forms') || choiceFallback || boolFallback ? (
@@ -1156,7 +1160,7 @@ export default function Learn() {
 
           {requeuedFlash && (
             <div className="rounded-2xl border border-[#ff9d5c]/30 bg-[#ff9d5c]/[0.07] px-3.5 py-2 text-center text-[12.5px] font-bold text-[#ff9d5c]">
-              🔁 Не запомнилось — слово вернётся в конце урока
+              {t('learn.study.requeued')}
             </div>
           )}
 
@@ -1166,7 +1170,7 @@ export default function Learn() {
                 onClick={() => setFlipped(true)}
                 className="w-full py-3 rounded-2xl bg-white/[0.06] border border-white/[0.08] text-sm font-black hover:bg-white/[0.1] transition"
               >
-                {cardMode === 'n2f' || cardMode === 'audio' ? 'Показать слово' : 'Показать перевод'}
+                {cardMode === 'n2f' || cardMode === 'audio' ? t('learn.study.show_word') : t('learn.study.show_translation')}
               </button>
             ) : manualMode ? (
               <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
@@ -1188,7 +1192,7 @@ export default function Learn() {
             ) : (
               <div className="text-center text-[13px] font-bold text-white/45 py-3">
                 {choiceLoading || boolLoading ? (
-                  'Подбираем варианты…'
+                  t('learn.study.picking')
                 ) : error && lastQuality.current !== null ? (
                   <button
                     onClick={() => {
@@ -1197,20 +1201,20 @@ export default function Learn() {
                     }}
                     className="px-4 py-2 rounded-xl bg-[#f43f5e]/15 border border-[#f43f5e]/40 text-[#fb7185] hover:bg-[#f43f5e]/25 transition"
                   >
-                    Не отправилось — попробовать снова
+                    {t('learn.errors.retry')}
                   </button>
                 ) : answering ? (
-                  '⏳ Ставим оценку…'
+                  t('learn.study.grading')
                 ) : cardMode === 'typing' ? (
-                  '⌨️ Напечатай ответ на карточке ↑ и жми Enter'
+                  t('learn.study.typing_hint')
                 ) : cardMode === 'choice' ? (
-                  'Выбери верный вариант ↑ — оценка сама'
+                  t('learn.study.choice_hint')
                 ) : cardMode === 'bool' ? (
-                  'Пара верна? Ответь ↑ — оценка сама'
+                  t('learn.study.bool_hint')
                 ) : cardMode === 'forms' ? (
-                  'Впиши пропущенную форму ↑ — оценка сама'
+                  t('learn.study.forms_hint')
                 ) : (
-                  'Собери слово из букв ↑ — оценка сама'
+                  t('learn.study.anagram_hint')
                 )}
               </div>
             )}
@@ -1221,71 +1225,71 @@ export default function Learn() {
               cardMode === 'typing' ? (
                 <>
                   <span>
-                    <Kbd>Enter</Kbd> — проверить ответ
+                    <Kbd>Enter</Kbd> {t('learn.hints.typing_check')}
                   </span>
-                  <span>💡 — подсказать букву</span>
+                  <span>{t('learn.hints.hint_letter')}</span>
                 </>
               ) : cardMode === 'audio' ? (
                 <>
                   <span>
-                    <Kbd>Пробел</Kbd> — открыть слово
+                    <Kbd>{t('learn.howto.space')}</Kbd> — {t('learn.hints.open_word')}
                   </span>
-                  <span>🔊 слушай и вспоминай</span>
+                  <span>{t('learn.hints.audio_listen')}</span>
                 </>
               ) : cardMode === 'choice' ? (
                 <>
                   <span>
-                    <Kbd>1</Kbd>–<Kbd>4</Kbd> — выбрать вариант
+                    <Kbd>1</Kbd>–<Kbd>4</Kbd> {t('learn.hints.choice_pick')}
                   </span>
-                  {blitzActive && <span>⏱ успей за {BLITZ_SECONDS}с</span>}
+                  {blitzActive && <span>{t('learn.hints.blitz_time', { s: BLITZ_SECONDS })}</span>}
                 </>
               ) : cardMode === 'bool' ? (
                 <>
                   <span>
-                    <Kbd>1</Kbd> — верно, <Kbd>2</Kbd> — неверно
+                    <Kbd>1</Kbd> {t('learn.hints.bool_yes')} <Kbd>2</Kbd> {t('learn.hints.bool_no')}
                   </span>
-                  {blitzActive && <span>⏱ успей за {BLITZ_SECONDS}с</span>}
+                  {blitzActive && <span>{t('learn.hints.blitz_time', { s: BLITZ_SECONDS })}</span>}
                 </>
               ) : cardMode === 'anagram' ? (
                 <>
-                  <span>печатай буквы • <Kbd>⌫</Kbd> — убрать</span>
-                  <span>клик — тоже работает</span>
+                  <span>{t('learn.hints.anagram_type')} <Kbd>⌫</Kbd> {t('learn.hints.anagram_erase')}</span>
+                  <span>{t('learn.hints.anagram_click')}</span>
                 </>
               ) : cardMode === 'forms' ? (
                 <>
                   <span>
-                    <Kbd>Enter</Kbd> — проверить форму
+                    <Kbd>Enter</Kbd> {t('learn.hints.forms_check')}
                   </span>
-                  <span>💡 — подсказать букву</span>
+                  <span>{t('learn.hints.hint_letter')}</span>
                 </>
               ) : (
                 <>
                   <span>
-                    <Kbd>Пробел</Kbd> — {cardMode === 'n2f' ? 'открыть слово' : 'открыть перевод'}
+                    <Kbd>{t('learn.howto.space')}</Kbd> — {cardMode === 'n2f' ? t('learn.hints.open_word') : t('learn.hints.open_translation')}
                   </span>
-                  <span>🖱️ или кликни по карточке</span>
+                  <span>{t('learn.hints.default_click')}</span>
                 </>
               )
             ) : (
               <>
                 <span>
-                  <Kbd>Пробел</Kbd> — дальше ✓
+                  <Kbd>{t('learn.howto.space')}</Kbd> {t('learn.hints.next')}
                 </span>
                 <span>
-                  <Kbd>{formatBinding(bindings.flip_back)}</Kbd> — назад к слову
+                  <Kbd>{formatBinding(bindings.flip_back)}</Kbd> {t('learn.hints.back_to_word')}
                 </span>
                 <span>
-                  <Kbd>{formatBinding(bindings.grade_again)}</Kbd>–<Kbd>{formatBinding(bindings.grade_easy)}</Kbd> — оценка
+                  <Kbd>{formatBinding(bindings.grade_again)}</Kbd>–<Kbd>{formatBinding(bindings.grade_easy)}</Kbd> {t('learn.howto.grade')}
                 </span>
               </>
             )}
           </div>
           <div className="flex items-center justify-between text-xs opacity-40">
             <span>
-              верно {sessionCorrect} • +{sessionXp} XP
+              {t('learn.progress', { c: sessionCorrect, xp: sessionXp })}
             </span>
             <button onClick={finishEarly} className="inline-flex items-center gap-1.5 font-bold hover:opacity-100 hover:text-white transition">
-              <FontAwesomeIcon icon={faFlag} /> Завершить
+              <FontAwesomeIcon icon={faFlag} /> {t('learn.finish')}
             </button>
           </div>
           {error && <div className="text-xs font-bold text-[#f43f5e]">{error}</div>}
@@ -1303,13 +1307,13 @@ export default function Learn() {
           >
             <FontAwesomeIcon icon={faCheck} />
           </motion.div>
-          <h2 className="text-[22px] font-black tracking-tight mt-4">Урок пройден!</h2>
+          <h2 className="text-[22px] font-black tracking-tight mt-4">{t('learn.finished.title')}</h2>
           <div className="flex justify-center gap-6 mt-4">
             <div>
               <div className="text-[26px] font-black tabular-nums text-[#5AD4B5]">
                 {session.total > 0 ? Math.round((session.correct / session.total) * 100) : 0}%
               </div>
-              <div className="text-[11px] opacity-40 font-bold">верно</div>
+              <div className="text-[11px] opacity-40 font-bold">{t('learn.finished.correct')}</div>
             </div>
             <div>
               <div className="text-[26px] font-black tabular-nums">+{sessionXp}</div>
@@ -1319,19 +1323,19 @@ export default function Learn() {
               <div className="text-[26px] font-black tabular-nums">
                 {session.correct}/{session.total}
               </div>
-              <div className="text-[11px] opacity-40 font-bold">слов</div>
+              <div className="text-[11px] opacity-40 font-bold">{t('learn.finished.words')}</div>
             </div>
             {blitz && maxStreak > 1 && (
               <div>
                 <div className="text-[26px] font-black tabular-nums text-[#ff9d5c]">×{maxStreak}</div>
-                <div className="text-[11px] opacity-40 font-bold">серия</div>
+                <div className="text-[11px] opacity-40 font-bold">{t('learn.finished.streak')}</div>
               </div>
             )}
           </div>
           {unlocked.length > 0 && (
             <div className="mt-4 rounded-2xl border border-[#F5C16A]/30 bg-[#F5C16A]/[0.07] p-3.5">
               <div className="text-[12px] font-black text-[#F5C16A] flex items-center justify-center gap-1.5">
-                <FontAwesomeIcon icon={faTrophy} /> Новые достижения
+                <FontAwesomeIcon icon={faTrophy} /> {t('learn.finished.achievements')}
               </div>
               <div className="flex flex-wrap justify-center gap-1.5 mt-2">
                 {unlocked.map((code) => (
@@ -1357,13 +1361,13 @@ export default function Learn() {
               }}
               className="px-5 py-2.5 rounded-full bg-white/[0.06] border border-white/[0.08] text-xs font-black hover:bg-white/[0.1]"
             >
-              <FontAwesomeIcon icon={faBolt} className="mr-1.5 text-[#F5C16A]" /> Ещё урок
+              <FontAwesomeIcon icon={faBolt} className="mr-1.5 text-[#F5C16A]" /> {t('learn.finished.more')}
             </button>
             <button
               onClick={() => navigate('/')}
               className="px-5 py-2.5 rounded-full bg-white text-black text-xs font-black"
             >
-              На главную
+              {t('learn.finished.home')}
             </button>
           </div>
         </div>

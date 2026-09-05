@@ -56,29 +56,46 @@ import {
   type RemoteStat,
   type UserSearchHit,
 } from '@/lib/profile-api'
+import { useT, pickPlural } from '@/lib/i18n'
 import { sanitizeAvatarImage } from '@/lib/image-upload'
 import { DatePicker, DateField, Calendar } from '@heroui/react'
 import { parseDate, getLocalTimeZone, today } from '@internationalized/date'
 import type { DateValue } from '@internationalized/date'
 
-const achievementsFallback = [
-  { icon: faFire, title: '3 дня подряд', desc: 'Серия', condition: 'Учи 3 дня без пропуска', total: 3, current: 3, progress: 100, rarity: 'common', color: '#ff9d5c', reward: '+50 XP' },
-  { icon: faDumbbell, title: '50 слов', desc: 'Первый словарь', condition: 'Выучи 50 слов', total: 50, current: 50, progress: 100, rarity: 'common', color: '#5AD4B5', reward: '+100 XP' },
-  { icon: faBullseye, title: 'Первый урок', desc: 'Старт дан', condition: 'Пройди первый урок', total: 1, current: 1, progress: 100, rarity: 'common', color: '#5B74FF', reward: '+25 XP' },
-  { icon: faStar, title: 'Цель 5 дней', desc: 'Неделя фокуса', condition: 'Достигай цель 5 дней', total: 5, current: 3, progress: 60, rarity: 'rare', color: '#F5C16A', reward: '+150 XP' },
-  { icon: faTrophy, title: '100 слов', desc: 'Словарь растёт', condition: 'Выучи 100 слов', total: 100, current: 42, progress: 42, rarity: 'rare', color: '#F08AB4', reward: '+200 XP' },
-  { icon: faCrown, title: 'Полиглот', desc: '500 слов', condition: 'Выучи 500 слов', total: 500, current: 142, progress: 28, rarity: 'epic', color: '#a78bfa', reward: '+1000 XP' },
-  { icon: faBook, title: 'Книгочей', desc: '10 текстов', condition: 'Прочитай 10 текстов', total: 10, current: 4, progress: 40, rarity: 'common', color: '#5AD4B5', reward: '+80 XP' },
-  { icon: faComments, title: 'Болтун', desc: '50 фраз', condition: 'Выучи 50 фраз', total: 50, current: 18, progress: 36, rarity: 'rare', color: '#5B74FF', reward: '+120 XP' },
-  { icon: faBolt, title: 'Спринт 7', desc: '7 дней подряд', condition: 'Серия 7 дней', total: 7, current: 7, progress: 100, rarity: 'rare', color: '#ff9d5c', reward: '+200 XP' },
-  { icon: faMedal, title: 'Отличник', desc: '95% точность', condition: 'Точность ≥95% (20 слов)', total: 20, current: 12, progress: 60, rarity: 'epic', color: '#F5C16A', reward: '+300 XP' },
-  { icon: faGraduationCap, title: 'Экзамен B1', desc: 'Сдай тест', condition: 'Пройди тест B1', total: 1, current: 0, progress: 0, rarity: 'legendary', color: '#f43f5e', reward: '+500 XP' },
-  { icon: faHeart, title: 'Любимчик', desc: '5 тем изучено', condition: 'Закрой 5 тем', total: 5, current: 1, progress: 20, rarity: 'common', color: '#F08AB4', reward: '+70 XP' },
-]
+type AchievementItem = {
+  icon: typeof faFire
+  title: string
+  desc: string
+  condition: string
+  total: number
+  current: number
+  progress: number
+  rarity: string
+  color: string
+  reward: string
+}
 
-const AchievementsBlock = memo(function AchievementsBlock({ items }: { items: typeof achievementsFallback }) {
+// Language-neutral fallback definitions (no display strings here):
+// titles/descs/conditions/rewards are built inside the component via t().
+const ACHIEVEMENT_FALLBACK_DEFS = [
+  { key: 'streak3', icon: faFire, total: 3, current: 3, progress: 100, rarity: 'common', color: '#ff9d5c', rewardXp: 50 },
+  { key: 'words50', icon: faDumbbell, total: 50, current: 50, progress: 100, rarity: 'common', color: '#5AD4B5', rewardXp: 100 },
+  { key: 'first_lesson', icon: faBullseye, total: 1, current: 1, progress: 100, rarity: 'common', color: '#5B74FF', rewardXp: 25 },
+  { key: 'goal5', icon: faStar, total: 5, current: 3, progress: 60, rarity: 'rare', color: '#F5C16A', rewardXp: 150 },
+  { key: 'words100', icon: faTrophy, total: 100, current: 42, progress: 42, rarity: 'rare', color: '#F08AB4', rewardXp: 200 },
+  { key: 'polyglot', icon: faCrown, total: 500, current: 142, progress: 28, rarity: 'epic', color: '#a78bfa', rewardXp: 1000 },
+  { key: 'reader', icon: faBook, total: 10, current: 4, progress: 40, rarity: 'common', color: '#5AD4B5', rewardXp: 80 },
+  { key: 'chatter', icon: faComments, total: 50, current: 18, progress: 36, rarity: 'rare', color: '#5B74FF', rewardXp: 120 },
+  { key: 'sprint7', icon: faBolt, total: 7, current: 7, progress: 100, rarity: 'rare', color: '#ff9d5c', rewardXp: 200 },
+  { key: 'excel', icon: faMedal, total: 20, current: 12, progress: 60, rarity: 'epic', color: '#F5C16A', rewardXp: 300 },
+  { key: 'exam', icon: faGraduationCap, total: 1, current: 0, progress: 0, rarity: 'legendary', color: '#f43f5e', rewardXp: 500 },
+  { key: 'fav', icon: faHeart, total: 5, current: 1, progress: 20, rarity: 'common', color: '#F08AB4', rewardXp: 70 },
+] as const
+
+const AchievementsBlock = memo(function AchievementsBlock({ items }: { items: AchievementItem[] }) {
+  const t = useT()
   const [filter, setFilter] = useState<'all' | 'done' | 'progress'>('all')
-  const [hovered, setHovered] = useState<(typeof achievementsFallback)[number] | null>(null)
+  const [hovered, setHovered] = useState<AchievementItem | null>(null)
   const [pos, setPos] = useState({ x: 0, y: 0 })
   const hoverTimeout = useRef<number | null>(null)
   const itemCircumferences = useMemo(() => items.map((a) => {
@@ -94,7 +111,7 @@ const AchievementsBlock = memo(function AchievementsBlock({ items }: { items: ty
   }), [items, filter])
   const doneCount = useMemo(() => items.filter((a) => a.progress === 100).length, [items])
 
-  const onEnter = useCallback((a: (typeof achievementsFallback)[number], e: React.MouseEvent) => {
+  const onEnter = useCallback((a: AchievementItem, e: React.MouseEvent) => {
     if (hoverTimeout.current) window.clearTimeout(hoverTimeout.current)
     const rect = e.currentTarget.getBoundingClientRect()
     setPos({ x: rect.left + rect.width / 2, y: rect.top })
@@ -110,12 +127,12 @@ const AchievementsBlock = memo(function AchievementsBlock({ items }: { items: ty
       <div className="p-5 pb-0 flex flex-wrap items-center justify-between gap-3">
         <h3 className="text-[15px] font-black tracking-tight flex items-center gap-2.5">
           <span className="w-8 h-8 rounded-xl bg-[#F5C16A]/15 border border-[#F5C16A]/20 grid place-items-center text-[#F5C16A]"><FontAwesomeIcon icon={faTrophy} /></span>
-          Достижения
+          {t('profile.achievements.title')}
           <span className="px-2 py-0.5 rounded-full bg-white/[0.06] border border-white/[0.06] text-[11px] font-bold opacity-60">{doneCount}/{items.length}</span>
         </h3>
         <div className="flex items-center gap-1 p-1 rounded-full bg-black/20 border border-white/[0.04]">
           {[
-            { k: 'all', label: 'Все' },
+            { k: 'all', label: t('profile.achievements.filter_all') },
             { k: 'done', label: '✓' },
             { k: 'progress', label: '…' },
           ].map((f) => (
@@ -175,7 +192,7 @@ const AchievementsBlock = memo(function AchievementsBlock({ items }: { items: ty
                 </div>
                 <span className="text-[12px] font-black leading-tight line-clamp-1 mt-1 text-white">{a.title}</span>
                 <span className="text-[11px] leading-none text-white/50 line-clamp-1">{a.desc}</span>
-                <span className="mt-1 text-[10px] font-bold px-2 py-0.5 rounded-full border" style={{ background: `${a.color}12`, borderColor: `${a.color}20`, color: a.color }}>{a.total - a.current === 0 ? 'Готово' : `${a.total - a.current} осталось`}</span>
+                <span className="mt-1 text-[10px] font-bold px-2 py-0.5 rounded-full border" style={{ background: `${a.color}12`, borderColor: `${a.color}20`, color: a.color }}>{a.total - a.current === 0 ? t('profile.achievements.done') : t('profile.achievements.left', { n: a.total - a.current })}</span>
               </div>
             )
           })}
@@ -199,17 +216,17 @@ const AchievementsBlock = memo(function AchievementsBlock({ items }: { items: ty
                 </div>
               </div>
               <div className="mt-3 rounded-xl bg-white/[0.04] border border-white/[0.06] p-3">
-                <div className="text-[11px] font-bold text-white/80">За что:</div>
+                <div className="text-[11px] font-bold text-white/80">{t('profile.achievements.reason')}</div>
                 <div className="text-[13px] leading-snug mt-1 text-white/90">{hovered.condition}</div>
                 <div className="flex items-center justify-between mt-3">
-                  <span className="text-[11px] font-bold text-white/50">Прогресс</span>
+                  <span className="text-[11px] font-bold text-white/50">{t('profile.achievements.progress')}</span>
                   <span className="text-xs font-black" style={{ color: hovered.color }}>{hovered.current}/{hovered.total} • {hovered.progress}%</span>
                 </div>
                 <div className="h-1.5 rounded-full bg-white/[0.08] overflow-hidden mt-1.5">
                   <div className="h-full rounded-full" style={{ width: `${hovered.progress}%`, background: hovered.color }} />
                 </div>
                 <div className="text-[12px] mt-2 font-bold" style={{ color: hovered.progress === 100 ? hovered.color : 'rgba(255,255,255,0.9)' }}>
-                  {hovered.progress === 100 ? `✓ Получено • ${hovered.reward}` : `Осталось: ${hovered.total - hovered.current} • ${100 - hovered.progress}% • Награда: ${hovered.reward}`}
+                  {hovered.progress === 100 ? t('profile.achievements.tooltip_done', { reward: hovered.reward }) : t('profile.achievements.tooltip_progress', { left: hovered.total - hovered.current, pct: 100 - hovered.progress, reward: hovered.reward })}
                 </div>
               </div>
             </div>
@@ -221,6 +238,7 @@ const AchievementsBlock = memo(function AchievementsBlock({ items }: { items: ty
 })
 
 const BirthDatePicker = memo(function BirthDatePicker({ value, onChange }: { value: string; onChange: (v: string) => void }) {
+  const t = useT()
   const dateValue = useMemo(() => {
     try {
       return value ? parseDate(value.slice(0, 10)) : undefined
@@ -256,7 +274,7 @@ const BirthDatePicker = memo(function BirthDatePicker({ value, onChange }: { val
         </DateField.Suffix>
       </DateField.Group>
       <DatePicker.Popover className="max-w-none w-max bg-[#1e1e1e] border border-white/10 rounded-2xl shadow-[0_20px_60px_rgba(0,0,0,0.55)]">
-        <Calendar aria-label="Дата рождения" className="bg-transparent text-white">
+        <Calendar aria-label={t('profile.header.birth_aria')} className="bg-transparent text-white">
           <Calendar.Header>
             <Calendar.YearPickerTrigger>
               <Calendar.YearPickerTriggerHeading />
@@ -284,14 +302,15 @@ const BirthDatePicker = memo(function BirthDatePicker({ value, onChange }: { val
   )
 })
 
+// Day ids only — short/full labels come from the i18n dict at render time.
 const WEEKDAYS = [
-  { id: 'mon', label: 'Пн', full: 'Понедельник' },
-  { id: 'tue', label: 'Вт', full: 'Вторник' },
-  { id: 'wed', label: 'Ср', full: 'Среда' },
-  { id: 'thu', label: 'Чт', full: 'Четверг' },
-  { id: 'fri', label: 'Пт', full: 'Пятница' },
-  { id: 'sat', label: 'Сб', full: 'Суббота' },
-  { id: 'sun', label: 'Вс', full: 'Воскресенье' },
+  { id: 'mon' },
+  { id: 'tue' },
+  { id: 'wed' },
+  { id: 'thu' },
+  { id: 'fri' },
+  { id: 'sat' },
+  { id: 'sun' },
 ] as const
 
 type DayKey = typeof WEEKDAYS[number]['id']
@@ -314,13 +333,14 @@ function sanitizeSchedule(raw: unknown): Record<DayKey, string[]> {
 }
 
 export default function Profile() {
+  const t = useT()
   const [isEditing, setIsEditing] = useState(false)
   const [profile, setProfile] = useState({
-    name: 'Алексей',
+    name: t('profile.mocks.default_name'),
     birthDate: '2002-05-15',
-    city: 'Москва',
+    city: t('profile.mocks.default_city'),
     language: 'en',
-    tags: ['Путешествия', 'Работа', 'Кино', 'Кофе'],
+    tags: [t('profile.tags.travel'), t('profile.tags.work'), t('profile.tags.cinema'), t('profile.tags.coffee')],
     avatar: null as string | null,
     level: 'A2' as string,
     gender: '' as string,
@@ -340,23 +360,36 @@ export default function Profile() {
   // Sanitized avatar blob waiting for upload on save (preview is a blob: URL).
   const pendingAvatar = useRef<{ blob: Blob; preview: string } | null>(null)
   const { user, token, ready: authReady } = useAuth()
-  const tagOptions = ['Путешествия', 'Работа', 'Кино', 'Кофе', 'Еда', 'Эмоции', 'Музыка', 'Спорт', 'Книги', 'Технологии']
+  const tagOptions = [t('profile.tags.travel'), t('profile.tags.work'), t('profile.tags.cinema'), t('profile.tags.coffee'), t('profile.tags.food'), t('profile.tags.emotions'), t('profile.tags.music'), t('profile.tags.sport'), t('profile.tags.books'), t('profile.tags.tech')]
   const langOptions = [
-    { id: 'en', label: 'English', sub: 'Английский' },
-    { id: 'es', label: 'Español', sub: 'Испанский' },
-    { id: 'de', label: 'Deutsch', sub: 'Немецкий' },
-    { id: 'fr', label: 'Français', sub: 'Французский' },
+    { id: 'en', label: 'English', sub: t('profile.languages.en') },
+    { id: 'es', label: 'Español', sub: t('profile.languages.es') },
+    { id: 'de', label: 'Deutsch', sub: t('profile.languages.de') },
+    { id: 'fr', label: 'Français', sub: t('profile.languages.fr') },
   ]
   const [goals, setGoals] = useState<(RemoteGoal & { desc: string; color: string })[]>([
-    { id: 'mock-1', profile_id: '', title: 'Заговорить в кафе', desc: 'Заказать еду без пауз', progress: 68, color: '#5AD4B5', sort: 0 },
-    { id: 'mock-2', profile_id: '', title: '20 фраз для путешествий', desc: 'Аэропорт, отель, город', progress: 42, color: '#5B74FF', sort: 1 },
-    { id: 'mock-3', profile_id: '', title: 'Серия 14 дней', desc: 'Не пропускать', progress: 50, color: '#F5C16A', sort: 2 },
+    { id: 'mock-1', profile_id: '', title: t('profile.mocks.goal_cafe_title'), desc: t('profile.mocks.goal_cafe_desc'), progress: 68, color: '#5AD4B5', sort: 0 },
+    { id: 'mock-2', profile_id: '', title: t('profile.mocks.goal_travel_title'), desc: t('profile.mocks.goal_travel_desc'), progress: 42, color: '#5B74FF', sort: 1 },
+    { id: 'mock-3', profile_id: '', title: t('profile.mocks.goal_streak_title'), desc: t('profile.mocks.goal_streak_desc'), progress: 50, color: '#F5C16A', sort: 2 },
   ])
-  const [achievements, setAchievements] = useState<typeof achievementsFallback | null>(null)
+  const [achievements, setAchievements] = useState<AchievementItem[] | null>(null)
+  // Guest fallback achievements, translated at render (no t() at module scope).
+  const fallbackAchievements: AchievementItem[] = useMemo(() => ACHIEVEMENT_FALLBACK_DEFS.map((d) => ({
+    icon: d.icon,
+    title: t(`profile.achievements.items.${d.key}.title`),
+    desc: t(`profile.achievements.items.${d.key}.desc`),
+    condition: t(`profile.achievements.items.${d.key}.condition`),
+    total: d.total,
+    current: d.current,
+    progress: d.progress,
+    rarity: d.rarity,
+    color: d.color,
+    reward: t('profile.achievements.reward', { n: d.rewardXp }),
+  })), [t])
   const [friends, setFriends] = useState([
-    { name: 'Марина', level: 'B1', streak: 12, avatar: 'М' },
-    { name: 'Игорь', level: 'A2', streak: 7, avatar: 'И' },
-    { name: 'София', level: 'A1', streak: 3, avatar: 'С' },
+    { name: t('profile.mocks.friend_marina'), level: 'B1', streak: 12, avatar: t('profile.mocks.friend_marina_avatar') },
+    { name: t('profile.mocks.friend_igor'), level: 'A2', streak: 7, avatar: t('profile.mocks.friend_igor_avatar') },
+    { name: t('profile.mocks.friend_sofia'), level: 'A1', streak: 3, avatar: t('profile.mocks.friend_sofia_avatar') },
   ])
   const [friendQuery, setFriendQuery] = useState('')
   const [remoteFriends, setRemoteFriends] = useState<RemoteFriend[] | null>(null)
@@ -465,13 +498,13 @@ export default function Profile() {
     () => {
       const lowerQuery = friendQuery.toLowerCase()
       return [
-        { name: 'Анна', level: 'B1', avatar: 'А' },
-        { name: 'Дмитрий', level: 'A2', avatar: 'Д' },
-        { name: 'Елена', level: 'B2', avatar: 'Е' },
-        { name: 'Павел', level: 'A1', avatar: 'П' },
+        { name: t('profile.mocks.user_anna'), level: 'B1', avatar: t('profile.mocks.user_anna_avatar') },
+        { name: t('profile.mocks.user_dmitry'), level: 'A2', avatar: t('profile.mocks.user_dmitry_avatar') },
+        { name: t('profile.mocks.user_elena'), level: 'B2', avatar: t('profile.mocks.user_elena_avatar') },
+        { name: t('profile.mocks.user_pavel'), level: 'A1', avatar: t('profile.mocks.user_pavel_avatar') },
       ].filter((u) => u.name.toLowerCase().includes(lowerQuery) && !friends.some((f) => f.name === u.name))
     },
-    [friendQuery, friends],
+    [friendQuery, friends, t],
   )
 
   const age = useMemo(() => {
@@ -490,13 +523,13 @@ export default function Profile() {
 
   const birthDateError = useMemo(() => {
     if (!isEditing || !draft.birthDate) return null
-    if (!/^\d{4}-\d{2}-\d{2}$/.test(draft.birthDate)) return 'Некорректная дата'
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(draft.birthDate)) return t('profile.birth.invalid')
     const d = new Date(`${draft.birthDate}T00:00:00`)
-    if (Number.isNaN(d.getTime())) return 'Некорректная дата'
-    if (d.getTime() > Date.now()) return 'Дата рождения не может быть в будущем'
-    if (d.getFullYear() < 1900) return 'Год должен быть не раньше 1900'
+    if (Number.isNaN(d.getTime())) return t('profile.birth.invalid')
+    if (d.getTime() > Date.now()) return t('profile.birth.future')
+    if (d.getFullYear() < 1900) return t('profile.birth.too_early')
     return null
-  }, [isEditing, draft.birthDate])
+  }, [isEditing, draft.birthDate, t])
 
   const handleBirthDateChange = useCallback((v: string) => {
     setDraft((p) => ({ ...p, birthDate: v }))
@@ -579,7 +612,7 @@ export default function Profile() {
             return r.avatar_url as string | null
           },
           (e) => {
-            setSaveError(e instanceof Error ? e.message : 'Аватар не загрузился — остальное сохраняем без него')
+            setSaveError(e instanceof Error ? e.message : t('profile.errors.avatar_failed'))
             return profile.avatar
           },
         )
@@ -627,10 +660,10 @@ export default function Profile() {
           // profile stays local-only; base data is already saved
         }
       })
-      .catch(() => setSaveError('Не сохранилось на сервер — проверь соединение'))
+      .catch(() => setSaveError(t('profile.errors.save_failed')))
       .finally(() => setSaving(false))
     })
-  }, [draft, user, token, learningProfiles, langIdByCode, birthDateError, profile.avatar])
+  }, [draft, user, token, learningProfiles, langIdByCode, birthDateError, profile.avatar, t])
   const onAvatarChange = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
     const f = e.target.files?.[0]
     e.target.value = ''
@@ -642,9 +675,9 @@ export default function Profile() {
         pendingAvatar.current = { blob: ok.blob, preview: ok.previewUrl }
         setDraft((p) => ({ ...p, avatar: ok.previewUrl }))
       },
-      (err) => setSaveError(err instanceof Error ? err.message : 'Файл не подошёл.'),
+      (err) => setSaveError(err instanceof Error ? err.message : t('profile.errors.file_rejected')),
     )
-  }, [])
+  }, [t])
   const toggleTag = useCallback((tag: string) => {
     setDraft((p) => ({ ...p, tags: p.tags.includes(tag) ? p.tags.filter((t) => t !== tag) : p.tags.length < 6 ? [...p.tags, tag] : p.tags }))
   }, [])
@@ -700,11 +733,20 @@ export default function Profile() {
   }, [schedule, WEEKDAYS])
 
   const scheduleSummary = useMemo(() => {
-    if (scheduleStats.days === 0) return 'выключены'
+    if (scheduleStats.days === 0) return t('profile.schedule.off')
     const first = WEEKDAYS.map((d) => schedule[d.id][0]).find(Boolean) ?? ''
-    const dayWord = scheduleStats.days === 1 ? 'день' : scheduleStats.days < 5 ? 'дня' : 'дней'
-    return `${scheduleStats.days} ${dayWord} • ${scheduleStats.total} в неделю${first ? ` • с ${first}` : ''}`
-  }, [schedule, scheduleStats, WEEKDAYS])
+    const dayWord = pickPlural(scheduleStats.days, {
+      one: t('profile.schedule.day.one'),
+      few: t('profile.schedule.day.few'),
+      many: t('profile.schedule.day.many'),
+    })
+    return t('profile.schedule.summary', {
+      days: scheduleStats.days,
+      dayWord,
+      total: scheduleStats.total,
+      from: first ? t('profile.schedule.summary_from', { time: first }) : '',
+    })
+  }, [schedule, scheduleStats, WEEKDAYS, t])
 
   const toggleDay = useCallback((day: DayKey) => {
     setSchedule((prev) => ({ ...prev, [day]: prev[day].length > 0 ? [] : ['09:00'] }))
@@ -918,10 +960,10 @@ export default function Profile() {
     [user, token, activeProfileId],
   )
 
-  const goalMood = goal <= 10 ? '🐢 Спокойный темп — главное каждый день'
-    : goal <= 20 ? '💪 Уверенный темп — так держать'
-    : goal <= 30 ? '🔥 Серьёзный настрой — мозг скажет спасибо'
-    : '🚀 Режим полиглота — осторожно, затягивает'
+  const goalMood = goal <= 10 ? t('profile.study.mood_calm')
+    : goal <= 20 ? t('profile.study.mood_confident')
+    : goal <= 30 ? t('profile.study.mood_serious')
+    : t('profile.study.mood_polyglot')
 
   const changeGoal = useCallback((delta: number) => {
     setGoal((prev) => {
@@ -951,7 +993,7 @@ export default function Profile() {
                 <span className="absolute -bottom-1 -right-1 w-7 h-7 rounded-full bg-[#5AD4B5] text-black grid place-items-center text-[11px] font-black border-2 border-[#171717]">{headerLoading ? '–' : profile.level}</span>
                 {isEditing && (
                   <button onClick={() => fileRef.current?.click()} className="absolute inset-0 rounded-[20px] bg-black/60 backdrop-blur grid place-items-center opacity-0 group-hover/avatar:opacity-100 transition-opacity">
-                    <span className="px-2.5 py-1 rounded-full bg-white text-black text-xs font-bold flex items-center gap-1"><FontAwesomeIcon icon={faCamera} /> Загрузить</span>
+                    <span className="px-2.5 py-1 rounded-full bg-white text-black text-xs font-bold flex items-center gap-1"><FontAwesomeIcon icon={faCamera} /> {t('profile.header.upload')}</span>
                   </button>
                 )}
                 <input ref={fileRef} type="file" accept="image/png,image/jpeg" className="hidden" onChange={onAvatarChange} />
@@ -960,13 +1002,13 @@ export default function Profile() {
                 {isEditing ? (
                   <div className="space-y-2">
                     <div className="flex flex-wrap items-center gap-2">
-                      <input value={draft.name} onChange={(e) => setDraft({ ...draft, name: e.target.value })} placeholder="Имя" className="w-full max-w-[220px] px-3 py-1.5 rounded-xl bg-white/[0.06] border border-white/[0.08] text-sm font-bold placeholder:text-white/30 focus:outline-none focus:border-white/15" />
-                      <div className="flex items-center gap-1 p-1 rounded-full bg-black/20 border border-white/[0.06]" role="radiogroup" aria-label="Пол">
+                      <input value={draft.name} onChange={(e) => setDraft({ ...draft, name: e.target.value })} placeholder={t('profile.header.name_placeholder')} className="w-full max-w-[220px] px-3 py-1.5 rounded-xl bg-white/[0.06] border border-white/[0.08] text-sm font-bold placeholder:text-white/30 focus:outline-none focus:border-white/15" />
+                      <div className="flex items-center gap-1 p-1 rounded-full bg-black/20 border border-white/[0.06]" role="radiogroup" aria-label={t('profile.header.gender')}>
                         <button
                           type="button"
                           role="radio"
                           aria-checked={draft.gender === 'female'}
-                          title="Женский"
+                          title={t('profile.header.female')}
                           onClick={() => setDraft({ ...draft, gender: draft.gender === 'female' ? '' : 'female' })}
                           className={`w-7 h-7 rounded-full grid place-items-center text-[13px] border transition-all ${draft.gender === 'female' ? 'bg-[#f43f5e]/15 border-[#f43f5e]/40 text-[#f43f5e]' : 'bg-transparent border-transparent text-white/35 hover:text-white'}`}
                         >
@@ -976,7 +1018,7 @@ export default function Profile() {
                           type="button"
                           role="radio"
                           aria-checked={draft.gender === 'male'}
-                          title="Мужской"
+                          title={t('profile.header.male')}
                           onClick={() => setDraft({ ...draft, gender: draft.gender === 'male' ? '' : 'male' })}
                           className={`w-7 h-7 rounded-full grid place-items-center text-[13px] border transition-all ${draft.gender === 'male' ? 'bg-[#5B74FF]/15 border-[#5B74FF]/40 text-[#5B74FF]' : 'bg-transparent border-transparent text-white/35 hover:text-white'}`}
                         >
@@ -986,7 +1028,7 @@ export default function Profile() {
                     </div>
                     <div className="flex flex-wrap gap-2">
                       <BirthDatePicker value={draft.birthDate} onChange={handleBirthDateChange} />
-                      <input value={draft.city} onChange={(e) => setDraft({ ...draft, city: e.target.value })} placeholder="Город" className="px-2.5 py-1.5 rounded-full bg-white/[0.06] border border-white/[0.08] text-xs focus:outline-none w-[120px]" />
+                      <input value={draft.city} onChange={(e) => setDraft({ ...draft, city: e.target.value })} placeholder={t('profile.header.city_placeholder')} className="px-2.5 py-1.5 rounded-full bg-white/[0.06] border border-white/[0.08] text-xs focus:outline-none w-[120px]" />
                     </div>
                     {birthDateError && (
                       <div className="text-[11px] font-bold text-[#f43f5e]">{birthDateError}</div>
@@ -998,23 +1040,23 @@ export default function Profile() {
                       {headerLoading ? (
                         <span className="inline-block h-8 w-44 max-w-full rounded-xl bg-white/[0.07] animate-pulse" aria-hidden />
                       ) : (
-                        <h1 className="text-[26px] sm:text-[30px] font-black tracking-tight leading-none">{profile.name || 'Без имени'}</h1>
+                        <h1 className="text-[26px] sm:text-[30px] font-black tracking-tight leading-none">{profile.name || t('profile.header.no_name')}</h1>
                       )}
                       {profile.gender === 'female' && (
-                        <span title="Женский" className="w-7 h-7 rounded-full grid place-items-center border bg-[#f43f5e]/10 border-[#f43f5e]/30 text-[#f43f5e] text-sm"><FontAwesomeIcon icon={faVenus} /></span>
+                        <span title={t('profile.header.female')} className="w-7 h-7 rounded-full grid place-items-center border bg-[#f43f5e]/10 border-[#f43f5e]/30 text-[#f43f5e] text-sm"><FontAwesomeIcon icon={faVenus} /></span>
                       )}
                       {profile.gender === 'male' && (
-                        <span title="Мужской" className="w-7 h-7 rounded-full grid place-items-center border bg-[#5B74FF]/10 border-[#5B74FF]/30 text-[#5B74FF] text-sm"><FontAwesomeIcon icon={faMars} /></span>
+                        <span title={t('profile.header.male')} className="w-7 h-7 rounded-full grid place-items-center border bg-[#5B74FF]/10 border-[#5B74FF]/30 text-[#5B74FF] text-sm"><FontAwesomeIcon icon={faMars} /></span>
                       )}
                       <span className="px-2.5 py-1 rounded-full bg-white text-black text-[11px] font-black">PRO</span>
                       {remote === 'loading' && (
-                        <span className="px-2.5 py-1 rounded-full bg-white/[0.06] border border-white/[0.08] text-white/50 text-[11px] font-bold animate-pulse">Загрузка…</span>
+                        <span className="px-2.5 py-1 rounded-full bg-white/[0.06] border border-white/[0.08] text-white/50 text-[11px] font-bold animate-pulse">{t('profile.header.loading')}</span>
                       )}
                 {headerLoading ? (
                   <span className="inline-block h-6 w-36 max-w-full rounded-full bg-white/[0.06] animate-pulse" aria-hidden />
                 ) : (
                   <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-white/[0.06] border border-white/[0.08] text-white/60 text-xs font-medium">
-                    <FontAwesomeIcon icon={faLocationDot} className="opacity-60" /> {(isEditing ? draft.city : profile.city) || 'Город не указан'}{age !== null ? ` • ${age} лет` : ''}
+                    <FontAwesomeIcon icon={faLocationDot} className="opacity-60" /> {(isEditing ? draft.city : profile.city) || t('profile.header.no_city')}{age !== null ? t('profile.header.age', { age }) : ''}
                   </span>
                 )}
               </div>
@@ -1030,7 +1072,7 @@ export default function Profile() {
                     <span key={t} className="px-2.5 py-1 rounded-full bg-white/[0.06] border border-white/[0.06] text-white/70 text-xs font-semibold">{t}</span>
                   ))}
                   {(isEditing ? draft.tags : profile.tags).length === 0 && (
-                    <span className="px-2.5 py-1 rounded-full border border-dashed border-white/[0.12] text-white/35 text-xs font-semibold">Нет тегов — добавь через «Редактировать»</span>
+                    <span className="px-2.5 py-1 rounded-full border border-dashed border-white/[0.12] text-white/35 text-xs font-semibold">{t('profile.header.no_tags')}</span>
                   )}
                 </div>
               )}
@@ -1040,14 +1082,14 @@ export default function Profile() {
             </div>
             <div className="hidden sm:flex flex-col items-end gap-1.5 shrink-0">
               <button onClick={isEditing ? saveEdit : startEdit} disabled={saving || headerLoading} className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-black border ${isEditing ? 'bg-[#5AD4B5] text-black border-[#5AD4B5]' : 'bg-white text-black border-white'} ${saving || headerLoading ? 'opacity-60' : ''}`}>
-                <FontAwesomeIcon icon={isEditing ? faCheck : faPen} /> {isEditing ? (saving ? 'Сохраняем…' : 'Сохранить') : 'Редактировать'}
+                <FontAwesomeIcon icon={isEditing ? faCheck : faPen} /> {isEditing ? (saving ? t('profile.header.saving') : t('profile.header.save')) : t('profile.header.edit')}
               </button>
               {saveError && <span className="text-[11px] font-bold text-[#f43f5e]">{saveError}</span>}
             </div>
           </div>
           {isEditing && (
             <div className="mt-4 p-3 rounded-2xl bg-white/[0.03] border border-white/[0.06]">
-              <div className="text-xs font-bold opacity-60 mb-2">Теги — выбери из списка или добавь свой (до 6)</div>
+              <div className="text-xs font-bold opacity-60 mb-2">{t('profile.tags.hint')}</div>
               <div className="flex flex-wrap gap-1.5">
                 {tagOptions.map((tag) => {
                   const active = draft.tags.includes(tag)
@@ -1059,16 +1101,16 @@ export default function Profile() {
                 })}
               </div>
               <div className="flex gap-2 mt-2.5">
-                <input value={customTag} onChange={(e) => setCustomTag(e.target.value)} onKeyDown={(e) => e.key === 'Enter' && (e.preventDefault(), addCustomTag())} placeholder="Свой тег..." maxLength={20} className="flex-1 px-3 py-1.5 rounded-full bg-black/20 border border-white/[0.06] text-xs placeholder:text-white/30 focus:outline-none" />
-                <button onClick={addCustomTag} className="px-3 py-1.5 rounded-full bg-white text-black text-xs font-black">Добавить</button>
+                <input value={customTag} onChange={(e) => setCustomTag(e.target.value)} onKeyDown={(e) => e.key === 'Enter' && (e.preventDefault(), addCustomTag())} placeholder={t('profile.tags.custom_placeholder')} maxLength={20} className="flex-1 px-3 py-1.5 rounded-full bg-black/20 border border-white/[0.06] text-xs placeholder:text-white/30 focus:outline-none" />
+                <button onClick={addCustomTag} className="px-3 py-1.5 rounded-full bg-white text-black text-xs font-black">{t('profile.tags.add')}</button>
               </div>
             </div>
           )}
           {isEditing && (
             <>
               <div className="mt-3 flex sm:hidden gap-2">
-                <button onClick={cancelEdit} className="flex-1 py-2 rounded-full bg-white/[0.06] border border-white/[0.06] text-xs font-bold">Отмена</button>
-                <button onClick={saveEdit} disabled={saving} className="flex-1 py-2 rounded-full bg-[#5AD4B5] text-black text-xs font-black disabled:opacity-60">{saving ? 'Сохраняем…' : 'Сохранить'}</button>
+                <button onClick={cancelEdit} className="flex-1 py-2 rounded-full bg-white/[0.06] border border-white/[0.06] text-xs font-bold">{t('profile.header.cancel')}</button>
+                <button onClick={saveEdit} disabled={saving} className="flex-1 py-2 rounded-full bg-[#5AD4B5] text-black text-xs font-black disabled:opacity-60">{saving ? t('profile.header.saving') : t('profile.header.save')}</button>
               </div>
               {saveError && <div className="sm:hidden text-[11px] font-bold text-[#f43f5e] mt-2">{saveError}</div>}
             </>
@@ -1077,10 +1119,10 @@ export default function Profile() {
         </div>
       </div>
 
-      {/* язык — вынесен из hero */}
+      {/* language — moved out of hero */}
       <div className="settings-group !mb-0">
-        <h3><FontAwesomeIcon icon={faLanguage} className="mr-2 opacity-60" /> Язык обучения</h3>
-        <p className="text-xs opacity-40 -mt-2 mb-2">Выбери язык — изменится контент</p>
+        <h3><FontAwesomeIcon icon={faLanguage} className="mr-2 opacity-60" /> {t('profile.languages.title')}</h3>
+        <p className="text-xs opacity-40 -mt-2 mb-2">{t('profile.languages.subtitle')}</p>
         {headerLoading ? (
           <div className="grid grid-cols-2 sm:grid-cols-4 gap-2" aria-hidden>
             {[0, 1, 2, 3].map((i) => (
@@ -1116,10 +1158,10 @@ export default function Profile() {
                     📚 {stat.words_learned} • 🔥 {stat.streak_days} • ⚡ {stat.xp}
                   </div>
                 ) : langProfile ? (
-                  <div className="text-[11px] mt-1.5 opacity-50">Уровень {langProfile.level} • только старт</div>
+                  <div className="text-[11px] mt-1.5 opacity-50">{t('profile.languages.level_started', { level: langProfile.level })}</div>
                 ) : (
                   <div className="text-[11px] mt-1.5 opacity-40 italic">
-                    {isEditing ? 'Выбери и сохрани, чтобы начать' : 'Не начат'}
+                    {isEditing ? t('profile.languages.start_editing') : t('profile.languages.not_started')}
                   </div>
                 )}
               </button>
@@ -1127,14 +1169,14 @@ export default function Profile() {
           })}
         </div>
         )}
-        {!isEditing && <div className="text-xs opacity-40 mt-2">Текущий: Русский → {headerLoading ? '…' : langOptions.find((l) => l.id === profile.language)?.label}</div>}
-        {isEditing && <div className="text-xs opacity-40 mt-2">Нажми на язык, чтобы выбрать (до сохранения)</div>}
+        {!isEditing && <div className="text-xs opacity-40 mt-2">{t('profile.languages.current', { label: headerLoading ? '…' : (langOptions.find((l) => l.id === profile.language)?.label ?? '') })}</div>}
+        {isEditing && <div className="text-xs opacity-40 mt-2">{t('profile.languages.pick_hint')}</div>}
       </div>
 
       <div className="rounded-[20px] border border-white/[0.06] bg-[#171717] p-5">
         <div className="flex items-center justify-between">
-          <h3 className="text-[14px] font-black tracking-tight flex items-center gap-2"><FontAwesomeIcon icon={faBullseye} className="text-[#5B74FF]" /> Цели на месяц</h3>
-          <span className="text-[11px] opacity-40 font-bold">май • 2026</span>
+          <h3 className="text-[14px] font-black tracking-tight flex items-center gap-2"><FontAwesomeIcon icon={faBullseye} className="text-[#5B74FF]" /> {t('profile.goals.title')}</h3>
+          <span className="text-[11px] opacity-40 font-bold">{t('profile.goals.month')}</span>
         </div>
         <div className="mt-4 grid gap-3 sm:grid-cols-3">
           {goalsLoading ? (
@@ -1146,7 +1188,7 @@ export default function Profile() {
               </div>
             ))
           ) : goals.length === 0 ? (
-            <div className="text-xs opacity-40 sm:col-span-3 py-2">Целей пока нет — добавь через «Редактировать» выше 👆</div>
+            <div className="text-xs opacity-40 sm:col-span-3 py-2">{t('profile.goals.empty')}</div>
           ) : goals.map((g) => (
             <div key={g.id ?? g.title} className="rounded-xl bg-white/[0.03] border border-white/[0.04] p-3.5 relative">
               {isEditing && (
@@ -1164,7 +1206,7 @@ export default function Profile() {
                 <div className="flex items-center gap-1.5 mt-2">
                   <button onClick={() => patchGoal(g, { progress: Math.max(0, g.progress - 10) })} className="w-5 h-5 rounded-full bg-white/[0.06] border border-white/[0.06] grid place-items-center text-[11px] hover:bg-white/10">−</button>
                   <button onClick={() => patchGoal(g, { progress: Math.min(100, g.progress + 10) })} className="w-5 h-5 rounded-full bg-white/[0.06] border border-white/[0.06] grid place-items-center text-[11px] hover:bg-white/10">+</button>
-                  <span className="text-[10px] opacity-40 ml-1">прогресс ±10</span>
+                  <span className="text-[10px] opacity-40 ml-1">{t('profile.goals.progress_step')}</span>
                 </div>
               )}
             </div>
@@ -1172,14 +1214,14 @@ export default function Profile() {
         </div>
         {isEditing && (
           <div className="mt-4">
-            <div className="text-xs font-bold opacity-60 mb-2">Готовые цели — выбери до 3</div>
+            <div className="text-xs font-bold opacity-60 mb-2">{t('profile.goals.presets_hint')}</div>
             <div className="flex flex-wrap gap-1.5">
               {[
-                { title: 'Читать 5 текстов', desc: '5 текстов • 20 мин', color: '#a78bfa' },
-                { title: 'Выучить 30 слов', desc: '7 дней • 30 слов', color: '#5AD4B5' },
-                { title: 'Пройти тест A2', desc: 'Грамматика • 15 мин', color: '#5B74FF' },
-                { title: 'Диалог без пауз', desc: 'Разговор • 10 мин', color: '#F08AB4' },
-                { title: 'Спринт 5 дней', desc: 'Серия • 5 дней', color: '#ff9d5c' },
+                { title: t('profile.presets.read_title'), desc: t('profile.presets.read_desc'), color: '#a78bfa' },
+                { title: t('profile.presets.words_title'), desc: t('profile.presets.words_desc'), color: '#5AD4B5' },
+                { title: t('profile.presets.test_title'), desc: t('profile.presets.test_desc'), color: '#5B74FF' },
+                { title: t('profile.presets.dialog_title'), desc: t('profile.presets.dialog_desc'), color: '#F08AB4' },
+                { title: t('profile.presets.sprint_title'), desc: t('profile.presets.sprint_desc'), color: '#ff9d5c' },
               ].filter(g => !goals.some(x => x.title === g.title)).map((g) => (
                 <button
                   key={g.title}
@@ -1191,19 +1233,19 @@ export default function Profile() {
                 </button>
               ))}
             </div>
-            {goals.length >= 3 && <div className="text-[11px] opacity-40 mt-2">Максимум 3 цели — удали одну, чтобы добавить</div>}
+            {goals.length >= 3 && <div className="text-[11px] opacity-40 mt-2">{t('profile.goals.max')}</div>}
           </div>
         )}
       </div>
 
-      {/* обучение — дневная цель и настроение темпа */}
+      {/* learning — daily goal and pace mood */}
       <div className="rounded-[20px] border border-white/[0.06] bg-[#171717] p-5">
         <div className="flex items-center justify-between">
-          <h3 className="text-[14px] font-black tracking-tight flex items-center gap-2"><FontAwesomeIcon icon={faGraduationCap} className="text-[#5AD4B5]" /> Обучение</h3>
-          <span className="text-[11px] opacity-40 font-bold">твой темп</span>
+          <h3 className="text-[14px] font-black tracking-tight flex items-center gap-2"><FontAwesomeIcon icon={faGraduationCap} className="text-[#5AD4B5]" /> {t('profile.study.title')}</h3>
+          <span className="text-[11px] opacity-40 font-bold">{t('profile.study.pace')}</span>
         </div>
         <div className="mt-4 settings-row !mx-0">
-          <span className="flex flex-col gap-1"><span className="text-[13px] font-bold">Дневная цель</span><span className="text-xs opacity-40">{goal} слов • ~{Math.round(goal * 1.5)} мин</span></span>
+          <span className="flex flex-col gap-1"><span className="text-[13px] font-bold">{t('profile.study.daily_goal')}</span><span className="text-xs opacity-40">{t('profile.study.daily_sub', { goal, mins: Math.round(goal * 1.5) })}</span></span>
           <span className="flex items-center gap-2">
             <button onClick={() => changeGoal(-5)} className="w-7 h-7 rounded-full bg-white/[0.06] border border-white/[0.06] grid place-items-center hover:bg-white/10 text-sm">−</button>
             <span className="min-w-[36px] text-center text-[13px] font-black tabular-nums">{goal}</span>
@@ -1223,22 +1265,22 @@ export default function Profile() {
           {goalMood}
         </motion.div>
         <div className="mt-2 settings-row !mx-0">
-          <span className="text-[13px]">Напоминания</span><span className="text-xs opacity-40 font-bold">{scheduleSummary}</span>
+          <span className="text-[13px]">{t('profile.study.reminders')}</span><span className="text-xs opacity-40 font-bold">{scheduleSummary}</span>
         </div>
       </div>
 
-      {/* уведомления — расписание по дням недели, до 3 на день */}
+      {/* notifications — per-weekday schedule, up to 3 per day */}
       <div className="rounded-[20px] border border-white/[0.06] bg-[#171717] p-5">
         <div className="flex items-center justify-between">
-          <h3 className="text-[14px] font-black tracking-tight flex items-center gap-2"><FontAwesomeIcon icon={faBell} className="text-[#F5C16A]" /> Уведомления</h3>
+          <h3 className="text-[14px] font-black tracking-tight flex items-center gap-2"><FontAwesomeIcon icon={faBell} className="text-[#F5C16A]" /> {t('profile.schedule.title')}</h3>
           <span className="text-[11px] opacity-40 font-bold">
-            {scheduleStats.total === 0 ? 'выключены' : `${scheduleStats.total} в неделю`}
+            {scheduleStats.total === 0 ? t('profile.schedule.off') : t('profile.schedule.per_week', { total: scheduleStats.total })}
           </span>
         </div>
         <div className="mt-3 flex flex-wrap gap-1.5">
-          <button onClick={() => applyPreset('everyday')} className="px-2.5 py-1.5 rounded-full text-xs font-bold border bg-white/[0.04] border-white/[0.06] hover:bg-white/[0.08]">Каждый день 09:00</button>
-          <button onClick={() => applyPreset('weekdays')} className="px-2.5 py-1.5 rounded-full text-xs font-bold border bg-white/[0.04] border-white/[0.06] hover:bg-white/[0.08]">Будни 09:00</button>
-          <button onClick={() => applyPreset('clear')} className="px-2.5 py-1.5 rounded-full text-xs font-bold border bg-transparent border-white/[0.06] text-white/50 hover:text-white">Очистить</button>
+          <button onClick={() => applyPreset('everyday')} className="px-2.5 py-1.5 rounded-full text-xs font-bold border bg-white/[0.04] border-white/[0.06] hover:bg-white/[0.08]">{t('profile.schedule.everyday')}</button>
+          <button onClick={() => applyPreset('weekdays')} className="px-2.5 py-1.5 rounded-full text-xs font-bold border bg-white/[0.04] border-white/[0.06] hover:bg-white/[0.08]">{t('profile.schedule.weekdays')}</button>
+          <button onClick={() => applyPreset('clear')} className="px-2.5 py-1.5 rounded-full text-xs font-bold border bg-transparent border-white/[0.06] text-white/50 hover:text-white">{t('profile.schedule.clear')}</button>
         </div>
         <div className="mt-3 grid gap-1.5">
           {WEEKDAYS.map((d) => {
@@ -1251,18 +1293,18 @@ export default function Profile() {
                     type="button"
                     role="switch"
                     aria-checked={active}
-                    aria-label={d.full}
+                    aria-label={t(`profile.weekdays.${d.id}_full`)}
                     onClick={() => toggleDay(d.id)}
                     className={`settings-switch ${active ? 'settings-switch--on' : ''}`}
                   >
                     <span className="settings-switch__thumb" />
                   </button>
-                  <span className="text-[13px] font-bold w-7">{d.label}</span>
+                  <span className="text-[13px] font-bold w-7">{t(`profile.weekdays.${d.id}`)}</span>
                   <div className="flex flex-wrap items-center gap-1.5 flex-1">
-                    {times.map((t) => (
-                      <span key={t} className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-[#F5C16A]/10 border border-[#F5C16A]/25 text-[#F5C16A] text-xs font-bold tabular-nums">
-                        {t}
-                        <button onClick={() => removeTime(d.id, t)} className="hover:text-white leading-none" aria-label={`Убрать ${t}`}>×</button>
+                    {times.map((tm) => (
+                      <span key={tm} className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-[#F5C16A]/10 border border-[#F5C16A]/25 text-[#F5C16A] text-xs font-bold tabular-nums">
+                        {tm}
+                        <button onClick={() => removeTime(d.id, tm)} className="hover:text-white leading-none" aria-label={t('profile.schedule.remove_time', { time: tm })}>×</button>
                       </span>
                     ))}
                     {active && times.length < 3 && (
@@ -1273,10 +1315,10 @@ export default function Profile() {
                           onChange={(e) => setTimeDraft(e.target.value)}
                           className="px-1.5 py-0.5 rounded-lg bg-black/20 border border-white/[0.08] text-xs text-white/80 focus:outline-none focus:border-white/20 [color-scheme:dark]"
                         />
-                        <button onClick={() => addTime(d.id)} className="w-5 h-5 rounded-full bg-white text-black grid place-items-center text-xs font-black" aria-label="Добавить время">+</button>
+                        <button onClick={() => addTime(d.id)} className="w-5 h-5 rounded-full bg-white text-black grid place-items-center text-xs font-black" aria-label={t('profile.schedule.add_time')}>+</button>
                       </span>
                     )}
-                    {!active && <span className="text-xs opacity-30">выходной 😴</span>}
+                    {!active && <span className="text-xs opacity-30">{t('profile.schedule.day_off')}</span>}
                   </div>
                 </div>
               </div>
@@ -1285,12 +1327,12 @@ export default function Profile() {
         </div>
         <div className="text-[11px] opacity-40 mt-2.5">
           {scheduleStats.total === 0
-            ? 'Включи хотя бы один день — и мы напомним позаниматься 💌'
-            : 'Можно задать разным дням разное время — хоть каждому своё 🎯'}
+            ? t('profile.schedule.hint_empty')
+            : t('profile.schedule.hint_custom')}
         </div>
       </div>
 
-      {/* achievements — переделано: много, hover с прогрессом */}
+      {/* achievements — reworked: many, hover with progress */}
       {achievementsLoading ? (
         <div className="rounded-[20px] border border-white/[0.06] bg-[#171717] p-5" aria-hidden>
           <div className="h-5 w-40 rounded-lg bg-white/[0.07] animate-pulse" />
@@ -1305,26 +1347,26 @@ export default function Profile() {
           </div>
         </div>
       ) : (
-        <AchievementsBlock items={achievements ?? achievementsFallback} />
+        <AchievementsBlock items={achievements ?? fallbackAchievements} />
       )}
 
       {/* friends / community */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
         <div className="rounded-[20px] border border-white/[0.06] bg-[#171717] p-5">
           <div className="flex items-center justify-between">
-            <h3 className="text-[14px] font-black tracking-tight flex items-center gap-2"><FontAwesomeIcon icon={faUsers} className="text-[#5B74FF]" /> Друзья учат</h3>
+            <h3 className="text-[14px] font-black tracking-tight flex items-center gap-2"><FontAwesomeIcon icon={faUsers} className="text-[#5B74FF]" /> {t('profile.friends.title')}</h3>
             <span className="text-[11px] opacity-40 font-bold">
-              {isAuthed ? (remoteFriends === null ? '…' : `${remoteFriends.length} друга`) : `${friends.length} друга`}
-              {incoming.length > 0 && <span className="ml-1.5 px-1.5 py-0.5 rounded-full bg-[#F5C16A]/15 border border-[#F5C16A]/25 text-[#F5C16A]">+{incoming.length} заявки</span>}
+              {isAuthed ? (remoteFriends === null ? '…' : t('profile.friends.count', { n: remoteFriends.length })) : t('profile.friends.count', { n: friends.length })}
+              {incoming.length > 0 && <span className="ml-1.5 px-1.5 py-0.5 rounded-full bg-[#F5C16A]/15 border border-[#F5C16A]/25 text-[#F5C16A]">{t('profile.friends.requests', { n: incoming.length })}</span>}
             </span>
           </div>
           {isAuthed ? (
             <div className="mt-3">
               <div className="relative">
-                <input value={friendQuery} onChange={(e) => setFriendQuery(e.target.value)} placeholder="Поиск по имени или email…" className="w-full pl-8 pr-3 py-2 rounded-xl bg-black/20 border border-white/[0.06] text-sm placeholder:text-white/30 focus:outline-none focus:border-white/15" />
+                <input value={friendQuery} onChange={(e) => setFriendQuery(e.target.value)} placeholder={t('profile.friends.search_placeholder')} className="w-full pl-8 pr-3 py-2 rounded-xl bg-black/20 border border-white/[0.06] text-sm placeholder:text-white/30 focus:outline-none focus:border-white/15" />
                 <FontAwesomeIcon icon={faUsers} className="absolute left-3 top-1/2 -translate-y-1/2 text-white/30 text-xs" />
               </div>
-              {searching && <div className="text-xs opacity-40 mt-2">Ищем…</div>}
+              {searching && <div className="text-xs opacity-40 mt-2">{t('profile.friends.searching')}</div>}
               {!searching && friendQuery.trim().length >= 2 && searchHits.length > 0 && (
                 <div className="mt-2 rounded-xl border border-white/[0.06] bg-[#0f0f0f] overflow-hidden">
                   {searchHits.map((u) => (
@@ -1334,25 +1376,25 @@ export default function Profile() {
                       </span>
                       <span className="text-sm font-bold truncate">{u.name || u.email}</span>
                       {u.relation === 'accepted' ? (
-                        <span className="ml-auto text-xs font-bold opacity-40">Уже друзья</span>
+                        <span className="ml-auto text-xs font-bold opacity-40">{t('profile.friends.already')}</span>
                       ) : u.relation === 'pending' ? (
-                        <span className="ml-auto text-xs font-bold text-[#F5C16A]">Заявка отправлена</span>
+                        <span className="ml-auto text-xs font-bold text-[#F5C16A]">{t('profile.friends.pending')}</span>
                       ) : (
-                        <button onClick={() => handleSendRequest(u)} className="ml-auto text-xs font-black text-[#5AD4B5] hover:text-white shrink-0">+ Добавить</button>
+                        <button onClick={() => handleSendRequest(u)} className="ml-auto text-xs font-black text-[#5AD4B5] hover:text-white shrink-0">{t('profile.friends.add')}</button>
                       )}
                     </div>
                   ))}
                 </div>
               )}
               {!searching && friendQuery.trim().length >= 2 && searchHits.length === 0 && (
-                <div className="text-xs opacity-40 mt-2">Никого не нашли по “{friendQuery.trim()}”</div>
+                <div className="text-xs opacity-40 mt-2">{t('profile.friends.not_found', { q: friendQuery.trim() })}</div>
               )}
             </div>
           ) : (
             isEditing && (
               <div className="mt-3">
                 <div className="relative">
-                  <input value={friendQuery} onChange={(e) => setFriendQuery(e.target.value)} placeholder="Поиск — Анна, Дмитрий..." className="w-full pl-8 pr-3 py-2 rounded-xl bg-black/20 border border-white/[0.06] text-sm placeholder:text-white/30 focus:outline-none focus:border-white/15" />
+                  <input value={friendQuery} onChange={(e) => setFriendQuery(e.target.value)} placeholder={t('profile.friends.search_guest_placeholder')} className="w-full pl-8 pr-3 py-2 rounded-xl bg-black/20 border border-white/[0.06] text-sm placeholder:text-white/30 focus:outline-none focus:border-white/15" />
                   <FontAwesomeIcon icon={faUsers} className="absolute left-3 top-1/2 -translate-y-1/2 text-white/30 text-xs" />
                 </div>
                 {friendQuery && mockUsers.length > 0 && (
@@ -1362,29 +1404,29 @@ export default function Profile() {
                         <span className="w-7 h-7 rounded-full bg-white/[0.08] grid place-items-center font-bold text-xs">{u.avatar}</span>
                         <span className="text-sm font-bold">{u.name}</span>
                         <span className="text-xs opacity-40">• {u.level}</span>
-                        <span className="ml-auto text-xs font-black text-[#5AD4B5]">+ Добавить</span>
+                        <span className="ml-auto text-xs font-black text-[#5AD4B5]">{t('profile.friends.add')}</span>
                       </button>
                     ))}
                   </div>
                 )}
-                {friendQuery && mockUsers.length === 0 && <div className="text-xs opacity-40 mt-2">Никого не нашли по “{friendQuery}”</div>}
+                {friendQuery && mockUsers.length === 0 && <div className="text-xs opacity-40 mt-2">{t('profile.friends.not_found', { q: friendQuery })}</div>}
               </div>
             )
           )}
           {isAuthed && incoming.length > 0 && (
             <div className="mt-3 rounded-xl border border-[#F5C16A]/20 bg-[#F5C16A]/[0.05] p-2.5">
-              <div className="text-[11px] font-black uppercase tracking-wide text-[#F5C16A] mb-1.5">Входящие заявки</div>
+              <div className="text-[11px] font-black uppercase tracking-wide text-[#F5C16A] mb-1.5">{t('profile.friends.incoming')}</div>
               <div className="space-y-1.5">
                 {incoming.map((r) => (
                   <div key={r.id} className="flex items-center gap-2.5">
                     <span className="w-7 h-7 rounded-full bg-white/[0.08] grid place-items-center font-bold text-xs">
                       {(r.name?.[0] || '?').toUpperCase()}
                     </span>
-                    <span className="text-sm font-bold flex-1 truncate">{r.name || 'Пользователь'}</span>
-                    <button onClick={() => handleAnswer(r.id, true)} className="w-7 h-7 rounded-full bg-[#5AD4B5] text-black grid place-items-center hover:opacity-90" aria-label="Принять">
+                    <span className="text-sm font-bold flex-1 truncate">{r.name || t('profile.friends.fallback_name')}</span>
+                    <button onClick={() => handleAnswer(r.id, true)} className="w-7 h-7 rounded-full bg-[#5AD4B5] text-black grid place-items-center hover:opacity-90" aria-label={t('profile.friends.accept')}>
                       <FontAwesomeIcon icon={faCheck} className="text-[11px]" />
                     </button>
-                    <button onClick={() => handleAnswer(r.id, false)} className="w-7 h-7 rounded-full bg-white/[0.06] border border-white/[0.08] text-white/60 grid place-items-center hover:bg-[#f43f5e]/20 hover:text-[#f43f5e] hover:border-[#f43f5e]/30" aria-label="Отклонить">
+                    <button onClick={() => handleAnswer(r.id, false)} className="w-7 h-7 rounded-full bg-white/[0.06] border border-white/[0.08] text-white/60 grid place-items-center hover:bg-[#f43f5e]/20 hover:text-[#f43f5e] hover:border-[#f43f5e]/30" aria-label={t('profile.friends.reject')}>
                       <FontAwesomeIcon icon={faTrash} className="text-[11px]" />
                     </button>
                   </div>
@@ -1402,21 +1444,21 @@ export default function Profile() {
                     </span>
                     <div className="flex-1 min-w-0">
                       <div className="text-sm font-bold leading-none truncate">
-                        {f.name || 'Пользователь'}
+                        {f.name || t('profile.friends.fallback_name')}
                         {f.level && <> • <span className="opacity-60 font-semibold">{f.level}</span></>}
                       </div>
-                      <div className="text-xs opacity-40">🔥 {f.streak_days} дней</div>
+                      <div className="text-xs opacity-40">{t('profile.friends.streak', { n: f.streak_days })}</div>
                     </div>
-                    <button onClick={() => handleRemoveFriend(f.friendship_id)} className="w-7 h-7 rounded-full bg-[#f43f5e]/10 border border-[#f43f5e]/20 text-[#f43f5e] grid place-items-center hover:bg-[#f43f5e]/20 opacity-0 group-hover:opacity-100 transition-opacity" aria-label="Убрать из друзей">
+                    <button onClick={() => handleRemoveFriend(f.friendship_id)} className="w-7 h-7 rounded-full bg-[#f43f5e]/10 border border-[#f43f5e]/20 text-[#f43f5e] grid place-items-center hover:bg-[#f43f5e]/20 opacity-0 group-hover:opacity-100 transition-opacity" aria-label={t('profile.friends.remove')}>
                       <FontAwesomeIcon icon={faTrash} className="text-[11px]" />
                     </button>
                   </div>
                 ))}
                 {remoteFriends !== null && remoteFriends.length === 0 && (
-                  <div className="text-xs opacity-40 text-center py-4">Пока нет друзей — найди их через поиск выше 👆</div>
+                  <div className="text-xs opacity-40 text-center py-4">{t('profile.friends.empty_authed')}</div>
                 )}
                 {remoteFriends === null && (
-                  <div className="text-xs opacity-40 text-center py-4 animate-pulse">Загружаем друзей…</div>
+                  <div className="text-xs opacity-40 text-center py-4 animate-pulse">{t('profile.friends.loading')}</div>
                 )}
               </>
             ) : (
@@ -1426,7 +1468,7 @@ export default function Profile() {
                     <span className="w-9 h-9 rounded-full bg-white/[0.08] border border-white/[0.08] grid place-items-center font-bold text-sm">{f.avatar}</span>
                     <div className="flex-1 min-w-0">
                       <div className="text-sm font-bold leading-none">{f.name} • <span className="opacity-60 font-semibold">{f.level}</span></div>
-                      <div className="text-xs opacity-40">🔥 {f.streak} дней</div>
+                      <div className="text-xs opacity-40">{t('profile.friends.streak', { n: f.streak })}</div>
                     </div>
                     {isEditing ? (
                       <button onClick={() => setFriends(friends.filter((x) => x.name !== f.name))} className="w-7 h-7 rounded-full bg-[#f43f5e]/10 border border-[#f43f5e]/20 text-[#f43f5e] grid place-items-center hover:bg-[#f43f5e]/20">
@@ -1437,19 +1479,19 @@ export default function Profile() {
                     )}
                   </div>
                 ))}
-                {friends.length === 0 && <div className="text-xs opacity-40 text-center py-4">Пока нет друзей — добавь через поиск выше</div>}
+                {friends.length === 0 && <div className="text-xs opacity-40 text-center py-4">{t('profile.friends.empty_guest')}</div>}
               </>
             )}
           </div>
         </div>
         <div className="rounded-[20px] border border-white/[0.06] bg-[#171717] p-5">
-          <h3 className="text-[14px] font-black tracking-tight flex items-center gap-2"><FontAwesomeIcon icon={faRocket} className="text-[#5AD4B5]" /> Быстрый старт</h3>
-          <p className="text-xs opacity-40 mt-1">что сделать за 5 минут</p>
+          <h3 className="text-[14px] font-black tracking-tight flex items-center gap-2"><FontAwesomeIcon icon={faRocket} className="text-[#5AD4B5]" /> {t('profile.quickstart.title')}</h3>
+          <p className="text-xs opacity-40 mt-1">{t('profile.quickstart.subtitle')}</p>
           <div className="mt-4 grid gap-2.5">
             {[
-              { title: 'Повторить 12 слов', sub: 'слабые • 2 мин', icon: faBook, color: '#5AD4B5' },
-              { title: '5 новых слов', sub: 'тема Еда • 3 мин', icon: faStar, color: '#5B74FF' },
-              { title: 'Диалог 3 мин', sub: 'кафе • голосом', icon: faUsers, color: '#F08AB4' },
+              { title: t('profile.quickstart.review_title'), sub: t('profile.quickstart.review_sub'), icon: faBook, color: '#5AD4B5' },
+              { title: t('profile.quickstart.new_title'), sub: t('profile.quickstart.new_sub'), icon: faStar, color: '#5B74FF' },
+              { title: t('profile.quickstart.dialog_title'), sub: t('profile.quickstart.dialog_sub'), icon: faUsers, color: '#F08AB4' },
             ].map((a) => (
               <button key={a.title} type="button" className="w-full flex items-center gap-3 rounded-xl bg-white/[0.03] border border-white/[0.04] p-3 text-left hover:bg-white/[0.06] hover:border-white/[0.08] transition-colors group">
                 <span className="w-9 h-9 rounded-xl grid place-items-center border shrink-0 transition-colors" style={{ background: `${a.color}14`, borderColor: `${a.color}22`, color: a.color }}>

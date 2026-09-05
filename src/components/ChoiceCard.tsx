@@ -2,6 +2,7 @@ import { useEffect, useRef, useState, type MutableRefObject } from 'react'
 import { motion } from 'framer-motion'
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome'
 import { faVolumeHigh, faCheck, faXmark, faListUl } from '@fortawesome/free-solid-svg-icons'
+import { useT } from '@/lib/i18n'
 
 interface ChoiceCardProps {
   question: string
@@ -29,6 +30,7 @@ export default function ChoiceCard({
   onSpeak,
   onAnswer,
 }: ChoiceCardProps) {
+  const t = useT()
   const [picked, setPicked] = useState<number | null>(null)
   const answered = useRef(false)
   const cb = useRef(onAnswer)
@@ -68,12 +70,12 @@ export default function ChoiceCard({
       <div className="absolute -right-14 -top-14 w-52 h-52 rounded-full bg-[#5B74FF]/[0.09] blur-3xl pointer-events-none" />
       <div className="flex items-center gap-2 relative">
         <span className="px-2.5 py-1 rounded-full bg-[#5B74FF]/15 border border-[#5B74FF]/30 text-[#8b9bff] text-[11px] font-black uppercase tracking-widest flex items-center gap-1.5">
-          <FontAwesomeIcon icon={faListUl} className="text-[10px]" /> Выбери перевод
+          <FontAwesomeIcon icon={faListUl} className="text-[10px]" /> {t('cards.choice.title')}
         </span>
         {questionSpeak && (
           <button
             onClick={() => onSpeak(questionSpeak.text, questionSpeak.lang, 'choice-q')}
-            aria-label="Озвучить слово"
+            aria-label={t('cards.common.speak_word')}
             className={`ml-auto w-10 h-10 rounded-full grid place-items-center border transition-all ${
               speakingKey === 'choice-q'
                 ? 'bg-[#5AD4B5] text-black border-[#5AD4B5]'
@@ -138,7 +140,7 @@ export default function ChoiceCard({
         })}
       </div>
       <div className="text-center text-[12px] font-bold text-white/35 relative">
-        {done ? 'оценка выставлена автоматически' : 'клик или клавиши 1–4'}
+        {done ? t('cards.common.auto_graded') : t('cards.choice.keys_hint')}
       </div>
     </div>
   )

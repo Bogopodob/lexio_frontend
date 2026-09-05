@@ -1,3 +1,5 @@
+import { getUiLang, translate } from '@/lib/i18n'
+
 const API_URL = (import.meta.env.VITE_API_URL as string | undefined) ?? '/api'
 
 const TOKEN_KEY = 'qwicki_token'
@@ -30,10 +32,10 @@ async function request<T>(path: string, init: RequestInit = {}): Promise<T> {
   try {
     res = await fetch(`${API_URL}${path}`, {
       ...init,
-      headers: { 'Content-Type': 'application/json', 'Accept-Language': 'ru', ...(init.headers ?? {}) },
+      headers: { 'Content-Type': 'application/json', 'Accept-Language': getUiLang(), ...(init.headers ?? {}) },
     })
   } catch {
-    throw new AuthError('Сервер недоступен. Проверь соединение.', 0)
+    throw new AuthError(translate(getUiLang(), 'lib.auth.server_unavailable'), 0)
   }
 
   const body = (await res.json().catch(() => null)) as {
@@ -47,7 +49,7 @@ async function request<T>(path: string, init: RequestInit = {}): Promise<T> {
   if (!res.ok || !body || body.success === false) {
     const firstValidation = body?.errors ? Object.values(body.errors)[0]?.[0] : undefined
     throw new AuthError(
-      firstValidation ?? body?.message ?? body?.error ?? 'Что-то пошло не так',
+      firstValidation ?? body?.message ?? body?.error ?? translate(getUiLang(), 'lib.auth.something_wrong'),
       res.status,
     )
   }

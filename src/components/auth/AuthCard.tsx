@@ -3,6 +3,7 @@ import { AnimatePresence, motion } from 'framer-motion'
 import { AtSign, Check, Eye, EyeOff, Loader2, Lock, TriangleAlert, User } from 'lucide-react'
 import { AuthError } from '@/lib/auth-api'
 import { useAuth } from '@/context/AuthContext'
+import { useList, useT } from '@/lib/i18n'
 import { cn } from '@/shared/lib/cn'
 
 type Mode = 'login' | 'register'
@@ -16,7 +17,6 @@ function passwordScore(pw: string): number {
   return Math.min(score, 4)
 }
 
-const STRENGTH_LABELS = ['слабый', 'так себе', 'норм', 'сильный']
 const STRENGTH_COLORS = ['#f43f5e', '#ff9d5c', '#F5C16A', '#5AD4B5']
 
 function Field({
@@ -54,6 +54,8 @@ function Field({
 
 export default function AuthCard({ onSuccess }: { onSuccess: () => void }) {
   const { login, register } = useAuth()
+  const t = useT()
+  const strengthLabels = useList('auth.card.strength')
   const [mode, setMode] = useState<Mode>('login')
   const [name, setName] = useState('')
   const [email, setEmail] = useState('')
@@ -68,11 +70,11 @@ export default function AuthCard({ onSuccess }: { onSuccess: () => void }) {
 
   const emailError =
     touched && email !== '' && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email.trim())
-      ? 'похоже, в email опечатка'
+      ? t('auth.card.emailError')
       : undefined
   const passwordError =
     touched && mode === 'register' && password !== '' && password.length < 8
-      ? 'минимум 8 символов'
+      ? t('auth.card.passwordError')
       : undefined
 
   const strength = useMemo(() => passwordScore(password), [password])
@@ -104,9 +106,9 @@ export default function AuthCard({ onSuccess }: { onSuccess: () => void }) {
       setFormError(
         err instanceof AuthError
           ? err.status === 0
-            ? 'Сервер недоступен — backend точно запущен?'
+            ? t('auth.card.serverDown')
             : err.message
-          : 'Что-то пошло не так',
+          : t('auth.card.genericError'),
       )
     }
   }
@@ -132,7 +134,7 @@ export default function AuthCard({ onSuccess }: { onSuccess: () => void }) {
                 transition={{ type: 'spring', stiffness: 420, damping: 34 }}
               />
             )}
-            <span className="auth-tabs__text">{m === 'login' ? 'Вход' : 'Регистрация'}</span>
+            <span className="auth-tabs__text">{m === 'login' ? t('auth.card.tabLogin') : t('auth.card.tabRegister')}</span>
           </button>
         ))}
       </div>
@@ -146,9 +148,7 @@ export default function AuthCard({ onSuccess }: { onSuccess: () => void }) {
           transition={{ duration: 0.22 }}
           className="auth-card__subtitle"
         >
-          {mode === 'login'
-            ? 'С возвращением! Продолжим с того же слова.'
-            : 'Пара минут — и вся библиотека слов твоя.'}
+          {mode === 'login' ? t('auth.card.subLogin') : t('auth.card.subRegister')}
         </motion.p>
       </AnimatePresence>
 
@@ -163,7 +163,7 @@ export default function AuthCard({ onSuccess }: { onSuccess: () => void }) {
               transition={{ duration: 0.28, ease: 'easeInOut' }}
               className="overflow-hidden"
             >
-              <Field icon={User} label="Имя">
+              <Field icon={User} label={t('auth.card.fieldName')}>
                 <input
                   value={name}
                   onChange={(e) => setName(e.target.value)}
@@ -177,7 +177,7 @@ export default function AuthCard({ onSuccess }: { onSuccess: () => void }) {
           )}
         </AnimatePresence>
 
-        <Field icon={AtSign} label="Email" error={emailError}>
+        <Field icon={AtSign} label={t('auth.card.fieldEmail')} error={emailError}>
           <input
             value={email}
             onChange={(e) => setEmail(e.target.value)}
@@ -190,7 +190,7 @@ export default function AuthCard({ onSuccess }: { onSuccess: () => void }) {
           />
         </Field>
 
-        <Field icon={Lock} label="Пароль" error={passwordError}>
+        <Field icon={Lock} label={t('auth.card.fieldPassword')} error={passwordError}>
           <input
             value={password}
             onChange={(e) => setPassword(e.target.value)}
@@ -206,7 +206,7 @@ export default function AuthCard({ onSuccess }: { onSuccess: () => void }) {
           />
           <button
             type="button"
-            aria-label={showPassword ? 'Скрыть пароль' : 'Показать пароль'}
+            aria-label={showPassword ? t('auth.card.hidePassword') : t('auth.card.showPassword')}
             onClick={() => setShowPassword((v) => !v)}
             className="auth-field__action"
           >
@@ -223,7 +223,7 @@ export default function AuthCard({ onSuccess }: { onSuccess: () => void }) {
                 exit={{ opacity: 0, height: 0 }}
                 className="auth-hints__caps"
               >
-                <TriangleAlert size={13} /> Caps Lock включён
+                <TriangleAlert size={13} /> {t('auth.card.capsLock')}
               </motion.span>
             )}
           </AnimatePresence>
@@ -251,7 +251,7 @@ export default function AuthCard({ onSuccess }: { onSuccess: () => void }) {
                   ))}
                 </div>
                 <span className="auth-strength__label" style={{ color: STRENGTH_COLORS[strength - 1] }}>
-                  {STRENGTH_LABELS[strength - 1]}
+                  {strengthLabels[strength - 1] ?? ''}
                 </span>
               </motion.div>
             )}
@@ -304,7 +304,7 @@ export default function AuthCard({ onSuccess }: { onSuccess: () => void }) {
                 exit={{ opacity: 0 }}
                 className="auth-submit__content"
               >
-                <Loader2 size={18} className="animate-spin" /> Открываем словарь…
+                <Loader2 size={18} className="animate-spin" /> {t('auth.card.submitting')}
               </motion.span>
             ) : status === 'success' ? (
               <motion.span
@@ -314,7 +314,7 @@ export default function AuthCard({ onSuccess }: { onSuccess: () => void }) {
                 transition={{ type: 'spring', stiffness: 400, damping: 20 }}
                 className="auth-submit__content"
               >
-                <Check size={18} strokeWidth={3} /> Получилось!
+                <Check size={18} strokeWidth={3} /> {t('auth.card.success')}
               </motion.span>
             ) : (
               <motion.span
@@ -324,7 +324,7 @@ export default function AuthCard({ onSuccess }: { onSuccess: () => void }) {
                 exit={{ opacity: 0 }}
                 className="auth-submit__content"
               >
-                {mode === 'login' ? 'Войти' : 'Создать аккаунт'}
+                {mode === 'login' ? t('auth.card.submitLogin') : t('auth.card.submitRegister')}
                 <span className="auth-submit__arrow">→</span>
               </motion.span>
             )}
@@ -333,7 +333,7 @@ export default function AuthCard({ onSuccess }: { onSuccess: () => void }) {
       </form>
 
       <p className="auth-card__footnote">
-        Нажимая кнопку, ты принимаешь магию интервальных повторений ✨
+        {t('auth.card.footnote')}
       </p>
     </div>
   )

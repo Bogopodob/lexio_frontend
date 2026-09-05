@@ -10,15 +10,15 @@ export type ShortcutId =
   | 'grade_good'
   | 'grade_easy'
 
-export const SHORTCUT_META: Record<ShortcutId, { label: string; hint: string }> = {
-  search: { label: 'Поиск', hint: 'Открыть палитру команд' },
-  flip: { label: 'Переворот карточки', hint: 'Показать перевод' },
-  flip_back: { label: 'Назад к слову', hint: 'Вернуть карточку без оценки' },
-  speak: { label: 'Озвучить', hint: 'Произнести фразу вслух' },
-  grade_again: { label: 'Оценка: Снова', hint: 'Не вспомнил — повторить' },
-  grade_hard: { label: 'Оценка: Трудно', hint: 'Вспомнил с трудом' },
-  grade_good: { label: 'Оценка: Хорошо', hint: 'Уверенно вспомнил' },
-  grade_easy: { label: 'Оценка: Легко', hint: 'Сразу вспомнил' },
+export const SHORTCUT_META: Record<ShortcutId, { labelKey: string; hintKey: string }> = {
+  search: { labelKey: 'settings.shortcuts.search.label', hintKey: 'settings.shortcuts.search.hint' },
+  flip: { labelKey: 'settings.shortcuts.flip.label', hintKey: 'settings.shortcuts.flip.hint' },
+  flip_back: { labelKey: 'settings.shortcuts.flip_back.label', hintKey: 'settings.shortcuts.flip_back.hint' },
+  speak: { labelKey: 'settings.shortcuts.speak.label', hintKey: 'settings.shortcuts.speak.hint' },
+  grade_again: { labelKey: 'settings.shortcuts.grade_again.label', hintKey: 'settings.shortcuts.grade_again.hint' },
+  grade_hard: { labelKey: 'settings.shortcuts.grade_hard.label', hintKey: 'settings.shortcuts.grade_hard.hint' },
+  grade_good: { labelKey: 'settings.shortcuts.grade_good.label', hintKey: 'settings.shortcuts.grade_good.hint' },
+  grade_easy: { labelKey: 'settings.shortcuts.grade_easy.label', hintKey: 'settings.shortcuts.grade_easy.hint' },
 }
 
 export const DEFAULT_SHORTCUTS: Record<ShortcutId, string> = {

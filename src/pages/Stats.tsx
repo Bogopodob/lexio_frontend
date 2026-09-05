@@ -25,18 +25,16 @@ import { RingChart } from '@/components/charts/ring-chart'
 import { Ring } from '@/components/charts/ring'
 import { RingCenter } from '@/components/charts/ring-center'
 import { useTheme } from '@/context/ThemeContext'
+import { getUiLang, translate, useList, useT } from '@/lib/i18n'
 
 type Period = 'day' | 'week' | 'month' | 'year' | 'custom'
 
-const PERIODS: { key: Period; label: string }[] = [
-  { key: 'day', label: 'День' },
-  { key: 'week', label: 'Неделя' },
-  { key: 'month', label: 'Месяц' },
-  { key: 'year', label: 'Год' },
+const PERIODS: { key: Period }[] = [
+  { key: 'day' },
+  { key: 'week' },
+  { key: 'month' },
+  { key: 'year' },
 ]
-
-const WEEKDAYS = ['Пн', 'Вт', 'Ср', 'Чт', 'Пт', 'Сб', 'Вс']
-const MONTHS = ['Янв', 'Фев', 'Мар', 'Апр', 'Май', 'Июн', 'Июл', 'Авг', 'Сен', 'Окт', 'Ноя', 'Дек']
 
 const C_FOCUS = '#5AD4B5'
 const C_WORDS = '#5B74FF'
@@ -44,10 +42,12 @@ const C_GRAMMAR = '#F08AB4'
 const C_PHRASES = '#DB9F3A'
 
 function fmtDur(min: number): string {
+  const uMin = translate(getUiLang(), 'stats.units.min')
+  const uH = translate(getUiLang(), 'stats.units.h')
   const h = Math.floor(min / 60)
   const m = min % 60
-  if (h === 0) return `${m} мин`
-  return m === 0 ? `${h} ч` : `${h} ч ${m} мин`
+  if (h === 0) return `${m} ${uMin}`
+  return m === 0 ? `${h} ${uH}` : `${h} ${uH} ${m} ${uMin}`
 }
 
 // mock daily data per period
@@ -87,6 +87,12 @@ function heatColor(minutes: number, isLight: boolean): string {
 
 export default function Stats() {
   const { theme } = useTheme()
+  const t = useT()
+  const weekdays = useList('stats.weekdays')
+  const months = useList('stats.months')
+  const topicNames = useList('stats.topics.names')
+  const ringLabels = useList('stats.goals.ring')
+  const planRowNames = useList('stats.days.planRows')
   const isLight = theme === 'light'
   const [period, setPeriod] = useState<Period>('week')
   const [hoveredRing, setHoveredRing] = useState<number | null>(null)
@@ -161,8 +167,8 @@ export default function Stats() {
       sums[wd] += d.minutes
       counts[wd] += 1
     }
-    return WEEKDAYS.map((label, i) => ({ label, minutes: Math.round(sums[i] / Math.max(1, counts[i])) }))
-  }, [daily])
+    return weekdays.map((label, i) => ({ label, minutes: Math.round(sums[i] / Math.max(1, counts[i])) }))
+  }, [daily, weekdays])
 
   // for year - monthly
   const monthly = useMemo(() => {
@@ -170,28 +176,28 @@ export default function Stats() {
     const byM = new Array(12).fill(0).map((_, mi) => {
       const ds = daily.filter((d) => d.date.getMonth() === mi)
       const avg = ds.length ? Math.round(ds.reduce((s, d) => s + d.minutes, 0) / ds.length) : 0
-      return { label: MONTHS[mi], minutes: avg }
+      return { label: months[mi] ?? '', minutes: avg }
     })
     return byM.filter((m) => m.minutes > 0)
-  }, [daily, period])
+  }, [daily, period, months])
 
   const pieData = useMemo(
-    () => [
-      { label: 'Еда', value: 48, color: C_FOCUS },
-      { label: 'Путешествия', value: 52, color: C_WORDS },
-      { label: 'Эмоции', value: 36, color: C_GRAMMAR },
-      { label: 'Работа', value: 44, color: C_PHRASES },
-    ],
-    [],
+    () =>
+      [C_FOCUS, C_WORDS, C_GRAMMAR, C_PHRASES].map((color, i) => ({
+        label: topicNames[i] ?? '',
+        value: [48, 52, 36, 44][i],
+        color,
+      })),
+    [topicNames],
   )
 
   const ringData = useMemo(
     () => [
-      { label: 'Слова', value: avgWords, maxValue: 20, color: C_FOCUS },
-      { label: 'Минуты', value: avgMin, maxValue: goal, color: C_WORDS },
-      { label: 'Точность', value: 92, maxValue: 100, color: C_GRAMMAR },
+      { label: ringLabels[0] ?? '', value: avgWords, maxValue: 20, color: C_FOCUS },
+      { label: ringLabels[1] ?? '', value: avgMin, maxValue: goal, color: C_WORDS },
+      { label: ringLabels[2] ?? '', value: 92, maxValue: 100, color: C_GRAMMAR },
     ],
-    [avgWords, avgMin],
+    [avgWords, avgMin, ringLabels],
   )
 
   const pills = useMemo(() => {
@@ -199,23 +205,41 @@ export default function Stats() {
       const todayMin = daily[daily.length - 1]?.minutes ?? 0
       const todayWords = daily[daily.length - 1]?.words ?? 0
       return [
-        { label: 'Сегодня', value: `${todayWords} слов`, sub: fmtDur(todayMin), color: C_FOCUS, glow: '90,212,181' },
-        { label: 'Цель', value: `${Math.round((todayMin / goal) * 100)}%`, sub: fmtDur(goal), color: C_WORDS, glow: '91,116,255' },
-        { label: 'Пик часа', value: '18:00', sub: '12 мин', color: C_GRAMMAR, glow: '240,138,180' },
-        { label: 'Серия', value: '7 дней', sub: '🔥 рекорд', color: C_PHRASES, glow: '219,159,58' },
+        { label: t('stats.pills.today'), value: `${todayWords} ${t('stats.pills.wordsUnit')}`, sub: fmtDur(todayMin), color: C_FOCUS, glow: '90,212,181' },
+        { label: t('stats.pills.goal'), value: `${Math.round((todayMin / goal) * 100)}%`, sub: fmtDur(goal), color: C_WORDS, glow: '91,116,255' },
+        { label: t('stats.pills.peakHour'), value: '18:00', sub: fmtDur(12), color: C_GRAMMAR, glow: '240,138,180' },
+        { label: t('stats.pills.streak'), value: t('stats.pills.streakValue'), sub: t('stats.pills.streakRecord'), color: C_PHRASES, glow: '219,159,58' },
       ]
     }
-    const word = period === 'week' ? 'неделю' : period === 'month' ? 'месяц' : 'год'
+    const word =
+      period === 'week'
+        ? t('stats.pills.weekGen')
+        : period === 'month'
+          ? t('stats.pills.monthGen')
+          : t('stats.pills.yearGen')
+    const localeTag = getUiLang() === 'en' ? 'en-US' : 'ru-RU'
     return [
-      { label: `Слов за ${word}`, value: `${totalWords}`, sub: `${avgWords}/день`, color: C_FOCUS, glow: '90,212,181' },
-      { label: 'Минут всего', value: fmtDur(totalMin), sub: `${avgMin}/день`, color: C_WORDS, glow: '91,116,255' },
-      { label: 'Лучший день', value: fmtDur(bestDay.minutes), sub: bestDay.date.toLocaleDateString('ru-RU'), color: C_GRAMMAR, glow: '240,138,180' },
-      { label: 'Серия', value: '7 дней', sub: '92% точность', color: C_PHRASES, glow: '219,159,58' },
+      { label: t('stats.pills.wordsFor', { w: word }), value: `${totalWords}`, sub: t('stats.pills.perDay', { n: avgWords }), color: C_FOCUS, glow: '90,212,181' },
+      { label: t('stats.pills.minutesTotal'), value: fmtDur(totalMin), sub: t('stats.pills.perDay', { n: avgMin }), color: C_WORDS, glow: '91,116,255' },
+      { label: t('stats.pills.bestDay'), value: fmtDur(bestDay.minutes), sub: bestDay.date.toLocaleDateString(localeTag), color: C_GRAMMAR, glow: '240,138,180' },
+      { label: t('stats.pills.streak'), value: t('stats.pills.streakValue'), sub: t('stats.pills.accuracySub'), color: C_PHRASES, glow: '219,159,58' },
     ]
-  }, [period, daily, totalWords, totalMin, avgWords, avgMin, bestDay])
+  }, [period, daily, totalWords, totalMin, avgWords, avgMin, bestDay, t])
 
-  const mainTitle = period === 'day' ? 'Фокус по часам' : period === 'week' ? 'Тренд недели' : period === 'month' ? 'Тренд месяца' : 'Тренд года'
-  const mainSub = period === 'day' ? 'сегодня' : period === 'week' ? `${totalWords} слов` : `${fmtDur(totalMin)} всего`
+  const mainTitle =
+    period === 'day'
+      ? t('stats.main.hours')
+      : period === 'week'
+        ? t('stats.main.week')
+        : period === 'month'
+          ? t('stats.main.month')
+          : t('stats.main.year')
+  const mainSub =
+    period === 'day'
+      ? t('stats.main.today')
+      : period === 'week'
+        ? t('stats.main.wordsSub', { n: totalWords })
+        : t('stats.main.totalSub', { dur: fmtDur(totalMin) })
 
   const mainIsBar = period === 'day' || period === 'year'
   const mainData = period === 'day' ? hourly : period === 'year' ? monthly : daily
@@ -247,12 +271,12 @@ export default function Stats() {
                       }
                 }
               >
-                {p.label}
+                {t(`stats.periods.${p.key}`)}
               </button>
             )
           })}
         </div>
-        <span className="text-xs opacity-40">период • {mainSub}</span>
+        <span className="text-xs opacity-40">{t('stats.periodLabel', { sub: mainSub })}</span>
       </div>
 
       {/* language profile + real stats */}
@@ -271,17 +295,17 @@ export default function Stats() {
                 </button>
               )
             })}
-            <span className="text-[11px] opacity-40 font-bold ml-1">статистика профиля</span>
+            <span className="text-[11px] opacity-40 font-bold ml-1">{t('stats.profileStats')}</span>
           </div>
           {realStat && (
             <div className="mt-4 grid grid-cols-2 lg:grid-cols-5 gap-3">
               {[
-                { label: 'Слов выучено', value: String(realStat.words_learned), color: '#5AD4B5' },
-                { label: 'Серия', value: `${realStat.streak_days} дн.`, color: '#F5C16A' },
-                { label: 'Рекорд серии', value: `${realStat.best_streak} дн.`, color: '#ff9d5c' },
-                { label: 'XP', value: String(realStat.xp), color: '#5B74FF' },
+                { label: t('stats.real.words'), value: String(realStat.words_learned), color: '#5AD4B5' },
+                { label: t('stats.real.streak'), value: `${realStat.streak_days} ${t('stats.units.daysShort')}.`, color: '#F5C16A' },
+                { label: t('stats.real.best'), value: `${realStat.best_streak} ${t('stats.units.daysShort')}.`, color: '#ff9d5c' },
+                { label: t('stats.real.xp'), value: String(realStat.xp), color: '#5B74FF' },
                 {
-                  label: 'Точность',
+                  label: t('stats.real.accuracy'),
                   value: `${Math.round(realStat.accuracy * 100)}%`,
                   color: '#F08AB4',
                 },
@@ -297,7 +321,7 @@ export default function Stats() {
           )}
           {dueCount !== null && (
             <div className="text-xs opacity-50 mt-3">
-              Сегодня к повторению: <span className="font-black text-white">{dueCount}</span>
+              {t('stats.dueToday')} <span className="font-black text-white">{dueCount}</span>
             </div>
           )}
         </div>
@@ -350,8 +374,8 @@ export default function Stats() {
         </div>
 
         <div className="rounded-[20px] border border-white/[0.06] bg-[#171717] p-5 overflow-hidden">
-          <h3 className="text-[15px] font-black tracking-tight">Темы</h3>
-          <p className="text-xs opacity-40">распределение слов</p>
+          <h3 className="text-[15px] font-black tracking-tight">{t('stats.topics.title')}</h3>
+          <p className="text-xs opacity-40">{t('stats.topics.sub')}</p>
           <div className="flex items-center justify-center py-2">
             <PieChart data={pieData} size={240} innerRadius={62} padAngle={0.02} cornerRadius={6}>
               <PieSlice index={0} hoverEffect="translate" />
@@ -364,7 +388,7 @@ export default function Stats() {
                     <div className="text-[22px] font-black tabular-nums" style={{ color: (pieData.find((p) => p.label === label)?.color as string) ?? '#fff' }}>
                       {value}
                     </div>
-                    <div className="text-[10px] tracking-[0.08em] uppercase opacity-40 font-bold">{label || 'слов'}</div>
+                    <div className="text-[10px] tracking-[0.08em] uppercase opacity-40 font-bold">{label || t('stats.topics.centerFallback')}</div>
                   </div>
                 )}
               </PieCenter>
@@ -386,15 +410,15 @@ export default function Stats() {
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
         <div className="rounded-[20px] border border-white/[0.06] bg-[#171717] p-5">
           <div className="flex items-center justify-between mb-3">
-            <h3 className="text-[15px] font-black tracking-tight">{period === 'day' ? 'План дня' : 'По дням недели'}</h3>
-            <span className="text-[11px] opacity-40 font-mono">среднее</span>
+            <h3 className="text-[15px] font-black tracking-tight">{period === 'day' ? t('stats.days.plan') : t('stats.days.byWeekday')}</h3>
+            <span className="text-[11px] opacity-40 font-mono">{t('stats.days.avg')}</span>
           </div>
           {period === 'day' ? (
             <div className="space-y-2.5">
               {[
-                { name: 'Утро • новые слова', min: 18, color: C_FOCUS },
-                { name: 'День • повторение', min: 12, color: C_WORDS },
-                { name: 'Вечер • фразы', min: 9, color: C_GRAMMAR },
+                { name: planRowNames[0] ?? '', min: 18, color: C_FOCUS },
+                { name: planRowNames[1] ?? '', min: 12, color: C_WORDS },
+                { name: planRowNames[2] ?? '', min: 9, color: C_GRAMMAR },
               ].map((r) => (
                 <div key={r.name} className="flex items-center gap-3">
                   <span className="w-2 h-2 rounded-full" style={{ background: r.color, boxShadow: `0 0 8px ${r.color}60` }} />
@@ -402,7 +426,7 @@ export default function Stats() {
                   <div className="flex-1 h-1.5 rounded-full bg-white/[0.06] overflow-hidden max-w-[160px]">
                     <motion.div initial={{ width: 0 }} animate={{ width: `${(r.min / 20) * 100}%` }} transition={{ duration: 0.7 }} className="h-full rounded-full" style={{ background: r.color }} />
                   </div>
-                  <span className="font-mono text-xs font-bold w-12 text-right">{r.min} мин</span>
+                  <span className="font-mono text-xs font-bold w-12 text-right">{fmtDur(r.min)}</span>
                 </div>
               ))}
             </div>
@@ -418,7 +442,7 @@ export default function Stats() {
         </div>
 
         <div className="rounded-[20px] border border-white/[0.06] bg-[#171717] p-5 flex flex-col">
-          <h3 className="text-[15px] font-black tracking-tight">Цели</h3>
+          <h3 className="text-[15px] font-black tracking-tight">{t('stats.goals.title')}</h3>
           <div className="flex items-center gap-6 py-3 flex-1">
             <RingChart data={ringData} size={200} hoveredIndex={hoveredRing} onHoverChange={setHoveredRing}>
               <Ring index={0} showGlow />
@@ -428,7 +452,7 @@ export default function Stats() {
                 {({ value, label }) => (
                   <div className="text-center">
                     <div className="text-[20px] font-black tabular-nums" style={{ color: (ringData.find((r) => r.label === label)?.color as string) ?? '#fff' }}>{value}</div>
-                    <div className="text-[10px] tracking-[0.08em] uppercase opacity-40 font-bold">{label || 'Слова'}</div>
+                    <div className="text-[10px] tracking-[0.08em] uppercase opacity-40 font-bold">{label || t('stats.goals.centerFallback')}</div>
                   </div>
                 )}
               </RingCenter>
@@ -461,8 +485,8 @@ export default function Stats() {
       <div className="grid grid-cols-1 lg:grid-cols-[1.6fr_1fr] gap-4">
         <div className="rounded-[20px] border border-white/[0.06] bg-[#171717] p-5">
           <div className="flex items-center justify-between mb-3">
-            <h3 className="text-[15px] font-black tracking-tight">Активность</h3>
-            <span className="text-[11px] opacity-40 font-mono">{daily.length} дн • {fmtDur(totalMin)}</span>
+            <h3 className="text-[15px] font-black tracking-tight">{t('stats.activity.title')}</h3>
+            <span className="text-[11px] opacity-40 font-mono">{t('stats.activity.daysTotal', { n: daily.length, dur: fmtDur(totalMin) })}</span>
           </div>
           <div className="overflow-x-auto pb-1">
             <div className="min-w-max">
@@ -476,7 +500,7 @@ export default function Stats() {
                       return (
                         <div
                           key={r}
-                          title={`${cell.date.toLocaleDateString('ru-RU')} — ${cell.minutes ? fmtDur(cell.minutes) : 'нет'}`}
+                          title={`${cell.date.toLocaleDateString(getUiLang() === 'en' ? 'en-US' : 'ru-RU')} — ${cell.minutes ? fmtDur(cell.minutes) : t('stats.activity.none')}`}
                           className="w-[11px] h-[11px] rounded-[3px]"
                           style={{ background: heatColor(cell.minutes, isLight) }}
                         />
@@ -488,18 +512,18 @@ export default function Stats() {
             </div>
           </div>
           <div className="flex items-center justify-end gap-1.5 mt-2 text-[10px] opacity-40">
-            меньше
+            {t('stats.activity.less')}
             {[0, 8, 16, 24, 30].map((v) => (
               <span key={v} className="w-2.5 h-2.5 rounded-[2px]" style={{ background: heatColor(v, isLight) }} />
             ))}
-            больше
+            {t('stats.activity.more')}
           </div>
         </div>
 
         <div className="rounded-[20px] border border-white/[0.06] bg-[#171717] p-5 flex flex-col">
           <div className="flex items-center justify-between mb-3">
-            <h3 className="text-[15px] font-black tracking-tight">Лучшие дни</h3>
-            <span className="text-[11px] opacity-40 font-mono">топ-5</span>
+            <h3 className="text-[15px] font-black tracking-tight">{t('stats.top.title')}</h3>
+            <span className="text-[11px] opacity-40 font-mono">{t('stats.top.top5')}</span>
           </div>
           <div className="space-y-2.5 flex-1">
             {[...daily]
@@ -512,7 +536,7 @@ export default function Stats() {
                     <span className="font-mono text-[11px] font-bold w-4 text-right" style={{ color: i === 0 ? '#ffd76a' : i === 1 ? '#b8c4d4' : i === 2 ? '#d08a5a' : '#6b7280' }}>
                       {i + 1}
                     </span>
-                    <span className="text-xs w-10 opacity-60">{WEEKDAYS[(d.date.getDay() + 6) % 7]}</span>
+                    <span className="text-xs w-10 opacity-60">{weekdays[(d.date.getDay() + 6) % 7]}</span>
                     <div className="flex-1 h-1.5 rounded-full bg-white/[0.06] overflow-hidden">
                       <div className="h-full rounded-full" style={{ width: `${(d.minutes / max) * 100}%`, background: d.minutes >= goal ? '#5AD4B5' : '#5B74FF' }} />
                     </div>
@@ -523,21 +547,21 @@ export default function Stats() {
                 )
               })}
           </div>
-          <div className="text-[11px] opacity-40 mt-3">{daily.filter((d) => d.minutes >= goal).length} дн достигли цели • средний {fmtDur(avgMin)}</div>
+          <div className="text-[11px] opacity-40 mt-3">{t('stats.top.summary', { n: daily.filter((d) => d.minutes >= goal).length, dur: fmtDur(avgMin) })}</div>
         </div>
       </div>
 
       {/* goal progress */}
       <div className="rounded-[20px] border border-white/[0.06] bg-[#171717] p-5">
         <div className="flex items-center justify-between mb-3">
-          <h3 className="text-[15px] font-black tracking-tight">Прогресс к цели</h3>
-          <span className="text-[11px] opacity-40 font-mono">цель {fmtDur(goal)}/день</span>
+          <h3 className="text-[15px] font-black tracking-tight">{t('stats.goalBlock.title')}</h3>
+          <span className="text-[11px] opacity-40 font-mono">{t('stats.goalBlock.goalPerDay', { dur: fmtDur(goal) })}</span>
         </div>
         <div className="flex items-baseline gap-2">
           <span className="text-[32px] font-black tabular-nums" style={{ color: pct >= 100 ? '#5AD4B5' : '#5B74FF' }}>
             {pct}%
           </span>
-          <span className="text-sm opacity-50">средний день — {fmtDur(avgMin)}</span>
+          <span className="text-sm opacity-50">{t('stats.goalBlock.avgDay', { dur: fmtDur(avgMin) })}</span>
         </div>
         <div className="h-2 rounded-full bg-white/[0.06] overflow-hidden mt-3">
           <motion.div
@@ -548,7 +572,7 @@ export default function Stats() {
             style={{ background: pct >= 100 ? 'linear-gradient(90deg,#5B74FF,#5AD4B5)' : '#5B74FF', boxShadow: pct >= 100 ? '0 0 14px rgba(90,212,181,0.5)' : undefined }}
           />
         </div>
-        <div className="text-xs opacity-40 mt-2">{pct >= 100 ? `Цель превышена на ${fmtDur(avgMin - goal)}` : `До цели не хватает ${fmtDur(goal - avgMin)}`}</div>
+        <div className="text-xs opacity-40 mt-2">{pct >= 100 ? t('stats.goalBlock.exceeded', { dur: fmtDur(avgMin - goal) }) : t('stats.goalBlock.missing', { dur: fmtDur(goal - avgMin) })}</div>
       </div>
     </div>
   )

@@ -1,3 +1,5 @@
+import { getUiLang, translate } from '@/lib/i18n'
+
 const API_URL = (import.meta.env.VITE_API_URL as string | undefined) ?? '/api'
 
 export type ReminderSchedule = Partial<Record<string, string[]>>
@@ -42,7 +44,7 @@ async function request<T>(path: string, token: string, init: RequestInit = {}): 
     ...init,
     headers: {
       'Content-Type': 'application/json',
-      'Accept-Language': 'ru',
+      'Accept-Language': getUiLang(),
       Authorization: `Bearer ${token}`,
       ...(init.headers ?? {}),
     },
@@ -54,7 +56,7 @@ async function request<T>(path: string, token: string, init: RequestInit = {}): 
     error?: string
   } | null
   if (!res.ok || !body || body.success === false) {
-    throw new Error(body?.message ?? body?.error ?? `Request failed (${res.status})`)
+    throw new Error(body?.message ?? body?.error ?? translate(getUiLang(), 'lib.errors.request_failed', { status: res.status }))
   }
   return body.data as T
 }
@@ -93,7 +95,7 @@ export async function uploadAvatar(userId: string, token: string, blob: Blob): P
   form.append('avatar', blob, blob.type === 'image/png' ? 'avatar.png' : 'avatar.jpg')
   const res = await fetch(`${API_URL}/users/${userId}/avatar`, {
     method: 'POST',
-    headers: { Authorization: `Bearer ${token}`, 'Accept-Language': 'ru' },
+    headers: { Authorization: `Bearer ${token}`, 'Accept-Language': getUiLang() },
     body: form,
   })
   const body = (await res.json().catch(() => null)) as {
@@ -105,16 +107,16 @@ export async function uploadAvatar(userId: string, token: string, blob: Blob): P
   } | null
   if (!res.ok || !body || body.success === false) {
     const fieldError = body?.errors ? Object.values(body.errors).flat()[0] : undefined
-    throw new Error(fieldError ?? body?.message ?? body?.error ?? `Upload failed (${res.status})`)
+    throw new Error(fieldError ?? body?.message ?? body?.error ?? translate(getUiLang(), 'lib.errors.upload_failed', { status: res.status }))
   }
-  if (!body.data) throw new Error('Пустой ответ сервера.')
+  if (!body.data) throw new Error(translate(getUiLang(), 'lib.errors.empty_response'))
   return body.data
 }
 
 export async function listLanguages(): Promise<RemoteLanguage[]> {
   const res = await fetch(`${API_URL}/catalog/languages`)
   const body = (await res.json().catch(() => null)) as { success?: boolean; data?: RemoteLanguage[] } | null
-  if (!res.ok || !body || body.success === false) throw new Error('Languages failed')
+  if (!res.ok || !body || body.success === false) throw new Error(translate(getUiLang(), 'lib.errors.languages_failed'))
   return body.data ?? []
 }
 

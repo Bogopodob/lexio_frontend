@@ -1,6 +1,9 @@
+import { translate, getUiLang } from '@/lib/i18n'
+
 export type BaseMode = 'f2n' | 'n2f' | 'typing' | 'audio' | 'choice' | 'anagram' | 'bool' | 'forms'
 
 export type Direction = BaseMode | 'mixed' | 'smart'
+
 
 export interface WordProgress {
   repetition: number
@@ -116,12 +119,13 @@ export interface WordBadge {
 }
 
 export function wordBadge(p: WordProgress | null): WordBadge {
+  const lang = getUiLang()
   const rep = p?.repetition ?? 0
   const interval = p?.interval_days ?? 0
-  if (rep <= 0) return { label: '🌱 Новое', color: '#9aa0a6' }
-  if (interval >= 30) return { label: '🛡 Стабильно', color: '#5B74FF' }
-  if (rep >= 3) return { label: '✅ Знаю', color: '#5AD4B5' }
-  return { label: '🔥 Учу', color: '#ff9d5c' }
+  if (rep <= 0) return { label: translate(lang, 'study.badge.fresh'), color: '#9aa0a6' }
+  if (interval >= 30) return { label: translate(lang, 'study.badge.stable'), color: '#5B74FF' }
+  if (rep >= 3) return { label: translate(lang, 'study.badge.known'), color: '#5AD4B5' }
+  return { label: translate(lang, 'study.badge.learning'), color: '#ff9d5c' }
 }
 
 /** Auto grade from a verified fact (9 — авто-грейд вместо самооценки). */

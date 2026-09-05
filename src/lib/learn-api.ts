@@ -1,3 +1,5 @@
+import { getUiLang, translate } from '@/lib/i18n'
+
 const API_URL = (import.meta.env.VITE_API_URL as string | undefined) ?? '/api'
 
 export interface RemoteSession {
@@ -72,7 +74,7 @@ async function request<T>(path: string, token: string, init: RequestInit = {}): 
     ...init,
     headers: {
       'Content-Type': 'application/json',
-      'Accept-Language': 'ru',
+      'Accept-Language': getUiLang(),
       Authorization: `Bearer ${token}`,
       ...(init.headers ?? {}),
     },
@@ -84,7 +86,7 @@ async function request<T>(path: string, token: string, init: RequestInit = {}): 
     error?: string
   } | null
   if (!res.ok || !body || body.success === false) {
-    throw new Error(body?.message ?? body?.error ?? `Request failed (${res.status})`)
+    throw new Error(body?.message ?? body?.error ?? translate(getUiLang(), 'lib.errors.request_failed', { status: res.status }))
   }
   return body.data as T
 }

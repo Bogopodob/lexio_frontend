@@ -4,6 +4,7 @@ import { FontAwesomeIcon } from '@fortawesome/react-fontawesome'
 import { faMagnifyingGlass, faFire, faBars, faXmark, faTableColumns, faChevronRight, faGhost, faRightToBracket, faUser, faArrowRightFromBracket } from '@fortawesome/free-solid-svg-icons'
 import { AnimatePresence, motion } from 'framer-motion'
 import { useAuth } from '@/context/AuthContext'
+import { useT } from '@/lib/i18n'
 
 interface AppHeaderProps {
   isDesktop: boolean
@@ -26,8 +27,9 @@ export default function AppHeader({
   const { pathname } = useLocation()
   const navigate = useNavigate()
   const { user, ready, logout } = useAuth()
-  const displayName = user?.name?.trim() || user?.email || 'Гость'
-  const avatarLetter = (displayName[0] || 'Г').toUpperCase()
+  const t = useT()
+  const displayName = user?.name?.trim() || user?.email || t('widgets.header.guest')
+  const avatarLetter = (displayName[0] || t('widgets.header.guestInitial')).toUpperCase()
   const [menuOpen, setMenuOpen] = useState(false)
   const menuRef = useRef<HTMLDivElement>(null)
 
@@ -57,21 +59,21 @@ export default function AppHeader({
     navigate('/')
   }
   const titleMap: Record<string, string> = {
-    '/': 'Главная',
-    '/stats': 'Статистика',
-    '/profile': 'Профиль',
-    '/settings': 'Настройки',
-    '/learn': 'Урок',
+    '/': t('widgets.header.titles.home'),
+    '/stats': t('widgets.header.titles.stats'),
+    '/profile': t('widgets.header.titles.profile'),
+    '/settings': t('widgets.header.titles.settings'),
+    '/learn': t('widgets.header.titles.learn'),
   }
   const currentTitle =
     titleMap[pathname] ??
     (pathname.startsWith('/stats')
-      ? 'Статистика'
+      ? t('widgets.header.titles.stats')
       : pathname.startsWith('/profile')
-        ? 'Профиль'
+        ? t('widgets.header.titles.profile')
         : pathname.startsWith('/learn')
-          ? 'Урок'
-          : 'Страница')
+          ? t('widgets.header.titles.learn')
+          : t('widgets.header.titles.page'))
 
   return (
     <header className="app-header">
@@ -81,7 +83,7 @@ export default function AppHeader({
           <motion.button
             type="button"
             className="app-header__burger"
-            aria-label={isDesktop ? (isSidebarCollapsed ? 'Развернуть меню' : 'Свернуть меню') : isMenuOpen ? 'Закрыть меню' : 'Открыть меню'}
+            aria-label={isDesktop ? (isSidebarCollapsed ? t('widgets.header.burgerExpand') : t('widgets.header.burgerCollapse')) : isMenuOpen ? t('widgets.header.burgerClose') : t('widgets.header.burgerOpen')}
             onClick={onMenuToggle}
             whileHover={{ scale: 1.04 }}
             whileTap={{ scale: 0.96 }}
@@ -99,7 +101,7 @@ export default function AppHeader({
             </motion.span>
             <span className="app-header__brand-text">
               <span className="app-header__brand-name">Lexio</span>
-              <span className="app-header__brand-sub">учим язык • строго</span>
+              <span className="app-header__brand-sub">{t('widgets.header.tagline')}</span>
             </span>
           </NavLink>
 
@@ -107,8 +109,8 @@ export default function AppHeader({
             <span className="app-header__divider" aria-hidden="true" />
           )}
           {isDesktop && (
-            <div className="app-header__breadcrumb" aria-label="Навигация">
-              <span className="app-header__breadcrumb-label">Раздел</span>
+            <div className="app-header__breadcrumb" aria-label={t('widgets.header.breadcrumbNav')}>
+              <span className="app-header__breadcrumb-label">{t('widgets.header.section')}</span>
               <span className="app-header__breadcrumb-sep">
                 <FontAwesomeIcon icon={faChevronRight} />
               </span>
@@ -130,7 +132,7 @@ export default function AppHeader({
           <motion.button
             type="button"
             className="app-header__search"
-            aria-label="Поиск ⌘K"
+            aria-label={t('widgets.header.searchAria')}
             onClick={() => window.dispatchEvent(new CustomEvent('lexio:open-palette'))}
             whileHover={{ y: -1 }}
             whileTap={{ scale: 0.98 }}
@@ -138,7 +140,7 @@ export default function AppHeader({
             <span className="app-header__search-icon">
               <FontAwesomeIcon icon={faMagnifyingGlass} />
             </span>
-            <span className="app-header__search-label">Поиск</span>
+            <span className="app-header__search-label">{t('widgets.header.search')}</span>
             <span className="app-header__search-kbd">⌘K</span>
           </motion.button>
 
@@ -154,7 +156,7 @@ export default function AppHeader({
             >
               <FontAwesomeIcon icon={faFire} />
             </motion.span>
-            <span>7 дней</span>
+            <span>{t('widgets.header.streak')}</span>
             <span className="app-header__streak-dot" aria-hidden="true" />
           </motion.div>
 
@@ -163,8 +165,8 @@ export default function AppHeader({
               <motion.button
                 type="button"
                 className="app-header__guest-avatar"
-                aria-label="Гостевой режим — войти"
-                title="Ты в гостевом режиме. Нажми, чтобы войти."
+                aria-label={t('widgets.header.guestAria')}
+                title={t('widgets.header.guestTitle')}
                 onClick={() => navigate('/auth')}
                 whileHover={{ scale: 1.06, rotate: -4 }}
                 whileTap={{ scale: 0.94 }}
@@ -173,14 +175,14 @@ export default function AppHeader({
                 <span className="app-header__guest-ping" aria-hidden="true" />
               </motion.button>
               <div className="app-header__guest-text">
-                <span className="app-header__guest-name">Гость</span>
+                <span className="app-header__guest-name">{t('widgets.header.guest')}</span>
                 <button
                   type="button"
                   className="app-header__guest-login"
                   onClick={() => navigate('/auth')}
                 >
                   <FontAwesomeIcon icon={faRightToBracket} />
-                  <span>Войти</span>
+                  <span>{t('widgets.header.login')}</span>
                 </button>
               </div>
             </div>
@@ -189,7 +191,7 @@ export default function AppHeader({
               <button
                 type="button"
                 className="app-header__avatar-btn"
-                aria-label={`Меню: ${displayName}`}
+                aria-label={t('widgets.header.menuFor', { name: displayName })}
                 aria-haspopup="menu"
                 aria-expanded={menuOpen}
                 title={displayName}
@@ -228,7 +230,7 @@ export default function AppHeader({
                       }}
                     >
                       <FontAwesomeIcon icon={faUser} />
-                      <span>Профиль</span>
+                      <span>{t('widgets.header.titles.profile')}</span>
                     </button>
                     <button
                       type="button"
@@ -237,7 +239,7 @@ export default function AppHeader({
                       onClick={handleLogout}
                     >
                       <FontAwesomeIcon icon={faArrowRightFromBracket} />
-                      <span>Выйти</span>
+                      <span>{t('widgets.header.logout')}</span>
                     </button>
                   </motion.div>
                 )}
@@ -248,7 +250,7 @@ export default function AppHeader({
           <motion.button
             type="button"
             className={`app-header__panel-toggle ${isRightOpen ? 'app-header__panel-toggle--active' : ''}`}
-            aria-label={isRightOpen ? 'Закрыть панель' : 'Открыть панель'}
+            aria-label={isRightOpen ? t('widgets.header.panelClose') : t('widgets.header.panelOpen')}
             aria-pressed={isRightOpen}
             onClick={onRightToggle}
             whileHover={{ scale: 1.04 }}

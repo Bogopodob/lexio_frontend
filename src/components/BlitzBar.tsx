@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react'
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome'
 import { faBolt, faFire, faTrophy } from '@fortawesome/free-solid-svg-icons'
+import { useT } from '@/lib/i18n'
 
 interface BlitzBarProps {
   seconds: number
@@ -13,6 +14,7 @@ const R = 18
 const CIRC = 2 * Math.PI * R
 
 export default function BlitzBar({ seconds, streak, best, onTimeout }: BlitzBarProps) {
+  const t = useT()
   const [left, setLeft] = useState(seconds)
   const fired = useRef(false)
   const cb = useRef(onTimeout)
@@ -59,13 +61,13 @@ export default function BlitzBar({ seconds, streak, best, onTimeout }: BlitzBarP
       </div>
       <div className="flex items-center gap-1.5 text-[15px] font-black">
         <FontAwesomeIcon icon={faBolt} className="text-[#F5C16A]" />
-        Блиц
+        {t('cards.blitz.title')}
       </div>
       <div className="ml-auto flex items-center gap-4 text-[13px] font-black tabular-nums">
-        <span className="flex items-center gap-1.5 text-[#ff9d5c]" title="Серия верных ответов">
+        <span className="flex items-center gap-1.5 text-[#ff9d5c]" title={t('cards.blitz.streak_title')}>
           <FontAwesomeIcon icon={faFire} />×{streak}
         </span>
-        <span className="flex items-center gap-1.5 text-white/45" title="Лучшая серия">
+        <span className="flex items-center gap-1.5 text-white/45" title={t('cards.blitz.best_title')}>
           <FontAwesomeIcon icon={faTrophy} className="text-[11px]" />{best}
         </span>
       </div>

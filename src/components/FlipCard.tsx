@@ -3,6 +3,7 @@ import { motion } from 'framer-motion'
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome'
 import { faVolumeHigh } from '@fortawesome/free-solid-svg-icons'
 import type { IconDefinition } from '@fortawesome/fontawesome-svg-core'
+import { useT } from '@/lib/i18n'
 import { matchesShortcut, useShortcuts } from '@/lib/shortcuts'
 
 interface FlipCardProps {
@@ -31,6 +32,7 @@ export default function FlipCard({
   onSpeak,
 }: FlipCardProps) {
   const { bindings } = useShortcuts()
+  const t = useT()
   const handleCardKey = (e) => {
     if (matchesShortcut(e, bindings.flip) || e.key === ' ') {
       e.preventDefault()
@@ -51,7 +53,7 @@ export default function FlipCard({
           onClick={onFlip}
           role="button"
           tabIndex={0}
-          aria-label={`${title} — нажать чтобы увидеть перевод`}
+          aria-label={t('components.flipcard.showTranslation', { title })}
           onKeyDown={(e) => {
             handleCardKey(e)
             if (matchesShortcut(e, bindings.speak)) {
@@ -70,7 +72,7 @@ export default function FlipCard({
               [{transcription}]
             </p>
           ) : null}
-          <p className="phrase-card__hint">Нажмите чтобы увидеть перевод</p>
+          <p className="phrase-card__hint">{t('components.flipcard.tapToTranslate')}</p>
           <div className="phrase-card__actions">
             <button
               className={`phrase-card__listen ${isSpeaking ? 'phrase-card__listen--active' : ''}`}
@@ -79,7 +81,7 @@ export default function FlipCard({
                 e.stopPropagation()
                 onSpeak()
               }}
-              aria-label="Озвучить фразу"
+              aria-label={t('components.flipcard.speak')}
             >
               {isSpeaking ? (
                 <span className="phrase-card__wave" aria-hidden="true">
@@ -88,7 +90,7 @@ export default function FlipCard({
               ) : (
                 <FontAwesomeIcon icon={faVolumeHigh} />
               )}
-              {isSpeaking ? 'Звучит…' : 'Слушать'}
+              {isSpeaking ? t('components.flipcard.sounding') : t('components.flipcard.listen')}
               <span className="phrase-card__kbd">L</span>
             </button>
             <span className="phrase-card__flip-hint">↻</span>
@@ -101,14 +103,14 @@ export default function FlipCard({
           onClick={onFlip}
           role="button"
           tabIndex={0}
-          aria-label={`${translation} — нажать чтобы вернуться`}
+          aria-label={t('components.flipcard.backToOriginal', { text: translation })}
           onKeyDown={handleCardKey}
           style={{ transform: 'rotateY(180deg)' }}
         >
           <div className="phrase-card__icon phrase-card__icon--back">✦</div>
-          <p className={`phrase-card__label ${labelAccent}`}>{label} • перевод</p>
+          <p className={`phrase-card__label ${labelAccent}`}>{t('components.flipcard.labelTranslation', { label })}</p>
           <h4 className="phrase-card__translation--large">{translation}</h4>
-          <p className="phrase-card__hint">Нажмите чтобы вернуться к оригиналу</p>
+          <p className="phrase-card__hint">{t('components.flipcard.tapToReturn')}</p>
           <button
             className={`phrase-card__listen ${isSpeaking ? 'phrase-card__listen--active' : ''}`}
             type="button"
@@ -124,7 +126,7 @@ export default function FlipCard({
             ) : (
               <FontAwesomeIcon icon={faVolumeHigh} />
             )}
-            {isSpeaking ? 'Звучит…' : 'Слушать оригинал'}
+            {isSpeaking ? t('components.flipcard.sounding') : t('components.flipcard.listenOriginal')}
           </button>
         </article>
       </motion.div>

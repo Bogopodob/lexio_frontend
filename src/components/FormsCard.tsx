@@ -3,6 +3,7 @@ import { motion } from 'framer-motion'
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome'
 import { faVolumeHigh, faCheck, faXmark, faArrowRight, faLightbulb, faLink } from '@fortawesome/free-solid-svg-icons'
 import { normalize, fuzzyMatch, type Fuzzy } from '@/lib/study'
+import { useT } from '@/lib/i18n'
 
 interface FormsCardProps {
   /** All accepted v1 variants (usually one). */
@@ -29,6 +30,7 @@ export default function FormsCard({
   onSpeak,
   onAnswer,
 }: FormsCardProps) {
+  const t = useT()
   // One random gap per card mount (remounts on every card via parent key).
   const blankIdx = useMemo(() => Math.floor(Math.random() * 3), []);
   const candidates = blankIdx === 0 ? v1forms : blankIdx === 1 ? past : participle;
@@ -80,11 +82,11 @@ export default function FormsCard({
 
   const banner =
     checked === 'exact'
-      ? { box: 'bg-[#5AD4B5]/[0.1] border-[#5AD4B5]/50', text: 'text-[#5AD4B5]', icon: faCheck, label: 'Правильно!' }
+      ? { box: 'bg-[#5AD4B5]/[0.1] border-[#5AD4B5]/50', text: 'text-[#5AD4B5]', icon: faCheck, label: t('cards.common.correct') }
       : checked === 'close'
-        ? { box: 'bg-[#ff9d5c]/[0.1] border-[#ff9d5c]/50', text: 'text-[#ff9d5c]', icon: faCheck, label: 'Почти верно!' }
+        ? { box: 'bg-[#ff9d5c]/[0.1] border-[#ff9d5c]/50', text: 'text-[#ff9d5c]', icon: faCheck, label: t('cards.common.almost') }
         : checked === 'wrong'
-          ? { box: 'bg-[#f43f5e]/[0.1] border-[#f43f5e]/50', text: 'text-[#fb7185]', icon: faXmark, label: 'Неправильно' }
+          ? { box: 'bg-[#f43f5e]/[0.1] border-[#f43f5e]/50', text: 'text-[#fb7185]', icon: faXmark, label: t('cards.common.wrong') }
           : null
 
   const slot = (idx: number, text: string) => {
@@ -110,7 +112,7 @@ export default function FormsCard({
           autoComplete="off"
           autoCapitalize="off"
           spellCheck={false}
-          aria-label="Пропущенная форма"
+          aria-label={t('cards.forms.gap')}
           className="flex-1 min-w-[110px] px-3 py-2 rounded-2xl bg-black/30 border border-dashed border-[#5AD4B5]/50 text-[20px] sm:text-[24px] font-black text-center placeholder:text-white/25 focus:outline-none focus:border-[#5AD4B5]"
         />
       )
@@ -139,11 +141,11 @@ export default function FormsCard({
       <div className="absolute -right-14 -top-14 w-52 h-52 rounded-full bg-[#5AD4B5]/[0.09] blur-3xl pointer-events-none" />
       <div className="flex items-center gap-2 relative">
         <span className="px-2.5 py-1 rounded-full bg-[#5AD4B5]/10 border border-[#5AD4B5]/25 text-[#5AD4B5] text-[11px] font-black uppercase tracking-widest flex items-center gap-1.5">
-          <FontAwesomeIcon icon={faLink} className="text-[10px]" /> Впиши пропуск
+          <FontAwesomeIcon icon={faLink} className="text-[10px]" /> {t('cards.forms.title')}
         </span>
         <button
           onClick={() => onSpeak(wordSpeak.text, wordSpeak.lang, 'forms-q')}
-          aria-label="Озвучить слово"
+          aria-label={t('cards.common.speak_word')}
           className={`ml-auto w-10 h-10 rounded-full grid place-items-center border transition-all ${
             speakingKey === 'forms-q'
               ? 'bg-[#5AD4B5] text-black border-[#5AD4B5]'
@@ -177,7 +179,7 @@ export default function FormsCard({
           </div>
           {checked !== 'exact' && (
             <div className="mt-1 text-[13px] font-bold text-white/60">
-              Ты: «{value.trim()}» → надо: <span className="text-white">«{answerWord}»</span>
+              {t('cards.forms.correction_prefix', { you: value.trim() })} <span className="text-white">«{answerWord}»</span>
             </div>
           )}
         </div>
@@ -191,7 +193,7 @@ export default function FormsCard({
             className="inline-flex items-center gap-1.5 text-[12px] font-bold text-[#F5C16A]/80 hover:text-[#F5C16A] transition disabled:opacity-30"
           >
             <FontAwesomeIcon icon={faLightbulb} className="text-[11px]" />
-            Буква (−1 к оценке{hintsUsed > 0 ? `: ${hintsUsed}` : ''})
+            {t('cards.forms.hint_letter', { tail: hintsUsed > 0 ? `: ${hintsUsed}` : '' })}
           </button>
           <motion.button
             whileTap={{ scale: 0.97 }}
@@ -199,12 +201,12 @@ export default function FormsCard({
             disabled={normalize(value) === ''}
             className="px-6 py-2.5 rounded-2xl bg-[#5AD4B5] text-black text-sm font-black hover:brightness-110 transition disabled:opacity-40"
           >
-            Проверить
+            {t('cards.forms.check')}
           </motion.button>
         </div>
       )}
       <div className="text-center text-[12px] font-bold text-white/35 relative">
-        {done ? 'оценка выставлена автоматически' : 'Enter — проверить'}
+        {done ? t('cards.common.auto_graded') : t('cards.forms.footer_check')}
       </div>
     </div>
   )

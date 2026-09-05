@@ -1,3 +1,5 @@
+import { getUiLang, translate } from '@/lib/i18n'
+
 export const AVATAR_MAX_BYTES = 5 * 1024 * 1024
 
 /** Long side after downscale. Keeps avatars light and kills metadata. */
@@ -25,7 +27,7 @@ function hasMagic(bytes: Uint8Array, magic: number[]): boolean {
 function decode(file: Blob): Promise<{ bmp: ImageBitmap; width: number; height: number }> {
   if (typeof createImageBitmap === 'function') {
     return createImageBitmap(file).then((bmp) => {
-      if (bmp.width < 1 || bmp.height < 1) fail('Картинка пустая.')
+      if (bmp.width < 1 || bmp.height < 1) fail(translate(getUiLang(), 'lib.upload.empty_image'))
       return { bmp, width: bmp.width, height: bmp.height }
     })
   }
@@ -36,7 +38,7 @@ function decode(file: Blob): Promise<{ bmp: ImageBitmap; width: number; height: 
     img.onload = () => {
       if (img.naturalWidth < 1 || img.naturalHeight < 1) {
         URL.revokeObjectURL(url)
-        reject(new Error('Картинка пустая.'))
+        reject(new Error(translate(getUiLang(), 'lib.upload.empty_image')))
         return
       }
       createImageBitmap(img)
@@ -46,12 +48,12 @@ function decode(file: Blob): Promise<{ bmp: ImageBitmap; width: number; height: 
         })
         .catch(() => {
           URL.revokeObjectURL(url)
-          reject(new Error('Файл не открывается как картинка.'))
+          reject(new Error(translate(getUiLang(), 'lib.upload.not_image')))
         })
     }
     img.onerror = () => {
       URL.revokeObjectURL(url)
-      reject(new Error('Файл не открывается как картинка.'))
+      reject(new Error(translate(getUiLang(), 'lib.upload.not_image')))
     }
     img.src = url
   })
@@ -60,7 +62,7 @@ function decode(file: Blob): Promise<{ bmp: ImageBitmap; width: number; height: 
 function toBlob(canvas: HTMLCanvasElement, mime: string): Promise<Blob> {
   return new Promise((resolve, reject) => {
     canvas.toBlob(
-      (b) => (b && b.size > 0 ? resolve(b) : reject(new Error('Не получилось обработать картинку.'))),
+      (b) => (b && b.size > 0 ? resolve(b) : reject(new Error(translate(getUiLang(), 'lib.upload.process_failed')))),
       mime,
       0.92,
     )
@@ -72,8 +74,8 @@ function toBlob(canvas: HTMLCanvasElement, mime: string): Promise<Blob> {
  * and re-encodes it through canvas: fresh pixels, no EXIF, bounded size.
  */
 export async function sanitizeAvatarImage(file: File): Promise<SanitizedAvatar> {
-  if (file.size > AVATAR_MAX_BYTES) fail('Картинка больше 5 МБ.')
-  if (file.size === 0) fail('Пустой файл.')
+  if (file.size > AVATAR_MAX_BYTES) fail(translate(getUiLang(), 'lib.upload.too_large'))
+  if (file.size === 0) fail(translate(getUiLang(), 'lib.upload.empty_file'))
 
   const lowerName = file.name.toLowerCase()
   const looksPng =
@@ -81,25 +83,25 @@ export async function sanitizeAvatarImage(file: File): Promise<SanitizedAvatar> 
   const looksJpeg =
     file.type === 'image/jpeg' || lowerName.endsWith('.jpg') || lowerName.endsWith('.jpeg')
 
-  if (!looksPng && !looksJpeg) fail('Нужен PNG или JPG.')
+  if (!looksPng && !looksJpeg) fail(translate(getUiLang(), 'lib.upload.need_png_or_jpg'))
 
   let head: Uint8Array
   try {
     head = new Uint8Array(await file.slice(0, 8).arrayBuffer())
   } catch {
-    fail('Не получилось прочитать файл.')
+    fail(translate(getUiLang(), 'lib.upload.read_failed'))
   }
 
   const isPng = hasMagic(head!, PNG_MAGIC)
   const isJpeg = hasMagic(head!, JPEG_MAGIC)
 
-  if (!isPng && !isJpeg) fail('Это не картинка, а переименованный файл.')
+  if (!isPng && !isJpeg) fail(translate(getUiLang(), 'lib.upload.not_real_image'))
 
   let decoded: { bmp: ImageBitmap; width: number; height: number }
   try {
     decoded = await decode(file)
   } catch (e) {
-    fail(e instanceof Error ? e.message : 'Файл не открывается как картинка.')
+    fail(e instanceof Error ? e.message : translate(getUiLang(), 'lib.upload.not_image'))
   }
 
   const { bmp, width, height } = decoded!
@@ -111,22 +113,22 @@ export async function sanitizeAvatarImage(file: File): Promise<SanitizedAvatar> 
   canvas.width = w
   canvas.height = h
   const ctx = canvas.getContext('2d')
-  if (!ctx) fail('Браузер не смог обработать картинку.')
+  if (!ctx) fail(translate(getUiLang(), 'lib.upload.browser_failed'))
   ctx!.drawImage(bmp, 0, 0, w, h)
   bmp.close()
 
   // Sanity: the canvas must contain non-trivial pixels.
   try {
     const sample = ctx!.getImageData(0, 0, Math.min(w, 8), Math.min(h, 8)).data
-    if (sample.every((v) => v === 0)) fail('Картинка пустая.')
+    if (sample.every((v) => v === 0)) fail(translate(getUiLang(), 'lib.upload.empty_image'))
   } catch {
-    fail('Браузер не смог обработать картинку.')
+    fail(translate(getUiLang(), 'lib.upload.browser_failed'))
   }
 
   const mime = isPng ? 'image/png' : 'image/jpeg'
   const blob = await toBlob(canvas, mime)
 
-  if (blob.size > AVATAR_MAX_BYTES) fail('Картинка больше 5 МБ даже после сжатия.')
+  if (blob.size > AVATAR_MAX_BYTES) fail(translate(getUiLang(), 'lib.upload.still_too_large'))
 
   return { blob, previewUrl: URL.createObjectURL(blob), ext: isPng ? 'png' : 'jpg', width: w, height: h }
 }

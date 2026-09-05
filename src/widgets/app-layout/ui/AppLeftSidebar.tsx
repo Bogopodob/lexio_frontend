@@ -4,6 +4,7 @@ import { faLightbulb } from '@fortawesome/free-solid-svg-icons'
 import { motion, AnimatePresence } from 'framer-motion'
 import AppLeftSidebarItem from './AppLeftSidebarItem'
 import { cn } from '@/shared/lib/cn'
+import { useT } from '@/lib/i18n'
 import { faHome, faChartBar, faGear } from '@fortawesome/free-solid-svg-icons'
 
 interface Props {
@@ -21,33 +22,35 @@ interface SidebarItem {
   badge?: string
 }
 
-const sections: { label: string; items: SidebarItem[] }[] = [
-  {
-    label: 'Навигация',
-    items: [
-      { id: 'home', label: 'Главная', icon: faHome, badge: '12/20' },
-      { id: 'stats', label: 'Статистика', icon: faChartBar, badge: '92%' },
-    ],
-  },
-  {
-    label: 'Аккаунт',
-    items: [
-      { id: 'settings', label: 'Настройки', icon: faGear },
-    ],
-  },
-]
-
-const tips = [
-  'Учите 5 слов в контексте, а не списком — запоминается в 3 раза дольше.',
-  'Повтор через 20 минут → через 24 часа — минимум для закрепления.',
-  'Говорите вслух даже без собеседника — мозг фиксирует произношение.',
-  '10 минут ежедневно эффективнее 70 минут раз в неделю.',
-  'Всегда учите фразу целиком, а не отдельное слово.',
-]
-
 const TIP_DURATION = 8500
 
 export default function AppLeftSidebar({ isDesktop, isCollapsed, isOpen, activeId, onSelect }: Props) {
+  const t = useT()
+
+  const sections: { label: string; items: SidebarItem[] }[] = [
+    {
+      label: t('widgets.sidebar.nav'),
+      items: [
+        { id: 'home', label: t('widgets.sidebar.home'), icon: faHome, badge: '12/20' },
+        { id: 'stats', label: t('widgets.sidebar.stats'), icon: faChartBar, badge: '92%' },
+      ],
+    },
+    {
+      label: t('widgets.sidebar.account'),
+      items: [
+        { id: 'settings', label: t('widgets.sidebar.settings'), icon: faGear },
+      ],
+    },
+  ]
+
+  const tips = [
+    t('widgets.sidebar.tips.0'),
+    t('widgets.sidebar.tips.1'),
+    t('widgets.sidebar.tips.2'),
+    t('widgets.sidebar.tips.3'),
+    t('widgets.sidebar.tips.4'),
+  ]
+
   const [tipIndex, setTipIndex] = useState(0)
   const [progress, setProgress] = useState(0)
   const [paused, setPaused] = useState(false)
@@ -98,9 +101,9 @@ export default function AppLeftSidebar({ isDesktop, isCollapsed, isOpen, activeI
             }
       }
       aria-hidden={!isDesktop && !isOpen ? true : undefined}
-      aria-label="Основная навигация"
+      aria-label={t('widgets.sidebar.mainNav')}
     >
-      <nav className="app-sidebar__nav" aria-label="Разделы">
+      <nav className="app-sidebar__nav" aria-label={t('widgets.sidebar.sections')}>
         {sections.map((section) => (
           <div key={section.label} className="app-sidebar__section">
             {!isCollapsed && <div className="app-sidebar__section-label">{section.label}</div>}
@@ -141,7 +144,7 @@ export default function AppLeftSidebar({ isDesktop, isCollapsed, isOpen, activeI
             onMouseLeave={() => setPaused(false)}
           >
             <div className="app-sidebar__tip-header">
-              <span className="app-sidebar__tip-eyebrow">Совет дня</span>
+              <span className="app-sidebar__tip-eyebrow">{t('widgets.sidebar.tipOfDay')}</span>
               <span className="app-sidebar__tip-counter">
                 {tipIndex + 1} / {tips.length}
               </span>
@@ -171,7 +174,7 @@ export default function AppLeftSidebar({ isDesktop, isCollapsed, isOpen, activeI
                   <button
                     key={i}
                     type="button"
-                    aria-label={`Совет ${i + 1}`}
+                    aria-label={t('widgets.sidebar.tipAria', { n: i + 1 })}
                     className={`app-sidebar__tip-dot ${i === tipIndex ? 'app-sidebar__tip-dot--active' : ''}`}
                     onClick={() => setTipIndex(i)}
                   />

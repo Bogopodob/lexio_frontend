@@ -4,10 +4,12 @@ import { AnimatePresence, motion } from 'framer-motion'
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome'
 import { faGhost, faXmark, faRightToBracket } from '@fortawesome/free-solid-svg-icons'
 import { useAuth } from '@/context/AuthContext'
+import { useT } from '@/lib/i18n'
 
 const DISMISS_KEY = 'qwicki:guest-banner-dismissed'
 
 export default function GuestBanner() {
+  const t = useT()
   const { user, ready } = useAuth()
   const navigate = useNavigate()
   const [dismissed, setDismissed] = useState(() => {
@@ -44,8 +46,8 @@ export default function GuestBanner() {
             <FontAwesomeIcon icon={faGhost} />
           </span>
           <p className="guest-banner__text">
-            <strong>Гостевой режим</strong>
-            <span> — прогресс, серия и слова не сохранятся. Войди, чтобы всё запомнить.</span>
+            <strong>{t('components.guestBanner.title')}</strong>
+            <span>{t('components.guestBanner.text')}</span>
           </p>
           <button
             type="button"
@@ -53,12 +55,12 @@ export default function GuestBanner() {
             onClick={() => navigate('/auth')}
           >
             <FontAwesomeIcon icon={faRightToBracket} />
-            <span>Войти / Регистрация</span>
+            <span>{t('components.guestBanner.cta')}</span>
           </button>
           <button
             type="button"
             className="guest-banner__close"
-            aria-label="Скрыть"
+            aria-label={t('components.guestBanner.dismiss')}
             onClick={dismiss}
           >
             <FontAwesomeIcon icon={faXmark} />

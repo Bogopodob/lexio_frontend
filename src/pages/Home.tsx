@@ -25,6 +25,7 @@ import FlipCard from '@/components/FlipCard'
 import { useSpeech } from '@/hooks/useSpeech'
 import SpotlightCard from '@/components/SpotlightCard'
 import CountUp from '@/components/CountUp'
+import { pickPlural, useForms, useList, useT } from '@/lib/i18n'
 // Heavy charts — lazy to not block initial paint, UI unchanged
 const AreaChart = lazy(() => import('@/components/charts/area-chart').then((m) => ({ default: m.AreaChart })))
 const Area = lazy(() => import('@/components/charts/area').then((m) => ({ default: m.Area })))
@@ -32,12 +33,12 @@ const Grid = lazy(() => import('@/components/charts/grid').then((m) => ({ defaul
 const XAxis = lazy(() => import('@/components/charts/x-axis').then((m) => ({ default: m.XAxis })))
 const ChartTooltip = lazy(() => import('@/components/charts/tooltip').then((m) => ({ default: m.ChartTooltip })))
 
-const topicCards: TopicCardData[] = [
-  { icon: 'utensils', title: 'Еда', count: '48 слов', sub: 'ресторан • рынок', tone: 'topic-card--mint' },
-  { icon: 'plane', title: 'Путешествия', count: '52 слова', sub: 'аэропорт • город', tone: 'topic-card--sky' },
-  { icon: 'smile', title: 'Эмоции', count: '36 слов', sub: 'чувства • общение', tone: 'topic-card--rose' },
-  { icon: 'briefcase', title: 'Работа', count: '44 слова', sub: 'офис • проекты', tone: 'topic-card--sand' },
-]
+const FALLBACK_TOPIC_STYLE = [
+  { icon: 'utensils', tone: 'topic-card--mint' },
+  { icon: 'plane', tone: 'topic-card--sky' },
+  { icon: 'smile', tone: 'topic-card--rose' },
+  { icon: 'briefcase', tone: 'topic-card--sand' },
+] as const
 
 const topicIconMap = {
   utensils: faUtensils,
@@ -46,18 +47,18 @@ const topicIconMap = {
   briefcase: faBriefcase,
 } as const
 
-const grammarCards = [
-  { dot: 'grammar-card__dot--mint', title: 'Глаголы', subtitle: '200 слов • 34 выучено', progress: 17, level: 'Основа речи', accent: 'rgba(90,212,181,0.22)', color: '#5AD4B5' },
-  { dot: 'grammar-card__dot--blue', title: 'Существительные', subtitle: '300 слов • 12 выучено', progress: 4, level: 'База словаря', accent: 'rgba(91,116,255,0.22)', color: '#5B74FF' },
-  { dot: 'grammar-card__dot--pink', title: 'Прилагательные', subtitle: '150 слов • 8 выучено', progress: 5, level: 'Описание', accent: 'rgba(240,138,180,0.22)', color: '#F08AB4' },
-  { dot: 'grammar-card__dot--gold', title: 'Фразы', subtitle: '80 фраз • 0 выучено', progress: 0, level: 'Практика', accent: 'rgba(219,159,58,0.22)', color: '#DB9F3A' },
+const FALLBACK_GRAMMAR_STYLE = [
+  { dot: 'grammar-card__dot--mint', progress: 17, accent: 'rgba(90,212,181,0.22)', color: '#5AD4B5' },
+  { dot: 'grammar-card__dot--blue', progress: 4, accent: 'rgba(91,116,255,0.22)', color: '#5B74FF' },
+  { dot: 'grammar-card__dot--pink', progress: 5, accent: 'rgba(240,138,180,0.22)', color: '#F08AB4' },
+  { dot: 'grammar-card__dot--gold', progress: 0, accent: 'rgba(219,159,58,0.22)', color: '#DB9F3A' },
 ]
 
-const phraseCards = [
-  { label: 'РЕСТОРАН', accent: 'phrase-card__label--mint', icon: faCircle, title: 'Can I have the bill, please?', translation: 'Можно счёт, пожалуйста?' },
-  { label: 'ГОРОД', accent: 'phrase-card__label--blue', icon: faLocationDot, title: 'Where is the nearest metro?', translation: 'Где ближайшее метро?' },
-  { label: 'ОТЕЛЬ', accent: 'phrase-card__label--pink', icon: faStar, title: "I'd like to check in", translation: 'Я хочу заселиться.' },
-]
+const PHRASE_STYLE = [
+  { accent: 'phrase-card__label--mint', icon: faCircle, title: 'Can I have the bill, please?', translation: 'Можно счёт, пожалуйста?' },
+  { accent: 'phrase-card__label--blue', icon: faLocationDot, title: 'Where is the nearest metro?', translation: 'Где ближайшее метро?' },
+  { accent: 'phrase-card__label--pink', icon: faStar, title: "I'd like to check in", translation: 'Я хочу заселиться.' },
+] as const
 
 const weeklyData = [
   { date: new Date('2026-08-26'), minutes: 18 },
@@ -76,19 +77,11 @@ const fadeUp = {
 
 const DAILY_WORD_TARGET = 20
 
-function plural(n: number, forms: [string, string, string]): string {
-  const m10 = n % 10
-  const m100 = n % 100
-  if (m10 === 1 && m100 !== 11) return forms[0]
-  if (m10 >= 2 && m10 <= 4 && (m100 < 12 || m100 > 14)) return forms[1]
-  return forms[2]
-}
-
-function greetingByHour(h: number): string {
-  if (h >= 5 && h < 12) return 'Доброе утро'
-  if (h >= 12 && h < 18) return 'Добрый день'
-  if (h >= 18 && h < 23) return 'Добрый вечер'
-  return 'Доброй ночи'
+function greetingKeyByHour(h: number): 'morning' | 'day' | 'evening' | 'night' {
+  if (h >= 5 && h < 12) return 'morning'
+  if (h >= 12 && h < 18) return 'day'
+  if (h >= 18 && h < 23) return 'evening'
+  return 'night'
 }
 
 function todayKey(d = new Date()): string {
@@ -195,6 +188,7 @@ export interface GrammarCardData {
 }
 
 const MemoTopicCard = memo(function MemoTopicCard({ card, index, onOpen }: { card: TopicCardData; index: number; onOpen?: (id: string) => void }) {
+  const t = useT()
   const Icon = card.icon ? topicIconMap[card.icon] : null
   const clickable = Boolean(card.id && onOpen)
   return (
@@ -202,7 +196,7 @@ const MemoTopicCard = memo(function MemoTopicCard({ card, index, onOpen }: { car
       <motion.div
         role={clickable ? 'button' : undefined}
         tabIndex={clickable ? 0 : undefined}
-        aria-label={clickable ? `Учить: ${card.title}` : undefined}
+        aria-label={clickable ? t('home.topics.ariaLearn', { title: card.title }) : undefined}
         onClick={clickable ? () => onOpen!(card.id as string) : undefined}
         onKeyDown={clickable ? (e) => { if (e.key === 'Enter') onOpen!(card.id as string) } : undefined}
         className={`group relative rounded-[20px] border border-white/[0.06] p-[1px] h-full overflow-hidden ${card.tone} ${clickable ? 'cursor-pointer' : ''}`}
@@ -224,7 +218,7 @@ const MemoTopicCard = memo(function MemoTopicCard({ card, index, onOpen }: { car
             <p className="text-[12px] opacity-50 leading-tight mt-1">{card.sub}</p>
           </div>
           <div className="mt-auto pt-3 flex items-center justify-between">
-            <span className="text-[11px] font-bold tracking-widest uppercase opacity-40">Открыть →</span>
+            <span className="text-[11px] font-bold tracking-widest uppercase opacity-40">{t('home.topics.open')}</span>
             <span className="w-6 h-6 rounded-full bg-white text-black grid place-items-center text-[11px] opacity-0 group-hover:opacity-100 -translate-x-1 group-hover:translate-x-0 transition-all">↗</span>
           </div>
         </div>
@@ -234,13 +228,14 @@ const MemoTopicCard = memo(function MemoTopicCard({ card, index, onOpen }: { car
 })
 
 const MemoGrammarCard = memo(function MemoGrammarCard({ card, index, onOpen }: { card: GrammarCardData; index: number; onOpen?: (id: string) => void }) {
+  const t = useT()
   const clickable = Boolean(card.id && onOpen)
   return (
     <SpotlightCard spotlightColor={(card.accent as unknown as `rgba(${number}, ${number}, ${number}, ${number})`)} className="!p-0 !bg-transparent !border-0 h-full">
       <motion.article
         role={clickable ? 'button' : undefined}
         tabIndex={clickable ? 0 : undefined}
-        aria-label={clickable ? `Учить: ${card.title}` : undefined}
+        aria-label={clickable ? t('home.topics.ariaLearn', { title: card.title }) : undefined}
         onClick={clickable ? () => onOpen!(card.id as string) : undefined}
         onKeyDown={clickable ? (e) => { if (e.key === 'Enter') onOpen!(card.id as string) } : undefined}
         className={`group relative rounded-[20px] border border-white/[0.06] bg-[#171717] p-4 flex flex-col gap-3 h-full overflow-hidden hover:border-white/10 transition-colors ${clickable ? 'cursor-pointer' : ''}`}
@@ -278,7 +273,7 @@ const MemoPhraseCard = memo(function MemoPhraseCard({
   onFlip,
   onSpeak,
 }: {
-  card: (typeof phraseCards)[number]
+  card: (typeof PHRASE_STYLE)[number] & { label: string }
   isFlipped: boolean
   isSpeaking: boolean
   onFlip: () => void
@@ -292,6 +287,11 @@ const MemoPhraseCard = memo(function MemoPhraseCard({
 })
 
 export default function Home() {
+  const t = useT()
+  const phraseLabels = useList('home.phraseLabels')
+  const weekdaysFull = useList('home.weekdaysFull')
+  const streakForms = useForms('home.streakForms')
+  const heroWordsForms = useForms('home.hero.wordsForms')
   const navigate = useNavigate()
   const [flippedId, setFlippedId] = useState<string | null>(null)
   const { speak, isSpeaking, cancel } = useSpeech({ lang: 'en-US', rate: 0.92 })
@@ -404,15 +404,18 @@ export default function Home() {
     }
   }, [authReady, user, token])
 
-  const VERB_COVERAGE: Record<string, string> = {
-    'irr-50': '≈50% употреблений',
-    'irr-100': '≈70% употреблений',
-    'irr-150': '≈90% употреблений',
-    'irr-200': '≈93% употреблений',
-    'irr-300': '≈97% употреблений',
-    'irr-366': '≈99% употреблений',
-    'irr-700': 'редкие и производные',
-  }
+  const verbCoverage = useMemo(
+    () => ({
+      'irr-50': t('home.verbs.coverage.irr-50'),
+      'irr-100': t('home.verbs.coverage.irr-100'),
+      'irr-150': t('home.verbs.coverage.irr-150'),
+      'irr-200': t('home.verbs.coverage.irr-200'),
+      'irr-300': t('home.verbs.coverage.irr-300'),
+      'irr-366': t('home.verbs.coverage.irr-366'),
+      'irr-700': t('home.verbs.coverage.irr-700'),
+    }),
+    [t],
+  )
 
   const visibleVerbs: GrammarCardData[] = useMemo(() => {
     if (verbsCategories.length === 0) return []
@@ -428,14 +431,14 @@ export default function Home() {
         id: c.id,
         dot: palette.dot,
         title: c.name ?? c.slug,
-        subtitle: `${c.entries_count} глаголов${learned !== null ? ` • ${learned} выучено` : ''}`,
+        subtitle: `${c.entries_count} ${t('home.verbs.unit')}${learned !== null ? ` • ${learned} ${t('home.verbs.learnedSuffix')}` : ''}`,
         progress,
-        level: VERB_COVERAGE[c.slug] ?? (learned !== null ? `${learned} ✓` : 'глаголы'),
+        level: verbCoverage[c.slug as keyof typeof verbCoverage] ?? (learned !== null ? t('home.verbs.levelLearned', { n: learned }) : t('home.verbs.levelDict')),
         accent: palette.accent,
         color: palette.color,
       }
     })
-  }, [verbsCategories])
+  }, [verbsCategories, t, verbCoverage])
 
   const [live, setLive] = useState<LiveHome | null>(null)
   const [wotd, setWotd] = useState<WordOfDay | null>(null)
@@ -445,7 +448,10 @@ export default function Home() {
   // Authed users see skeletons until their data settles — no mock flash.
   const heroLoading = !isGuest && !liveDone
 
-  const greeting = useMemo(() => greetingByHour(new Date().getHours()), [])
+  const greeting = useMemo(
+    () => t(`home.greeting.${greetingKeyByHour(new Date().getHours())}`),
+    [t],
+  )
 
   // Live numbers for authed users: stats + availability + today's sessions + week.
   // Guests keep the static demo numbers below.
@@ -543,10 +549,10 @@ export default function Home() {
 
   const dailyPct = live ? Math.min(100, Math.round((live.wordsToday / DAILY_WORD_TARGET) * 100)) : 60
   const focusLine = !live
-    ? 'Еда, travel-фразы и глаголы — сегодня в фокусе.'
+    ? t('home.focus.default')
     : live.due + live.fresh === 0
-      ? 'Всё выучено — так держать.'
-      : `${live.due} на повторение • ${live.fresh} новых — сегодня в фокусе.`
+      ? t('home.focus.empty')
+      : t('home.focus.some', { due: live.due, fresh: live.fresh })
 
   const topicNameById = useMemo(() => {
     const map: Record<string, string> = {}
@@ -560,22 +566,45 @@ export default function Home() {
   const topicSkeletons = useMemo(() => [0, 1, 2, 3], [])
   const grammarSkeletons = useMemo(() => [0, 1, 2, 3], [])
 
+  const fallbackTopics = useMemo(
+    () =>
+      FALLBACK_TOPIC_STYLE.map((s, i) => ({
+        icon: s.icon,
+        title: t(`home.fallbackTopics.${i}.title`),
+        count: t(`home.fallbackTopics.${i}.count`),
+        sub: t(`home.fallbackTopics.${i}.sub`),
+        tone: s.tone,
+      })),
+    [t],
+  )
+
+  const fallbackGrammar = useMemo(
+    () =>
+      FALLBACK_GRAMMAR_STYLE.map((s, i) => ({
+        ...s,
+        title: t(`home.fallbackGrammar.${i}.title`),
+        subtitle: t(`home.fallbackGrammar.${i}.subtitle`),
+        level: t(`home.fallbackGrammar.${i}.level`),
+      })),
+    [t],
+  )
+
   const visibleTopics: TopicCardData[] = useMemo(() => {
-    if (themeCategories.length === 0) return isAuthed ? [] : topicCards
+    if (themeCategories.length === 0) return isAuthed ? [] : fallbackTopics
     const sorted = [...themeCategories].sort((a, b) => b.entries_count - a.entries_count)
     const shown = showAllTopics ? sorted : sorted.slice(0, 8)
     return shown.map((c, i) => ({
       id: c.id,
       emoji: c.icon ?? '📚',
       title: c.name ?? c.slug,
-      count: `${c.entries_count} слов`,
-      sub: c.parent_id && topicNameById[c.parent_id] ? topicNameById[c.parent_id] : 'словарь',
+      count: t('home.topics.countWords', { n: c.entries_count }),
+      sub: c.parent_id && topicNameById[c.parent_id] ? topicNameById[c.parent_id] : t('home.topics.defaultSub'),
       tone: TOPIC_TONES[i % TOPIC_TONES.length],
     }))
-  }, [themeCategories, showAllTopics, topicNameById, isAuthed])
+  }, [themeCategories, showAllTopics, topicNameById, isAuthed, fallbackTopics, t])
 
   const visibleGrammar: GrammarCardData[] = useMemo(() => {
-    if (grammarCategories.length === 0) return isAuthed ? [] : grammarCards
+    if (grammarCategories.length === 0) return isAuthed ? [] : fallbackGrammar
     return grammarCategories.map((c, i) => {
       const palette = GRAMMAR_COLORS[i % GRAMMAR_COLORS.length]
       const learned = c.learned_count ?? null
@@ -584,26 +613,26 @@ export default function Home() {
         id: c.id,
         dot: palette.dot,
         title: c.name ?? c.slug,
-        subtitle: `${c.entries_count} слов${learned !== null ? ` • ${learned} выучено` : ''}`,
+        subtitle: `${c.entries_count} ${t('home.grammar.unit')}${learned !== null ? ` • ${learned} ${t('home.grammar.learnedSuffix')}` : ''}`,
         progress,
-        level: learned !== null ? `${learned} ✓` : 'словарь',
+        level: learned !== null ? `${learned} ✓` : t('home.grammar.levelDict'),
         accent: palette.accent,
         color: palette.color,
       }
     })
-  }, [grammarCategories, isAuthed])
+  }, [grammarCategories, isAuthed, fallbackGrammar, t])
 
   return (
     <motion.div animate="animate" initial="initial" transition={{ staggerChildren: 0.08 }} className="relative">
       <motion.header className="topbar relative" variants={fadeUp} transition={{ duration: 0.5 }}>
         <div>
           <p className="brand">Lexio</p>
-          <p className="greeting">{greeting} • Готов к прорыву?</p>
+          <p className="greeting">{greeting} • {t('home.greeting.ready')}</p>
           <h1>
-            Продолжим <span className="text-transparent bg-clip-text bg-gradient-to-r from-[#5AD4B5] to-[#5B74FF]">учить?</span>
+            {t('home.hero.titleStart')} <span className="text-transparent bg-clip-text bg-gradient-to-r from-[#5AD4B5] to-[#5B74FF]">{t('home.hero.titleAccent')}</span>
           </h1>
           <p className="hero-copy">
-            Короткие сессии, живые карточки и магия прогресса. Сегодня — твой день!
+            {t('home.hero.copy')}
           </p>
         </div>
         <motion.div
@@ -619,7 +648,7 @@ export default function Home() {
           {heroLoading ? (
             <span className="inline-block w-20 h-4 rounded bg-white/10 animate-pulse" aria-hidden />
           ) : (
-            <>{live?.streak ?? 7} {plural(live?.streak ?? 7, ['день', 'дня', 'дней'])} подряд</>
+            <>{live?.streak ?? 7} {pickPlural(live?.streak ?? 7, streakForms)} {t('home.streakSuffix')}</>
           )}
         </motion.div>
       </motion.header>
@@ -633,34 +662,34 @@ export default function Home() {
               <ProgressRing value={heroLoading ? 0 : (live ? Math.min(1, live.wordsToday / DAILY_WORD_TARGET) : 0.6)} loading={heroLoading} />
               <div className="min-w-0">
                 <p className="eyebrow flex items-center gap-2 !mt-0">
-                  <FontAwesomeIcon icon={faBolt} className="text-[#5AD4B5]" /> Дневная цель
+                  <FontAwesomeIcon icon={faBolt} className="text-[#5AD4B5]" /> {t('home.hero.dailyGoal')}
                 </p>
                 <h2 className="text-[18px] sm:text-[20px] font-black tracking-tight leading-tight mt-1">
                   {heroLoading ? (
                     <span className="inline-block w-44 h-6 rounded-lg bg-white/10 animate-pulse" aria-hidden />
                   ) : (
-                    <><CountUp to={live?.wordsToday ?? 12} /> из <CountUp to={DAILY_WORD_TARGET} /> слов • <span className="text-white/60 font-semibold">{dailyPct}%</span></>
+                    <><CountUp to={live?.wordsToday ?? 12} /> из <CountUp to={DAILY_WORD_TARGET} /> {t('home.hero.ofWords')} • <span className="text-white/60 font-semibold">{dailyPct}%</span></>
                   )}
                 </h2>
-                <p className="text-white/50 text-[13px] leading-snug mt-1">{heroLoading ? 'Загружаем статистику…' : focusLine}</p>
+                <p className="text-white/50 text-[13px] leading-snug mt-1">{heroLoading ? t('home.hero.loadingStats') : focusLine}</p>
               </div>
             </div>
             <div className="flex gap-2.5 flex-wrap lg:flex-nowrap">
               <div className="flex-1 lg:flex-none min-w-[110px] rounded-2xl bg-white/[0.04] border border-white/[0.06] px-4 py-3 text-center">
-                <div className="text-[11px] tracking-[0.10em] uppercase opacity-50 font-bold">Сегодня</div>
-                <div className="text-[18px] font-black">{heroLoading ? '–' : <><CountUp to={live?.wordsToday ?? 18} /> {live ? plural(live.wordsToday, ['слово', 'слова', 'слов']) : 'мин'}</>}</div>
+                <div className="text-[11px] tracking-[0.10em] uppercase opacity-50 font-bold">{t('home.hero.today')}</div>
+                <div className="text-[18px] font-black">{heroLoading ? '–' : <><CountUp to={live?.wordsToday ?? 18} /> {live ? pickPlural(live.wordsToday, heroWordsForms) : t('home.hero.minutes')}</>}</div>
               </div>
               <div className="flex-1 lg:flex-none min-w-[110px] rounded-2xl bg-[#5AD4B5]/[0.08] border border-[#5AD4B5]/20 px-4 py-3 text-center">
-                <div className="text-[11px] tracking-[0.10em] uppercase opacity-60 font-bold text-[#5AD4B5]">{live ? 'Точность' : 'Серия'}</div>
+                <div className="text-[11px] tracking-[0.10em] uppercase opacity-60 font-bold text-[#5AD4B5]">{live ? t('home.hero.accuracy') : t('home.hero.series')}</div>
                 <div className="text-[18px] font-black text-[#5AD4B5]">{heroLoading ? '–' : <><CountUp to={live ? Math.round(live.accuracy * 100) : 92} />%</>}</div>
               </div>
               <div className="hidden sm:flex min-w-[90px] rounded-2xl bg-white/[0.04] border border-white/[0.06] px-4 py-3 flex-col items-center justify-center">
-                <div className="text-[11px] tracking-[0.10em] uppercase opacity-50 font-bold flex items-center gap-1"><FontAwesomeIcon icon={faTrophy} className="text-[#DB9F3A]" /> Уровень</div>
+                <div className="text-[11px] tracking-[0.10em] uppercase opacity-50 font-bold flex items-center gap-1"><FontAwesomeIcon icon={faTrophy} className="text-[#DB9F3A]" /> {t('home.hero.level')}</div>
                 <div className="text-[16px] font-black">{heroLoading ? '–' : (live?.level ?? 'A2')}</div>
               </div>
             </div>
             <motion.button onClick={() => navigate('/learn')} className="primary-action !m-0 lg:ml-auto group shrink-0" type="button" whileHover={{ y: -2, scale: 1.02 }} whileTap={{ scale: 0.97 }}>
-              {live?.hasActive ? 'Продолжить урок' : 'Продолжить'} <FontAwesomeIcon icon={faArrowRight} className="ml-1.5 group-hover:translate-x-0.5 transition-transform" />
+              {live?.hasActive ? t('home.hero.continueLesson') : t('home.hero.continue')} <FontAwesomeIcon icon={faArrowRight} className="ml-1.5 group-hover:translate-x-0.5 transition-transform" />
             </motion.button>
           </div>
         </SpotlightCard>
@@ -670,9 +699,9 @@ export default function Home() {
       <motion.section variants={fadeUp} transition={{ duration: 0.5 }} className="content-section !mt-6">
         <div className="section-header">
           <h3 className="flex items-center gap-2">
-            <FontAwesomeIcon icon={faBookOpen} className="text-[#5AD4B5]" /> Слово дня
+            <FontAwesomeIcon icon={faBookOpen} className="text-[#5AD4B5]" /> {t('home.wotd.title')}
           </h3>
-          <span className="text-[11px] tracking-[0.12em] uppercase opacity-50 font-bold">клик — озвучка</span>
+          <span className="text-[11px] tracking-[0.12em] uppercase opacity-50 font-bold">{t('home.wotd.hint')}</span>
         </div>
         <SpotlightCard spotlightColor={'rgba(90, 212, 181, 0.10)' as unknown as `rgba(${number}, ${number}, ${number}, ${number})`} className="!p-0 !bg-transparent !border-0">
           <div className="group relative rounded-[24px] border border-white/[0.06] bg-[#171717] p-6 sm:p-7 overflow-hidden">
@@ -687,11 +716,11 @@ export default function Home() {
             <div className="relative flex flex-wrap items-start justify-between gap-4">
               <div className="min-w-0">
                 <div className="inline-flex items-center gap-2 px-2.5 py-1 rounded-full bg-white/[0.06] border border-white/[0.06] text-[11px] font-bold tracking-widest uppercase">
-                  <span className="w-1.5 h-1.5 rounded-full bg-[#5AD4B5] animate-pulse" /> EN • {wotd?.part_of_speech ?? 'сущ.'} • {wotd?.level ?? 'B2'}
+                  <span className="w-1.5 h-1.5 rounded-full bg-[#5AD4B5] animate-pulse" /> EN • {wotd?.part_of_speech ?? t('home.wotd.defaultPos')} • {wotd?.level ?? 'B2'}
                 </div>
                 <h4 className="text-[34px] sm:text-[42px] font-black tracking-[-0.04em] leading-none mt-3 break-words">{wotd?.word ?? 'Serendipity'}</h4>
                 <p className="text-white/40 text-[13px] font-medium mt-1">{wotd?.transcription ? `/${wotd.transcription}/` : ' '}</p>
-                <p className="text-white/70 text-[14px] leading-relaxed mt-3 max-w-[42ch]">{wotd?.translation ?? 'Счастливая случайность — когда находишь ценное, не искав.'}</p>
+                <p className="text-white/70 text-[14px] leading-relaxed mt-3 max-w-[42ch]">{wotd?.translation ?? t('home.wotd.mockTranslation')}</p>
                 {wotd?.example ? (
                   <p className="text-white/35 text-[13px] mt-2 leading-relaxed max-w-[42ch]">“{wotd.example}”</p>
                 ) : !wotd ? (
@@ -703,13 +732,13 @@ export default function Home() {
               </button>
             </div>
             <div className="relative mt-5 flex flex-wrap gap-2">
-              <span className="px-3 py-1.5 rounded-full bg-white text-black text-xs font-bold">Запомнить</span>
+              <span className="px-3 py-1.5 rounded-full bg-white text-black text-xs font-bold">{t('home.wotd.remember')}</span>
               {wotd ? (
                 wotd.forms.length > 0 ? (
-                  <span className="px-3 py-1.5 rounded-full bg-white/[0.06] border border-white/[0.08] text-white/70 text-xs font-semibold">Формы: {wotd.forms.join(', ')}</span>
+                  <span className="px-3 py-1.5 rounded-full bg-white/[0.06] border border-white/[0.08] text-white/70 text-xs font-semibold">{t('home.wotd.forms', { list: wotd.forms.join(', ') })}</span>
                 ) : null
               ) : (
-                <span className="px-3 py-1.5 rounded-full bg-white/[0.06] border border-white/[0.08] text-white/50 text-xs">Синонимы: luck, chance</span>
+                <span className="px-3 py-1.5 rounded-full bg-white/[0.06] border border-white/[0.08] text-white/50 text-xs">{t('home.wotd.synonyms')}</span>
               )}
             </div>
             </>
@@ -721,10 +750,10 @@ export default function Home() {
       {/* TOPICS — мемоизированы, viewport once */}
       <motion.section className="content-section !mt-6" variants={fadeUp} transition={{ duration: 0.5 }}>
         <div className="section-header">
-          <h3>По теме</h3>
+          <h3>{t('home.topics.title')}</h3>
           {themeCategories.length > 8 && (
             <button className="text-link" type="button" onClick={() => setShowAllTopics((v) => !v)}>
-              {showAllTopics ? 'Свернуть' : `Все темы (${themeCategories.length})`}
+              {showAllTopics ? t('home.topics.collapse') : t('home.topics.all', { n: themeCategories.length })}
             </button>
           )}
         </div>
@@ -736,7 +765,7 @@ export default function Home() {
               <MemoTopicCard key={card.title} card={card} index={index} onOpen={openCategory} />
             ))
           ) : isAuthed ? (
-            <p className="text-[13px] opacity-40 col-span-full">Тем пока нет — загляни позже.</p>
+            <p className="text-[13px] opacity-40 col-span-full">{t('home.topics.empty')}</p>
           ) : null}
         </div>
       </motion.section>
@@ -745,8 +774,8 @@ export default function Home() {
       <motion.section className="content-section !mt-6" variants={fadeUp} transition={{ duration: 0.5 }}>
         <div className="section-header section-header--stacked">
           <div>
-            <h3>По грамматике</h3>
-            <p>Соберите базу, чтобы быстрее перейти к свободной речи.</p>
+            <h3>{t('home.grammar.title')}</h3>
+            <p>{t('home.grammar.sub')}</p>
           </div>
         </div>
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
@@ -757,7 +786,7 @@ export default function Home() {
               <MemoGrammarCard key={card.title} card={card} index={index} onOpen={openCategory} />
             ))
           ) : isAuthed ? (
-            <p className="text-[13px] opacity-40 col-span-full">Разделов пока нет — загляни позже.</p>
+            <p className="text-[13px] opacity-40 col-span-full">{t('home.grammar.empty')}</p>
           ) : null}
         </div>
       </motion.section>
@@ -767,8 +796,8 @@ export default function Home() {
         <motion.section className="content-section !mt-6" variants={fadeUp} transition={{ duration: 0.5 }}>
           <div className="section-header section-header--stacked">
             <div>
-              <h3>Неправильные глаголы</h3>
-              <p>Три формы сразу: go → went → gone. Частые — первые.</p>
+              <h3>{t('home.verbs.title')}</h3>
+              <p>{t('home.verbs.sub')}</p>
             </div>
           </div>
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
@@ -787,9 +816,9 @@ export default function Home() {
       <motion.section className="content-section !mt-6" variants={fadeUp} transition={{ duration: 0.5 }}>
         <div className="section-header">
           <h3 className="flex items-center gap-2">
-            <FontAwesomeIcon icon={faBolt} className="text-[#5B74FF]" /> Тренд недели
+            <FontAwesomeIcon icon={faBolt} className="text-[#5B74FF]" /> {t('home.weekly.title')}
           </h3>
-          <span className="text-[11px] tracking-[0.12em] uppercase opacity-50 font-bold">интерактив • наведи</span>
+          <span className="text-[11px] tracking-[0.12em] uppercase opacity-50 font-bold">{t('home.weekly.hint')}</span>
         </div>
         <div className="rounded-[24px] border border-white/[0.06] bg-white/[0.02] p-3 sm:p-5 backdrop-blur">
           {!isGuest && !liveDone ? (
@@ -807,9 +836,9 @@ export default function Home() {
             </Suspense>
           )}
           <div className="flex gap-2 mt-3 flex-wrap">
-            <span className="px-3 py-1 rounded-full bg-[#5AD4B5]/15 text-[#5AD4B5] text-xs font-bold border border-[#5AD4B5]/20">{heroLoading ? '–' : `${live?.minutesToday ?? 18} мин сегодня`}</span>
-            <span className="px-3 py-1 rounded-full bg-white/5 text-white/60 text-xs font-semibold border border-white/10">{heroLoading ? 'Считаем…' : (weekPeak ? `Пик: ${weekPeak.minutes} мин в ${weekPeak.day}` : 'Пик: 30 мин в субботу')}</span>
-            <span className="px-3 py-1 rounded-full bg-[#5B74FF]/15 text-[#8b9bff] text-xs font-semibold border border-[#5B74FF]/20">Цель: 20 мин/день</span>
+            <span className="px-3 py-1 rounded-full bg-[#5AD4B5]/15 text-[#5AD4B5] text-xs font-bold border border-[#5AD4B5]/20">{heroLoading ? '–' : t('home.weekly.todayMin', { n: live?.minutesToday ?? 18 })}</span>
+            <span className="px-3 py-1 rounded-full bg-white/5 text-white/60 text-xs font-semibold border border-white/10">{heroLoading ? t('home.weekly.counting') : (weekPeak ? t('home.weekly.peak', { n: weekPeak.minutes, day: weekPeak.day }) : t('home.weekly.peakFallback'))}</span>
+            <span className="px-3 py-1 rounded-full bg-[#5B74FF]/15 text-[#8b9bff] text-xs font-semibold border border-[#5B74FF]/20">{t('home.weekly.goal')}</span>
           </div>
         </div>
       </motion.section>
@@ -818,10 +847,10 @@ export default function Home() {
       <motion.section className="content-section !mt-6" variants={fadeUp} transition={{ duration: 0.5 }}>
         <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
           {[
-            { label: 'Слов выучено', value: live?.wordsLearned ?? 142, sub: 'всего', color: '#5AD4B5' },
-            { label: 'Дней подряд', value: live?.streak ?? 7, sub: live ? `🔥 рекорд ${live.bestStreak}` : '🔥 рекорд', color: '#F5C16A' },
-            { label: 'Точность', value: live ? Math.round(live.accuracy * 100) : 92, suffix: '%', color: '#5B74FF' },
-            { label: 'Минут сегодня', value: live?.minutesToday ?? 18, sub: live ? 'сегодня' : 'из 20', color: '#F08AB4' },
+            { label: t('home.stats.words'), value: live?.wordsLearned ?? 142, sub: t('home.stats.total'), color: '#5AD4B5' },
+            { label: t('home.stats.days'), value: live?.streak ?? 7, sub: live ? t('home.stats.record', { n: live.bestStreak }) : t('home.stats.recordEmpty'), color: '#F5C16A' },
+            { label: t('home.stats.accuracy'), value: live ? Math.round(live.accuracy * 100) : 92, suffix: '%', color: '#5B74FF' },
+            { label: t('home.stats.minutes'), value: live?.minutesToday ?? 18, sub: live ? t('home.stats.todaySub') : t('home.stats.of20'), color: '#F08AB4' },
           ].map((s) => (
             <div key={s.label} className="rounded-[20px] border border-white/[0.06] bg-white/[0.03] p-4 backdrop-blur flex flex-col items-center gap-1 text-center">
               <span className="text-[11px] tracking-[0.10em] uppercase opacity-50 font-bold">{s.label}</span>
@@ -845,14 +874,17 @@ export default function Home() {
       <motion.section className="content-section !mt-6" variants={fadeUp} transition={{ duration: 0.5 }}>
         <div className="section-header">
           <h3 className="flex items-center gap-2">
-            <FontAwesomeIcon icon={faComments} className="text-[#F08AB4]" /> Разговорные фразы • клик — флип, L — звук
+            <FontAwesomeIcon icon={faComments} className="text-[#F08AB4]" /> {t('home.phrasesSection.title')}
           </h3>
-          <button className="text-link" type="button">Все фразы</button>
+          <button className="text-link" type="button">{t('home.phrasesSection.all')}</button>
         </div>
         <div className="phrase-strip">
-          {phraseCards.map((card) => (
-            <MemoPhraseCard key={card.title} card={card} isFlipped={flippedId === card.title} isSpeaking={speakingId === card.title && isSpeaking} onFlip={() => handleFlip(card.title)} onSpeak={() => handleSpeak(card.title, card.title)} />
-          ))}
+          {PHRASE_STYLE.map((card, i) => {
+            const item = { ...card, label: phraseLabels[i] ?? '' }
+            return (
+              <MemoPhraseCard key={card.title} card={item} isFlipped={flippedId === card.title} isSpeaking={speakingId === card.title && isSpeaking} onFlip={() => handleFlip(card.title)} onSpeak={() => handleSpeak(card.title, card.title)} />
+            )
+          })}
         </div>
       </motion.section>
     </motion.div>

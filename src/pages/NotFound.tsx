@@ -4,6 +4,7 @@ import { motion, useMotionValue, useSpring, useTransform } from 'framer-motion'
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome'
 import { faHouse, faArrowLeft, faCompass, faGhost, faCheck, faTrophy, faRotateRight, faSpellCheck, faLanguage } from '@fortawesome/free-solid-svg-icons'
 import { getQuizRound, type QuizRound } from '@/lib/catalog-api'
+import { useList, useT } from '@/lib/i18n'
 
 const ORBIT_WORDS = [
   { text: 'undefined', x: '-38%', y: '-34%', d: 0, color: '#8b9bff' },
@@ -32,42 +33,45 @@ interface CheckSegment {
 interface CheckExample {
   student: CheckSegment[]
   teacher: string
-  note: string
+  noteIdx: number
 }
 
 const CHECK_EXAMPLES: CheckExample[] = [
   {
     student: [{ t: 'I ' }, { t: 'have 5 years', wrong: true }],
     teacher: 'I am 5 years old',
-    note: 'возраст — только через to be',
+    noteIdx: 0,
   },
   {
     student: [{ t: 'He ' }, { t: 'go', wrong: true }, { t: ' to school every day' }],
     teacher: 'He goes to school every day',
-    note: 'he / she / it → глагол + s',
+    noteIdx: 1,
   },
   {
     student: [{ t: 'There ', wrong: true }, { t: 'house is big' }],
     teacher: 'Their house is big',
-    note: 'their — их, there — там',
+    noteIdx: 2,
   },
   {
     student: [{ t: 'I ' }, { t: 'am agree', wrong: true }, { t: ' with you' }],
     teacher: 'I agree with you',
-    note: 'agree — без to be',
+    noteIdx: 3,
   },
   {
     student: [{ t: 'Он ' }, { t: 'звОнит', wrong: true }, { t: ' мне каждый день' }],
     teacher: 'Он звонИт мне каждый день',
-    note: 'ударение на И',
+    noteIdx: 4,
   },
 ]
 
 function GrammarCheck() {
+  const t = useT()
+  const notes = useList('notfound.check.notes')
   const [round, setRound] = useState(0)
   const [stage, setStage] = useState(0) // 0 — пишут, 1 — ошибка подсвечена, 2 — верный вариант
   const [typed, setTyped] = useState(0)
   const ex = CHECK_EXAMPLES[round % CHECK_EXAMPLES.length]
+  const note = notes[ex.noteIdx] ?? ''
 
   useEffect(() => {
     setStage(0)
@@ -107,11 +111,11 @@ function GrammarCheck() {
         <span className="nf-terminal__dot nf-terminal__dot--y" />
         <span className="nf-terminal__dot nf-terminal__dot--g" />
         <span className="nf-terminal__title">
-          <FontAwesomeIcon icon={faSpellCheck} /> grammar-check — live
+          <FontAwesomeIcon icon={faSpellCheck} /> {t('notfound.check.title')}
         </span>
       </div>
       <div className="nf-terminal__body">
-        <div className="nf-check__who">ученик пишет</div>
+        <div className="nf-check__who">{t('notfound.check.student')}</div>
         <div className="nf-check__student" key={`s-${round}`}>
           {words.map((w, i) => (
             <motion.span
@@ -128,12 +132,12 @@ function GrammarCheck() {
         </div>
         {stage >= 2 && (
           <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ duration: 0.3 }}>
-            <div className="nf-check__who">правильно</div>
+            <div className="nf-check__who">{t('notfound.check.correct')}</div>
             <div className="nf-check__teacher">
               <FontAwesomeIcon icon={faCheck} /> {ex.teacher.slice(0, typed)}
               {typed < ex.teacher.length && <span className="nf-terminal__caret" />}
             </div>
-            {typed >= ex.teacher.length && <div className="nf-check__note">{ex.note}</div>}
+            {typed >= ex.teacher.length && <div className="nf-check__note">{note}</div>}
           </motion.div>
         )}
       </div>
@@ -142,6 +146,7 @@ function GrammarCheck() {
 }
 
 function WordQuiz() {
+  const t = useT()
   const [round, setRound] = useState<QuizRound | null>(null)
   const [picked, setPicked] = useState<number | null>(null)
   const [score, setScore] = useState(0)
@@ -211,10 +216,10 @@ function WordQuiz() {
     <div className="nf-arena">
       <div className="nf-arena__head">
         <span className="nf-arena__title">
-          <FontAwesomeIcon icon={faLanguage} /> Переведи слово
+          <FontAwesomeIcon icon={faLanguage} /> {t('notfound.quiz.title')}
         </span>
         <span className="nf-arena__score">
-          счёт <b>{score}</b>
+          {t('notfound.quiz.score')} <b>{score}</b>
           <span className="nf-arena__best">
             <FontAwesomeIcon icon={faTrophy} /> {best}
           </span>
@@ -230,9 +235,9 @@ function WordQuiz() {
         </div>
       ) : failed || !round ? (
         <div className="nf-quiz">
-          <p className="nf-quiz__err">Слова не загрузились — страница и так потерялась</p>
+          <p className="nf-quiz__err">{t('notfound.quiz.error')}</p>
           <button onClick={load} className="nf-quiz__opt" style={{ justifyContent: 'center' }}>
-            <FontAwesomeIcon icon={faRotateRight} /> Попробовать снова
+            <FontAwesomeIcon icon={faRotateRight} /> {t('notfound.quiz.retry')}
           </button>
         </div>
       ) : (
@@ -254,7 +259,7 @@ function WordQuiz() {
               </button>
             ))}
           </div>
-          <div className="nf-quiz__foot">клик или клавиши 1–4 • слова из словаря</div>
+          <div className="nf-quiz__foot">{t('notfound.quiz.foot')}</div>
         </div>
       )}
     </div>
@@ -263,6 +268,7 @@ function WordQuiz() {
 
 export default function NotFound() {
   const navigate = useNavigate()
+  const t = useT()
   const mx = useMotionValue(0)
   const my = useMotionValue(0)
   const sx = useSpring(mx, { stiffness: 60, damping: 18 })
@@ -325,7 +331,7 @@ export default function NotFound() {
           >
             <FontAwesomeIcon icon={faGhost} />
           </motion.div>
-          <h1 className="nf-digits nf-digits--glitch" data-text="404" aria-label="Ошибка 404">
+          <h1 className="nf-digits nf-digits--glitch" data-text="404" aria-label={t('notfound.hero.aria')}>
             {'404'.split('').map((ch, i) => (
               <motion.span
                 key={i}
@@ -345,7 +351,7 @@ export default function NotFound() {
             transition={{ delay: 0.6 }}
             className="nf-text"
           >
-            Такое слово даже мы не выучили — <span className="nf-text__accent">страницы не существует</span>
+            {t('notfound.hero.textStart')} <span className="nf-text__accent">{t('notfound.hero.textAccent')}</span>
           </motion.p>
           <motion.div
             initial={{ opacity: 0, y: 10 }}
@@ -354,10 +360,10 @@ export default function NotFound() {
             className="nf-actions"
           >
             <button onClick={() => navigate('/')} className="nf-btn nf-btn--primary">
-              <FontAwesomeIcon icon={faHouse} /> На главную
+              <FontAwesomeIcon icon={faHouse} /> {t('notfound.hero.home')}
             </button>
             <button onClick={() => navigate(-1)} className="nf-btn">
-              <FontAwesomeIcon icon={faArrowLeft} /> Назад
+              <FontAwesomeIcon icon={faArrowLeft} /> {t('notfound.hero.back')}
             </button>
           </motion.div>
         </motion.div>
@@ -374,7 +380,7 @@ export default function NotFound() {
         transition={{ delay: 0.95 }}
         className="nf-hint"
       >
-        <FontAwesomeIcon icon={faCompass} /> а повторения слов — по расписанию, без опозданий
+        <FontAwesomeIcon icon={faCompass} /> {t('notfound.hint')}
       </motion.div>
     </motion.div>
   )

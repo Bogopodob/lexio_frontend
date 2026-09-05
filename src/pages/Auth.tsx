@@ -5,15 +5,9 @@ import gsap from 'gsap'
 import { BookOpenText, Flame, GraduationCap, Languages, Sparkles } from 'lucide-react'
 import AuthCard from '@/components/auth/AuthCard'
 import { useAuth } from '@/context/AuthContext'
+import { useList, useT, getUiLang } from '@/lib/i18n'
 
 const WordSphere = lazy(() => import('@/components/auth/WordSphere'))
-
-const PHRASES = [
-  'Выучи 20 слов сегодня',
-  'Speak without pauses',
-  'Серия 14 дней подряд',
-  'Мир — это peace и world',
-]
 
 function useTypewriter(phrases: string[]): string {
   const [text, setText] = useState('')
@@ -71,20 +65,14 @@ function useCountUp(target: number, duration = 1600, started = true): number {
   return value
 }
 
-const STATS = [
-  { icon: BookOpenText, value: 2783, suffix: '', label: 'слов в словаре', color: '#5AD4B5' },
-  { icon: Languages, value: 5, suffix: '', label: 'языков', color: '#8b9bff' },
-  { icon: Flame, value: 14, suffix: '', label: 'дней — топ-серия', color: '#F5C16A' },
-]
-
-function Stat({ icon: Icon, value, label, color, started }: (typeof STATS)[number] & { started: boolean }) {
+function Stat({ icon: Icon, value, label, color, started }: { icon: typeof BookOpenText; value: number; suffix: string; label: string; color: string } & { started: boolean }) {
   const display = useCountUp(value, 1600, started)
   return (
     <div className="auth-stat">
       <span className="auth-stat__icon" style={{ color, background: `${color}14`, borderColor: `${color}30` }}>
         <Icon size={15} />
       </span>
-      <span className="auth-stat__value">{display.toLocaleString('ru-RU')}</span>
+      <span className="auth-stat__value">{display.toLocaleString(getUiLang() === 'en' ? 'en-US' : 'ru-RU')}</span>
       <span className="auth-stat__label">{label}</span>
     </div>
   )
@@ -93,6 +81,7 @@ function Stat({ icon: Icon, value, label, color, started }: (typeof STATS)[numbe
 export default function Auth() {
   const navigate = useNavigate()
   const location = useLocation()
+  const t = useT()
   const afterLogin =
     typeof (location.state as { from?: unknown } | null)?.from === 'string'
       ? ((location.state as { from: string }).from as string)
@@ -100,7 +89,12 @@ export default function Auth() {
   const goApp = () => navigate(afterLogin, { replace: true })
   const { user, ready } = useAuth()
 
-  const typed = useTypewriter(PHRASES)
+  const stats = [
+    { icon: BookOpenText, value: 2783, suffix: '', label: t('auth.stats.words'), color: '#5AD4B5' },
+    { icon: Languages, value: 5, suffix: '', label: t('auth.stats.languages'), color: '#8b9bff' },
+    { icon: Flame, value: 14, suffix: '', label: t('auth.stats.streak'), color: '#F5C16A' },
+  ]
+  const typed = useTypewriter(useList('auth.phrases'))
   const rootRef = useRef<HTMLDivElement>(null)
   const [entered, setEntered] = useState(false)
 
@@ -130,7 +124,7 @@ export default function Auth() {
         </div>
         <div className="auth-layout" style={{ placeItems: 'center', gridTemplateColumns: '1fr' }}>
           <div className="px-4 py-2 rounded-full bg-white/[0.06] border border-white/[0.08] text-white/50 text-xs font-bold animate-pulse">
-            {user ? 'Уже вошли — возвращаем…' : 'Проверяем вход…'}
+            {user ? t('auth.returning') : t('auth.checking')}
           </div>
         </div>
       </div>
@@ -156,7 +150,7 @@ export default function Auth() {
             </span>
             <span className="auth-brand__name">qwicki</span>
             <span className="auth-brand__tag">
-              <Sparkles size={12} /> учи языки
+              <Sparkles size={12} /> {t('auth.brandTag')}
             </span>
           </div>
 
@@ -165,7 +159,7 @@ export default function Auth() {
             <span className="auth-title__caret" />
           </h1>
           <p className="auth-intro auth-subtitle">
-            Слова со смыслами, примеры из фильмов и умные повторения — всё в одном месте.
+            {t('auth.subtitle')}
           </p>
 
           <div className="auth-intro">
@@ -173,13 +167,13 @@ export default function Auth() {
           </div>
 
           <div className="auth-intro auth-stats">
-            {STATS.map((s) => (
+            {stats.map((s) => (
               <Stat key={s.label} {...s} started={entered} />
             ))}
           </div>
 
           <button onClick={() => navigate('/')} className="auth-intro auth-guest">
-            Продолжить как гость →
+            {t('auth.guest')}
           </button>
         </div>
 
@@ -190,7 +184,7 @@ export default function Auth() {
           </Suspense>
           <div className="auth-side__caption">
             <span className="auth-side__dot" />
-            16 слов · 7 языков · одна сфера
+            {t('auth.sideCaption')}
           </div>
         </div>
       </div>

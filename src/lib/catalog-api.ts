@@ -1,3 +1,5 @@
+import { getUiLang, translate } from '@/lib/i18n'
+
 const API_URL = (import.meta.env.VITE_API_URL as string | undefined) ?? '/api'
 
 export interface RemoteCategory {
@@ -15,13 +17,13 @@ export interface RemoteCategory {
 
 async function get<T>(path: string, token?: string): Promise<T> {
   const res = await fetch(`${API_URL}${path}`, {
-    headers: token ? { Authorization: `Bearer ${token}`, 'Accept-Language': 'ru' } : { 'Accept-Language': 'ru' },
+    headers: token ? { Authorization: `Bearer ${token}`, 'Accept-Language': getUiLang() } : { 'Accept-Language': getUiLang() },
   })
   const body = (await res.json().catch(() => null)) as {
     success?: boolean
     data?: T
   } | null
-  if (!res.ok || !body || body.success === false) throw new Error(`Catalog request failed (${res.status})`)
+  if (!res.ok || !body || body.success === false) throw new Error(translate(getUiLang(), 'lib.errors.catalog_failed', { status: res.status }))
   return (body.data ?? []) as T
 }
 

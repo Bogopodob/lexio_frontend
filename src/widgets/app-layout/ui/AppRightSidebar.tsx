@@ -15,6 +15,7 @@ import {
 } from '@fortawesome/free-solid-svg-icons'
 import { motion, AnimatePresence } from 'framer-motion'
 import { cn } from '@/shared/lib/cn'
+import { useT } from '@/lib/i18n'
 
 interface Props {
   isDesktop: boolean
@@ -22,32 +23,34 @@ interface Props {
   onClose: () => void
 }
 
-const quickActions = [
-  { id: 'continue', label: 'Продолжить урок', hint: '12/20 слов', icon: faPlay, primary: true },
-  { id: 'repeat', label: 'Повторить', hint: '20 слов вчера', icon: faRotateLeft },
-  { id: 'vocab', label: 'Словарь', hint: '142 слова', icon: faBook },
-  { id: 'phrases', label: 'Фразы', hint: '80 фраз', icon: faComments },
-]
-
-const tasksByDay = {
-  yesterday: [
-    { id: 'y1', text: 'Повторить 10 слов по теме Еда', done: true },
-    { id: 'y2', text: 'Прослушать 3 фразы', done: true },
-    { id: 'y3', text: 'Разбор глаголов', done: false },
-  ],
-  today: [
-    { id: 't1', text: 'Выучить 5 новых слов', done: false },
-    { id: 't2', text: 'Пройти тест по существительным', done: false },
-    { id: 't3', text: 'Прослушать фразы — ресторан', done: true },
-    { id: 't4', text: 'Повторить вчерашние ошибки', done: false },
-  ],
-  tomorrow: [
-    { id: 'tm1', text: 'Подготовка к теме Путешествия', done: false },
-    { id: 'tm2', text: 'Прослушать диалоги', done: false },
-  ],
-}
-
 export default function AppRightSidebar({ isDesktop, isOpen, onClose }: Props) {
+  const t = useT()
+
+  const quickActions = [
+    { id: 'continue', label: t('widgets.rightbar.actions.continue'), hint: t('widgets.rightbar.actions.continueHint'), icon: faPlay, primary: true },
+    { id: 'repeat', label: t('widgets.rightbar.actions.repeat'), hint: t('widgets.rightbar.actions.repeatHint'), icon: faRotateLeft },
+    { id: 'vocab', label: t('widgets.rightbar.actions.vocab'), hint: t('widgets.rightbar.actions.vocabHint'), icon: faBook },
+    { id: 'phrases', label: t('widgets.rightbar.actions.phrases'), hint: t('widgets.rightbar.actions.phrasesHint'), icon: faComments },
+  ]
+
+  const tasksByDay = {
+    yesterday: [
+      { id: 'y1', text: t('widgets.rightbar.tasks.y1'), done: true },
+      { id: 'y2', text: t('widgets.rightbar.tasks.y2'), done: true },
+      { id: 'y3', text: t('widgets.rightbar.tasks.y3'), done: false },
+    ],
+    today: [
+      { id: 't1', text: t('widgets.rightbar.tasks.t1'), done: false },
+      { id: 't2', text: t('widgets.rightbar.tasks.t2'), done: false },
+      { id: 't3', text: t('widgets.rightbar.tasks.t3'), done: true },
+      { id: 't4', text: t('widgets.rightbar.tasks.t4'), done: false },
+    ],
+    tomorrow: [
+      { id: 'tm1', text: t('widgets.rightbar.tasks.tm1'), done: false },
+      { id: 'tm2', text: t('widgets.rightbar.tasks.tm2'), done: false },
+    ],
+  }
+
   const [day, setDay] = useState<'yesterday' | 'today' | 'tomorrow'>('today')
   const [doneIds, setDoneIds] = useState<Set<string>>(new Set(['y1', 'y2', 't3']))
   const [dir, setDir] = useState(1)
@@ -86,7 +89,7 @@ export default function AppRightSidebar({ isDesktop, isOpen, onClose }: Props) {
             }
       }
       aria-hidden={!isOpen}
-      aria-label="Панель прогресса"
+      aria-label={t('widgets.rightbar.panel')}
     >
       <div className="app-rightbar__inner">
         {/* Header user */}
@@ -97,21 +100,21 @@ export default function AppRightSidebar({ isDesktop, isOpen, onClose }: Props) {
               <strong>Алексей</strong>
               <span>aleksey@example.com</span>
             </div>
-            <button type="button" className="app-rightbar__close" onClick={onClose} aria-label="Закрыть">
+            <button type="button" className="app-rightbar__close" onClick={onClose} aria-label={t('common.close')}>
               <FontAwesomeIcon icon={faXmark} />
             </button>
           </div>
           <div className="app-rightbar__user-meta">
-            <span className="app-rightbar__level">A2 • База</span>
+            <span className="app-rightbar__level">{t('widgets.rightbar.level')}</span>
             <span className="app-rightbar__streak">
-              <FontAwesomeIcon icon={faFire} /> 7 дней
+              <FontAwesomeIcon icon={faFire} /> {t('widgets.rightbar.streak')}
             </span>
           </div>
         </div>
 
         {/* Quick actions */}
         <div className="app-rightbar__section">
-          <h3 className="app-rightbar__title">Быстрые действия</h3>
+          <h3 className="app-rightbar__title">{t('widgets.rightbar.quickActions')}</h3>
           <div className="app-rightbar__quick">
             {quickActions.map((a) => (
               <button
@@ -133,23 +136,23 @@ export default function AppRightSidebar({ isDesktop, isOpen, onClose }: Props) {
 
         {/* Today progress */}
         <div className="app-rightbar__section">
-          <h3 className="app-rightbar__title">Сегодня</h3>
+          <h3 className="app-rightbar__title">{t('widgets.rightbar.days.today')}</h3>
           <div className="app-rightbar__today">
             <div className="app-rightbar__today-stats">
               <div className="app-rightbar__today-stat">
                 <FontAwesomeIcon icon={faBook} />
                 <strong>12/20</strong>
-                <span>слов</span>
+                <span>{t('widgets.rightbar.todayWords')}</span>
               </div>
               <div className="app-rightbar__today-stat">
                 <FontAwesomeIcon icon={faClock} />
-                <strong>18 мин</strong>
-                <span>занятия</span>
+                <strong>{t('widgets.rightbar.todayTime')}</strong>
+                <span>{t('widgets.rightbar.todayTimeLabel')}</span>
               </div>
               <div className="app-rightbar__today-stat">
                 <FontAwesomeIcon icon={faBullseye} />
                 <strong>92%</strong>
-                <span>точность</span>
+                <span>{t('widgets.rightbar.todayAccuracy')}</span>
               </div>
             </div>
             <div className="app-rightbar__progress">
@@ -161,7 +164,7 @@ export default function AppRightSidebar({ isDesktop, isOpen, onClose }: Props) {
                   transition={{ duration: 0.9, ease: [0.22, 1, 0.36, 1] }}
                 />
               </div>
-              <span>60% дневной цели</span>
+              <span>{t('widgets.rightbar.dailyGoal')}</span>
             </div>
           </div>
         </div>
@@ -170,7 +173,7 @@ export default function AppRightSidebar({ isDesktop, isOpen, onClose }: Props) {
         <div className="app-rightbar__section app-rightbar__section--grow">
           <div className="app-rightbar__tasks-header">
             <h3 className="app-rightbar__title" style={{ margin: 0 }}>
-              Задачи
+              {t('widgets.rightbar.tasksTitle')}
             </h3>
             <span className="app-rightbar__tasks-count">
               {doneCount}/{tasks.length}
@@ -185,7 +188,7 @@ export default function AppRightSidebar({ isDesktop, isOpen, onClose }: Props) {
                 className={`app-rightbar__tab ${day === d ? 'app-rightbar__tab--active' : ''}`}
                 onClick={() => changeDay(d)}
               >
-                {d === 'yesterday' ? 'Вчера' : d === 'today' ? 'Сегодня' : 'Завтра'}
+                {d === 'yesterday' ? t('widgets.rightbar.days.yesterday') : d === 'today' ? t('widgets.rightbar.days.today') : t('widgets.rightbar.days.tomorrow')}
               </button>
             ))}
           </div>
@@ -221,10 +224,10 @@ export default function AppRightSidebar({ isDesktop, isOpen, onClose }: Props) {
         {/* Footer */}
         <div className="app-rightbar__footer">
           <button type="button" className="app-rightbar__footer-btn">
-            <FontAwesomeIcon icon={faGear} /> Настройки
+            <FontAwesomeIcon icon={faGear} /> {t('widgets.rightbar.settings')}
           </button>
           <button type="button" className="app-rightbar__footer-btn app-rightbar__footer-btn--ghost">
-            <FontAwesomeIcon icon={faArrowRightFromBracket} /> Выйти
+            <FontAwesomeIcon icon={faArrowRightFromBracket} /> {t('widgets.rightbar.logout')}
           </button>
         </div>
       </div>

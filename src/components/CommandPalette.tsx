@@ -15,6 +15,7 @@ import {
   faArrowRight,
 } from '@fortawesome/free-solid-svg-icons'
 import { useTheme } from '@/context/ThemeContext'
+import { useT } from '@/lib/i18n'
 import { matchesShortcut, useShortcuts } from '@/lib/shortcuts'
 
 interface Command {
@@ -33,60 +34,61 @@ export default function CommandPalette() {
   const inputRef = useRef<HTMLInputElement>(null)
   const navigate = useNavigate()
   const { toggleTheme, theme } = useTheme()
+  const t = useT()
 
   const commands: Command[] = useMemo(
     () => [
       {
         id: 'home',
-        label: 'Главная',
-        hint: 'Перейти на главную',
+        label: t('components.palette.homeLabel'),
+        hint: t('components.palette.homeHint'),
         icon: faHome,
         keywords: 'главная home dashboard',
         action: () => navigate('/'),
       },
       {
         id: 'stats',
-        label: 'Статистика',
-        hint: 'Ваш прогресс',
+        label: t('components.palette.statsLabel'),
+        hint: t('components.palette.statsHint'),
         icon: faChartBar,
         keywords: 'статистика stats progress',
         action: () => navigate('/stats'),
       },
       {
         id: 'profile',
-        label: 'Профиль',
-        hint: 'Достижения и уровень',
+        label: t('components.palette.profileLabel'),
+        hint: t('components.palette.profileHint'),
         icon: faUser,
         keywords: 'профиль profile',
         action: () => navigate('/profile'),
       },
       {
         id: 'settings',
-        label: 'Настройки',
-        hint: 'Язык, уведомления',
+        label: t('components.palette.settingsLabel'),
+        hint: t('components.palette.settingsHint'),
         icon: faGear,
         keywords: 'настройки settings',
         action: () => navigate('/settings'),
       },
       {
         id: 'lesson',
-        label: 'Продолжить урок',
-        hint: '12 из 20 слов',
+        label: t('components.palette.lessonLabel'),
+        hint: t('components.palette.lessonHint'),
         icon: faPlay,
         keywords: 'урок lesson continue',
         action: () => navigate('/'),
       },
       {
         id: 'theme',
-        label: theme === 'dark' ? 'Светлая тема' : 'Тёмная тема',
-        hint: 'Переключить оформление',
+        label: theme === 'dark' ? t('components.palette.themeLight') : t('components.palette.themeDark'),
+        hint: t('components.palette.themeHint'),
         icon: faPalette,
         keywords: 'тема theme dark light',
         action: () => toggleTheme(),
       },
       {
         id: 'listen',
-        label: 'Озвучить фразу',
+        label: t('components.palette.listenLabel'),
         hint: 'Where is the nearest metro?',
         icon: faVolumeHigh,
         keywords: 'озвучить listen speech',
@@ -100,7 +102,7 @@ export default function CommandPalette() {
         },
       },
     ],
-    [navigate, theme, toggleTheme],
+    [navigate, theme, toggleTheme, t],
   )
 
   const filtered = useMemo(() => {
@@ -189,7 +191,7 @@ export default function CommandPalette() {
               className="command-palette"
               role="dialog"
               aria-modal="true"
-              aria-label="Быстрый поиск"
+              aria-label={t('components.palette.dialogAria')}
               initial={{ opacity: 0, y: 12, scale: 0.97, x: '-50%' } as never}
               animate={{ opacity: 1, y: 0, scale: 1, x: '-50%' } as never}
               exit={{ opacity: 0, y: 8, scale: 0.98, x: '-50%' } as never}
@@ -203,11 +205,11 @@ export default function CommandPalette() {
                 <input
                   ref={inputRef}
                   className="command-palette__input !text-[15px] !font-semibold"
-                  placeholder="Что ищем? Главная, фразы, настройки…"
+                  placeholder={t('components.palette.placeholder')}
                   value={query}
                   onChange={(e) => setQuery(e.target.value)}
                   onKeyDown={onKeyDown}
-                  aria-label="Поиск команд"
+                  aria-label={t('components.palette.inputAria')}
                 />
                 <span className="hidden sm:inline-flex items-center gap-1.5 px-2 py-1 rounded-full bg-white/[0.06] border border-white/[0.06] text-[11px] font-bold opacity-60">
                   <span className="w-1.5 h-1.5 rounded-full bg-[#5AD4B5] animate-pulse" /> ESC
@@ -218,7 +220,7 @@ export default function CommandPalette() {
                 {filtered.length === 0 ? (
                   <div className="command-palette__empty !py-10">
                     <div className="w-10 h-10 rounded-full bg-white/[0.06] border border-white/[0.06] grid place-items-center mx-auto mb-3">?</div>
-                    Ничего не найдено — попробуйте «урок» или «профиль»
+                    {t('components.palette.empty')}
                   </div>
                 ) : (
                   filtered.map((cmd, idx) => (
@@ -246,10 +248,10 @@ export default function CommandPalette() {
               </div>
 
               <div className="command-palette__footer !bg-white/[0.02] !border-white/[0.06] !py-2.5 !px-3 !gap-3 !text-[11px]">
-                <span className="hidden sm:inline-flex items-center gap-1.5"><kbd className="!px-1.5 !py-0.5 !bg-white/[0.06] !border-white/[0.06] !text-[10px]">↑↓</kbd> выбор</span>
-                <span className="inline-flex items-center gap-1.5"><kbd className="!px-1.5 !py-0.5 !bg-[#5AD4B5] !text-black !border-[#5AD4B5] !text-[10px]">↵</kbd> открыть</span>
-                <span className="hidden sm:inline-flex items-center gap-1.5"><kbd className="!px-1.5 !py-0.5 !bg-white/[0.06] !border-white/[0.06] !text-[10px]">ESC</kbd> закрыть</span>
-                <span className="ml-auto hidden sm:inline-flex items-center gap-1.5 opacity-40"><span className="w-1.5 h-1.5 rounded-full bg-[#5AD4B5]" /> {filtered.length} команд</span>
+                <span className="hidden sm:inline-flex items-center gap-1.5"><kbd className="!px-1.5 !py-0.5 !bg-white/[0.06] !border-white/[0.06] !text-[10px]">↑↓</kbd> {t('components.palette.footerSelect')}</span>
+                <span className="inline-flex items-center gap-1.5"><kbd className="!px-1.5 !py-0.5 !bg-[#5AD4B5] !text-black !border-[#5AD4B5] !text-[10px]">↵</kbd> {t('components.palette.footerOpen')}</span>
+                <span className="hidden sm:inline-flex items-center gap-1.5"><kbd className="!px-1.5 !py-0.5 !bg-white/[0.06] !border-white/[0.06] !text-[10px]">ESC</kbd> {t('components.palette.footerClose')}</span>
+                <span className="ml-auto hidden sm:inline-flex items-center gap-1.5 opacity-40"><span className="w-1.5 h-1.5 rounded-full bg-[#5AD4B5]" /> {t('components.palette.commandCount', { n: filtered.length })}</span>
               </div>
             </motion.div>
           </>

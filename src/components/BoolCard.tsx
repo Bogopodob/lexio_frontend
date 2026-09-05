@@ -2,6 +2,7 @@ import { useEffect, useRef, useState, type MutableRefObject } from 'react'
 import { motion } from 'framer-motion'
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome'
 import { faVolumeHigh, faCheck, faXmark, faScaleBalanced } from '@fortawesome/free-solid-svg-icons'
+import { useT } from '@/lib/i18n'
 
 interface BoolCardProps {
   word: string
@@ -28,6 +29,7 @@ export default function BoolCard({
   onSpeak,
   onAnswer,
 }: BoolCardProps) {
+  const t = useT()
   const [said, setSaid] = useState<boolean | null>(null)
   const answered = useRef(false)
   const cb = useRef(onAnswer)
@@ -68,11 +70,11 @@ export default function BoolCard({
       <div className="absolute -right-14 -top-14 w-52 h-52 rounded-full bg-[#F5C16A]/[0.08] blur-3xl pointer-events-none" />
       <div className="flex items-center gap-2 relative">
         <span className="px-2.5 py-1 rounded-full bg-[#F5C16A]/10 border border-[#F5C16A]/30 text-[#F5C16A] text-[11px] font-black uppercase tracking-widest flex items-center gap-1.5">
-          <FontAwesomeIcon icon={faScaleBalanced} className="text-[10px]" /> Верно или нет?
+          <FontAwesomeIcon icon={faScaleBalanced} className="text-[10px]" /> {t('cards.bool.title')}
         </span>
         <button
           onClick={() => onSpeak(wordSpeak.text, wordSpeak.lang, 'bool-q')}
-          aria-label="Озвучить слово"
+          aria-label={t('cards.common.speak_word')}
           className={`ml-auto w-10 h-10 rounded-full grid place-items-center border transition-all ${
             speakingKey === 'bool-q'
               ? 'bg-[#5AD4B5] text-black border-[#5AD4B5]'
@@ -102,7 +104,7 @@ export default function BoolCard({
           }`}
         >
           <FontAwesomeIcon icon={verdictOk ? faCheck : faXmark} />
-          {verdictOk ? 'Верно!' : isCorrect ? 'Пара была верной' : 'Пара была неверной'}
+          {verdictOk ? t('cards.bool.verdict_ok') : isCorrect ? t('cards.bool.was_true') : t('cards.bool.was_false')}
         </div>
       ) : (
         <div className="grid grid-cols-2 gap-2 relative">
@@ -111,19 +113,19 @@ export default function BoolCard({
             onClick={() => answer(true)}
             className="py-3.5 rounded-2xl bg-[#5AD4B5]/[0.12] border border-[#5AD4B5]/40 text-[#5AD4B5] text-[16px] font-black hover:bg-[#5AD4B5]/[0.2] transition flex items-center justify-center gap-2"
           >
-            <FontAwesomeIcon icon={faCheck} /> Верно
+            <FontAwesomeIcon icon={faCheck} /> {t('cards.bool.yes')}
           </motion.button>
           <motion.button
             whileTap={{ scale: 0.97 }}
             onClick={() => answer(false)}
             className="py-3.5 rounded-2xl bg-[#f43f5e]/[0.12] border border-[#f43f5e]/40 text-[#fb7185] text-[16px] font-black hover:bg-[#f43f5e]/[0.2] transition flex items-center justify-center gap-2"
           >
-            <FontAwesomeIcon icon={faXmark} /> Неверно
+            <FontAwesomeIcon icon={faXmark} /> {t('cards.bool.no')}
           </motion.button>
         </div>
       )}
       <div className="text-center text-[12px] font-bold text-white/35 relative">
-        {done ? 'оценка выставлена автоматически' : 'клик или клавиши 1 / 2'}
+        {done ? t('cards.common.auto_graded') : t('cards.bool.keys_hint')}
       </div>
     </div>
   )

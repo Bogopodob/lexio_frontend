@@ -7,6 +7,7 @@ import {
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome'
 import { faVolumeHigh, faCheck, faXmark, faRotateLeft, faEye, faEyeSlash, faLanguage, faKeyboard, faHeadphones, faLightbulb, faPen, faCircleCheck } from '@fortawesome/free-solid-svg-icons'
 import { normalize, fuzzyMatch, type Fuzzy } from '@/lib/study'
+import { useT } from '@/lib/i18n'
 
 export type CardMode = 'f2n' | 'n2f' | 'typing' | 'audio'
 
@@ -44,6 +45,7 @@ interface StudyFlashcardProps {
 }
 
 function OwnHintBlock({ hint, onSave }: { hint: string | null; onSave: (h: string) => void }) {
+  const t = useT()
   const [editing, setEditing] = useState(false)
   const [draft, setDraft] = useState(hint ?? '')
 
@@ -64,7 +66,7 @@ function OwnHintBlock({ hint, onSave }: { hint: string | null; onSave: (h: strin
       >
         <FontAwesomeIcon icon={faLightbulb} className="text-[#F5C16A] text-xs shrink-0" />
         <span className="flex-1 min-w-0 text-[13px] font-bold text-white/70 truncate">
-          {hint ?? 'Добавить свою подсказку…'}
+          {hint ?? t('cards.flash.own_hint_add')}
         </span>
         <FontAwesomeIcon icon={faPen} className="text-white/30 text-[11px] shrink-0" />
       </button>
@@ -86,8 +88,8 @@ function OwnHintBlock({ hint, onSave }: { hint: string | null; onSave: (h: strin
           }
           if (e.key === 'Escape') setEditing(false)
         }}
-        placeholder="Моя ассоциация…"
-        aria-label="Своя подсказка"
+        placeholder={t('cards.flash.own_hint_ph')}
+        aria-label={t('cards.flash.own_hint_label')}
         className="flex-1 min-w-0 px-3 py-1.5 rounded-xl bg-black/30 border border-[#F5C16A]/40 text-[13px] font-bold focus:outline-none"
       />
       <button
@@ -95,7 +97,7 @@ function OwnHintBlock({ hint, onSave }: { hint: string | null; onSave: (h: strin
           onSave(draft.trim())
           setEditing(false)
         }}
-        aria-label="Сохранить подсказку"
+        aria-label={t('cards.flash.own_hint_save')}
         className="w-9 shrink-0 rounded-xl bg-[#F5C16A] text-black grid place-items-center hover:brightness-110"
       >
         <FontAwesomeIcon icon={faCircleCheck} className="text-sm" />
@@ -127,6 +129,7 @@ export default function StudyFlashcard({
   onChecked,
   onMountAudio,
 }: StudyFlashcardProps) {
+  const t = useT()
   const dragX = useMotionValue(0)
   const leftOpacity = useTransform(dragX, [-130, -35], [1, 0])
   const rightOpacity = useTransform(dragX, [35, 130], [0, 1])
@@ -139,7 +142,7 @@ export default function StudyFlashcard({
   const displayLang = mode === 'f2n' ? targetLang : nativeLang
   const answers = mode === 'f2n' ? nativeTexts : targetTexts
   const answerLang = mode === 'f2n' ? nativeLang : targetLang
-  const backLabel = mode === 'f2n' ? 'Перевод' : mode === 'n2f' ? 'Слово' : mode === 'audio' ? 'Слово' : 'Ответ'
+  const backLabel = mode === 'f2n' ? t('cards.flash.back_translation') : mode === 'n2f' ? t('cards.flash.back_word') : mode === 'audio' ? t('cards.flash.back_word') : t('cards.flash.back_answer')
 
   const [value, setValue] = useState('')
   const [result, setResult] = useState<Fuzzy | null>(null)
@@ -193,10 +196,10 @@ export default function StudyFlashcard({
 
   const resultStyle =
     result === 'exact'
-      ? { box: 'bg-[#5AD4B5]/[0.1] border-[#5AD4B5]/50 shadow-[0_0_28px_rgba(90,212,181,0.25)]', text: 'text-[#5AD4B5]', icon: faCheck, label: 'Правильно!' }
+      ? { box: 'bg-[#5AD4B5]/[0.1] border-[#5AD4B5]/50 shadow-[0_0_28px_rgba(90,212,181,0.25)]', text: 'text-[#5AD4B5]', icon: faCheck, label: t('cards.common.correct') }
       : result === 'close'
-        ? { box: 'bg-[#ff9d5c]/[0.1] border-[#ff9d5c]/50 shadow-[0_0_28px_rgba(255,157,92,0.25)]', text: 'text-[#ff9d5c]', icon: faCheck, label: 'Почти верно!' }
-        : { box: 'bg-[#f43f5e]/[0.1] border-[#f43f5e]/50 shadow-[0_0_28px_rgba(244,63,94,0.25)]', text: 'text-[#fb7185]', icon: faXmark, label: 'Неправильно' }
+        ? { box: 'bg-[#ff9d5c]/[0.1] border-[#ff9d5c]/50 shadow-[0_0_28px_rgba(255,157,92,0.25)]', text: 'text-[#ff9d5c]', icon: faCheck, label: t('cards.common.almost') }
+        : { box: 'bg-[#f43f5e]/[0.1] border-[#f43f5e]/50 shadow-[0_0_28px_rgba(244,63,94,0.25)]', text: 'text-[#fb7185]', icon: faXmark, label: t('cards.common.wrong') }
 
   const showTrFront = mode === 'f2n' && transcription && (!hideTranscription || trShown)
   const showTrBack = mode !== 'f2n' && transcription && (!hideTranscription || trShown)
@@ -268,12 +271,12 @@ export default function StudyFlashcard({
               )}
               {isTyping && (
                 <span className="px-2.5 py-1 rounded-full bg-[#5B74FF]/15 border border-[#5B74FF]/30 text-[#8b9bff] text-[11px] font-black uppercase tracking-widest flex items-center gap-1.5">
-                  <FontAwesomeIcon icon={faKeyboard} className="text-[10px]" /> Напиши на английском
+                  <FontAwesomeIcon icon={faKeyboard} className="text-[10px]" /> {t('cards.flash.typing_badge')}
                 </span>
               )}
               {isAudio && (
                 <span className="px-2.5 py-1 rounded-full bg-[#F5C16A]/10 border border-[#F5C16A]/30 text-[#F5C16A] text-[11px] font-black uppercase tracking-widest flex items-center gap-1.5">
-                  <FontAwesomeIcon icon={faHeadphones} className="text-[10px]" /> Слушай
+                  <FontAwesomeIcon icon={faHeadphones} className="text-[10px]" /> {t('cards.flash.audio_badge')}
                 </span>
               )}
               {badge && (
@@ -290,7 +293,7 @@ export default function StudyFlashcard({
                     e.stopPropagation()
                     onSpeak(displayText, displayLang, 'front')
                   }}
-                  aria-label="Озвучить слово"
+                    aria-label={t('cards.common.speak_word')}
                   className={`ml-auto w-10 h-10 rounded-full grid place-items-center border transition-all ${
                     speakingKey === 'front'
                       ? 'bg-[#5AD4B5] text-black border-[#5AD4B5]'
@@ -311,7 +314,7 @@ export default function StudyFlashcard({
                         e.stopPropagation()
                         onSpeak(answerWord, targetLang, 'audio-front')
                       }}
-                      aria-label="Слушать слово"
+                      aria-label={t('cards.flash.listen_word')}
                       className={`w-24 h-24 rounded-full grid place-items-center border transition-all ${
                         speakingKey === 'audio-front' || speakingKey === 'audio-q'
                           ? 'bg-[#F5C16A] text-black border-[#F5C16A] shadow-[0_0_44px_rgba(245,193,106,0.45)]'
@@ -320,7 +323,7 @@ export default function StudyFlashcard({
                     >
                       <FontAwesomeIcon icon={faVolumeHigh} className="text-3xl" />
                     </button>
-                    <div className="text-[15px] font-bold text-white/50">Что это за слово?</div>
+                    <div className="text-[15px] font-bold text-white/50">{t('cards.flash.audio_what')}</div>
                   </div>
                 ) : (
                   <>
@@ -340,7 +343,7 @@ export default function StudyFlashcard({
                           }}
                           className="mt-3 inline-flex items-center gap-1.5 px-4 py-1.5 rounded-full bg-white/[0.04] border border-dashed border-white/[0.15] text-white/40 text-[13px] font-bold hover:text-white/70 transition"
                         >
-                          <FontAwesomeIcon icon={faEyeSlash} className="text-[11px]" /> показать транскрипцию
+                          <FontAwesomeIcon icon={faEyeSlash} className="text-[11px]" /> {t('cards.common.show_tr')}
                         </button>
                       )
                     ) : null}
@@ -361,7 +364,7 @@ export default function StudyFlashcard({
                         autoComplete="off"
                         autoCapitalize="off"
                         spellCheck={false}
-                        aria-label="Ответ на английском"
+                        aria-label={t('cards.flash.answer_label')}
                         className="flex-1 min-w-0 px-4 py-3 rounded-2xl bg-black/30 border border-white/[0.12] text-[17px] font-bold text-center placeholder:text-white/25 placeholder:font-medium focus:outline-none focus:border-[#5AD4B5]/60"
                       />
                       <button
@@ -378,7 +381,7 @@ export default function StudyFlashcard({
                       className="mt-2 inline-flex items-center gap-1.5 text-[12px] font-bold text-[#F5C16A]/80 hover:text-[#F5C16A] transition disabled:opacity-30"
                     >
                       <FontAwesomeIcon icon={faLightbulb} className="text-[11px]" />
-                      Подсказать букву (−1 к оценке{hintsUsed > 0 ? `: использовано ${hintsUsed}` : ''})
+                      {t('cards.flash.hint_letter', { tail: hintsUsed > 0 ? t('cards.flash.hint_used', { n: hintsUsed }) : '' })}
                     </button>
                   </div>
                 )}
@@ -387,7 +390,7 @@ export default function StudyFlashcard({
 
             <div className="flex items-center justify-center gap-2 text-[12px] font-bold text-white/35 relative">
               <FontAwesomeIcon icon={faEye} className="text-[11px]" />
-              {isTyping ? 'Enter — проверить' : isAudio ? 'вспомнил — клик / пробел' : 'клик / пробел — перевод'}
+              {isTyping ? t('cards.flash.footer_check') : isAudio ? t('cards.flash.footer_recall') : t('cards.flash.footer_flip')}
             </div>
           </div>
 
@@ -402,7 +405,7 @@ export default function StudyFlashcard({
                 {backLabel}
               </span>
               <span className="text-[11px] text-white/40 font-bold flex items-center gap-1.5">
-                <FontAwesomeIcon icon={faLanguage} /> {answers.length > 1 ? `${answers.length} варианта` : '1 вариант'}
+                <FontAwesomeIcon icon={faLanguage} /> {answers.length > 1 ? t('cards.flash.variants_many', { n: answers.length }) : t('cards.flash.variants_one')}
               </span>
             </div>
 
@@ -415,7 +418,7 @@ export default function StudyFlashcard({
                       e.stopPropagation()
                       onSpeak(answerWord, targetLang, 'audio-back')
                     }}
-                    aria-label="Озвучить слово"
+                  aria-label={t('cards.common.speak_word')}
                     className={`w-9 h-9 shrink-0 rounded-full grid place-items-center border transition-all ${
                       speakingKey === 'audio-back'
                         ? 'bg-[#F5C16A] text-black border-[#F5C16A]'
@@ -433,7 +436,7 @@ export default function StudyFlashcard({
                     {resultStyle.label}
                   </div>
                   <div className="mt-2 text-[10.5px] font-black uppercase tracking-[0.18em] text-white/40">
-                    Твой ответ
+                    {t('cards.flash.your_answer')}
                   </div>
                   <div className="mt-0.5 text-[19px] font-black text-white break-words leading-snug">
                     «{value.trim()}»
@@ -442,23 +445,23 @@ export default function StudyFlashcard({
               )}
               {isTyping && (
                 <div className="text-[10.5px] font-black uppercase tracking-[0.18em] text-white/40 mt-1">
-                  Правильно так
+                  {t('cards.flash.correct_is')}
                 </div>
               )}
               {visibleAnswers.length > 0 ? (
-                visibleAnswers.map((t, i) => (
+                visibleAnswers.map((txt, i) => (
                   <div
-                    key={`${t}-${i}`}
+                    key={`${txt}-${i}`}
                     className={`flex items-center gap-3 rounded-2xl bg-white/[0.05] border border-white/[0.07] px-4 ${answers.length > 3 ? 'py-1.5' : 'py-2.5'}`}
                   >
-                    <span className={`flex-1 min-w-0 font-black leading-snug break-words ${answers.length > 3 ? 'text-[15px]' : 'text-[19px] sm:text-[22px]'}`}>{t}</span>
+                    <span className={`flex-1 min-w-0 font-black leading-snug break-words ${answers.length > 3 ? 'text-[15px]' : 'text-[19px] sm:text-[22px]'}`}>{txt}</span>
                     {mode !== 'f2n' && (
                       <button
                         onClick={(e) => {
                           e.stopPropagation()
-                          onSpeak(t, answerLang, `back-${i}`)
+                          onSpeak(txt, answerLang, `back-${i}`)
                         }}
-                        aria-label={`Озвучить: ${t}`}
+                        aria-label={t('cards.common.speak_as', { t: txt })}
                         className={`w-9 h-9 shrink-0 rounded-full grid place-items-center border transition-all ${
                           speakingKey === `back-${i}`
                             ? 'bg-[#5AD4B5] text-black border-[#5AD4B5]'
@@ -471,10 +474,10 @@ export default function StudyFlashcard({
                   </div>
                 ))
               ) : (
-                <div className="text-white/40 text-sm">Перевода пока нет</div>
+                <div className="text-white/40 text-sm">{t('cards.flash.no_translation')}</div>
               )}
               {hiddenCount > 0 && (
-                <div className="text-center text-[12px] font-bold text-white/35">…и ещё {hiddenCount}</div>
+                <div className="text-center text-[12px] font-bold text-white/35">{t('cards.flash.more', { n: hiddenCount })}</div>
               )}
               {showTrBack ? (
                 <div className="text-[13px] font-bold text-[#5AD4B5]/80 tabular-nums">[{transcription}]</div>
@@ -486,7 +489,7 @@ export default function StudyFlashcard({
                   }}
                   className="self-start inline-flex items-center gap-1.5 text-[12px] font-bold text-white/35 hover:text-white/60 transition"
                 >
-                  <FontAwesomeIcon icon={faEyeSlash} className="text-[11px]" /> показать транскрипцию
+                  <FontAwesomeIcon icon={faEyeSlash} className="text-[11px]" /> {t('cards.common.show_tr')}
                 </button>
               ) : null}
               {(forms.length > 0 || formsPattern) && (
@@ -509,7 +512,7 @@ export default function StudyFlashcard({
                     {forms.map((f, i) => (
                       <div key={`tr-${f.form}-${f.form_type}-${i}`} className="flex items-center gap-2 text-[12px]">
                         <span className="font-black uppercase tracking-widest text-white/35 text-[10px] w-[86px] shrink-0">
-                          {f.form_type === 'past' ? '2-я · past' : '3-я · participle'}
+                          {f.form_type === 'past' ? t('cards.flash.form_past') : t('cards.flash.form_participle')}
                         </span>
                         <span className="font-bold text-[#5AD4B5]/80 tabular-nums truncate">{f.form}</span>
                         {f.transcription ? (
@@ -520,7 +523,7 @@ export default function StudyFlashcard({
                             e.stopPropagation()
                             onSpeak(f.form, targetLang, `form-${i}`)
                           }}
-                          aria-label={`Озвучить: ${f.form}`}
+                          aria-label={t('cards.common.speak_as', { t: f.form })}
                           className={`ml-auto w-7 h-7 shrink-0 rounded-full grid place-items-center border transition-all ${
                             speakingKey === `form-${i}`
                               ? 'bg-[#5AD4B5] text-black border-[#5AD4B5]'
@@ -537,7 +540,7 @@ export default function StudyFlashcard({
               {isTyping && nativeTexts.length > 0 && (
                 <>
                   <div className="text-[10.5px] font-black uppercase tracking-[0.18em] text-white/40 mt-1">
-                    Перевод
+                    {t('cards.flash.translation')}
                   </div>
                   {nativeTexts.slice(0, 6).map((t, i) => (
                     <div
@@ -548,7 +551,7 @@ export default function StudyFlashcard({
                     </div>
                   ))}
                   {nativeTexts.length > 6 && (
-                    <div className="text-center text-[12px] font-bold text-white/35">…и ещё {nativeTexts.length - 6}</div>
+                    <div className="text-center text-[12px] font-bold text-white/35">{t('cards.flash.more', { n: nativeTexts.length - 6 })}</div>
                   )}
                 </>
               )}
@@ -556,8 +559,8 @@ export default function StudyFlashcard({
             </div>
 
             <div className="text-center text-[12px] font-bold text-white/35 relative">
-              {isTyping ? 'оценка выставится автоматически' : (
-                <>свайп <span className="text-[#f43f5e]">←</span> / <span className="text-[#5AD4B5]">→</span> — тоже оценка</>
+              {isTyping ? t('cards.flash.auto_grade') : (
+                <>{t('cards.flash.swipe')} <span className="text-[#f43f5e]">←</span> / <span className="text-[#5AD4B5]">→</span> {t('cards.flash.swipe_grade')}</>
               )}
             </div>
           </div>

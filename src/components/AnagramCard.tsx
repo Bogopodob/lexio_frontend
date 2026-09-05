@@ -2,6 +2,7 @@ import { useEffect, useMemo, useRef, useState, type MutableRefObject } from 'rea
 import { motion } from 'framer-motion'
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome'
 import { faVolumeHigh, faPuzzlePiece, faDeleteLeft, faEye } from '@fortawesome/free-solid-svg-icons'
+import { useT } from '@/lib/i18n'
 
 interface AnagramCardProps {
   word: string
@@ -29,6 +30,7 @@ export default function AnagramCard({
   onSolved,
   onGiveUp,
 }: AnagramCardProps) {
+  const t = useT()
   const tiles: Tile[] = useMemo(() => {
     const letters = [...word].filter((c) => c !== ' ').map((ch, i) => ({ id: i, ch }))
     for (let attempt = 0; attempt < 8; attempt++) {
@@ -123,14 +125,14 @@ export default function AnagramCard({
         const inWord = tiles.some((t) => t.ch.toLowerCase() === low)
         denyR.current(
           key.toUpperCase(),
-          inWord ? 'все такие буквы уже на местах' : 'такой буквы нет в слове',
+          inWord ? t('cards.anagram.deny_used') : t('cards.anagram.deny_absent'),
         )
       }
     }
     return () => {
       keyRef.current = null
     }
-  }, [keyRef, tiles, givenUp])
+  }, [keyRef, tiles, givenUp, t])
   const placedRef = useRef(placed)
   placedRef.current = placed
 
@@ -174,11 +176,11 @@ export default function AnagramCard({
       <div className="absolute -right-14 -top-14 w-52 h-52 rounded-full bg-[#5AD4B5]/[0.09] blur-3xl pointer-events-none" />
       <div className="flex items-center gap-2 relative">
         <span className="px-2.5 py-1 rounded-full bg-[#5AD4B5]/10 border border-[#5AD4B5]/25 text-[#5AD4B5] text-[11px] font-black uppercase tracking-widest flex items-center gap-1.5">
-          <FontAwesomeIcon icon={faPuzzlePiece} className="text-[10px]" /> Собери слово
+          <FontAwesomeIcon icon={faPuzzlePiece} className="text-[10px]" /> {t('cards.anagram.title')}
         </span>
         <button
           onClick={() => onSpeak(wordSpeak.text, wordSpeak.lang, 'anagram-q')}
-          aria-label="Озвучить слово"
+          aria-label={t('cards.common.speak_word')}
           className={`ml-auto w-10 h-10 rounded-full grid place-items-center border transition-all ${
             speakingKey === 'anagram-q'
               ? 'bg-[#5AD4B5] text-black border-[#5AD4B5]'
@@ -250,12 +252,12 @@ export default function AnagramCard({
           </motion.button>
         ))}
         {available.length === 0 && !givenUp && (
-          <span className="text-[13px] font-bold text-white/35 self-center">все буквы на местах…</span>
+          <span className="text-[13px] font-bold text-white/35 self-center">{t('cards.anagram.all_placed')}</span>
         )}
       </motion.div>
       {denied && (
         <div className="text-center text-[13px] font-black text-[#fb7185] relative -mt-1">
-          «{denied.ch}» — {denied.msg}
+          {t('cards.anagram.denied', { ch: denied.ch, msg: denied.msg })}
         </div>
       )}
 
@@ -266,11 +268,11 @@ export default function AnagramCard({
       )}
 
       <div className="flex items-center justify-between relative">
-        <span className="text-[12px] font-bold text-white/40 tabular-nums">ошибок: {mistakes}</span>
+        <span className="text-[12px] font-bold text-white/40 tabular-nums">{t('cards.anagram.mistakes', { n: mistakes })}</span>
         <div className="flex gap-2">
           <button
             onClick={removeLast}
-            aria-label="Убрать последнюю букву"
+            aria-label={t('cards.anagram.remove_last')}
             className="h-9 px-3 rounded-xl bg-white/[0.06] border border-white/[0.08] text-sm font-black hover:bg-white/[0.1]"
           >
             <FontAwesomeIcon icon={faDeleteLeft} />
@@ -280,13 +282,13 @@ export default function AnagramCard({
               onClick={giveUp}
               className="h-9 px-3 rounded-xl bg-white/[0.06] border border-white/[0.08] text-[12px] font-black hover:bg-white/[0.1] flex items-center gap-1.5"
             >
-              <FontAwesomeIcon icon={faEye} className="text-[11px]" /> Сдаться
+              <FontAwesomeIcon icon={faEye} className="text-[11px]" /> {t('cards.anagram.give_up')}
             </button>
           )}
         </div>
       </div>
       <div className="text-center text-[12px] font-bold text-white/35 relative">
-        {givenUp ? 'оценка выставлена автоматически' : 'кликай по буквам или печатай с клавиатуры'}
+        {givenUp ? t('cards.common.auto_graded') : t('cards.anagram.type_hint')}
       </div>
     </div>
   )
