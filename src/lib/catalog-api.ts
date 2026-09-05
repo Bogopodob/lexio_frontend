@@ -32,6 +32,21 @@ export function listCategories(type?: string, locale = 'ru'): Promise<RemoteCate
   return get(`/catalog/categories?${params.toString()}`)
 }
 
+export interface WordOfDay {
+  date: string
+  word: string
+  transcription: string | null
+  translation: string
+  part_of_speech: string | null
+  level: string
+  forms: string[]
+  example: string | null
+}
+
+export function getWordOfDay(date: string): Promise<WordOfDay> {
+  return get(`/catalog/word-of-day?date=${encodeURIComponent(date)}`)
+}
+
 export function listCategoriesWithProgress(
   userId: string,
   token: string,

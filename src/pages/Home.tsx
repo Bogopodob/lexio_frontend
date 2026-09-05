@@ -2,8 +2,9 @@ import { useState, useCallback, useEffect, useMemo, memo, lazy, Suspense } from 
 import { useNavigate } from 'react-router-dom'
 import { motion } from 'framer-motion'
 import { useAuth } from '@/context/AuthContext'
-import { listCategories, listCategoriesWithProgress, type RemoteCategory } from '@/lib/catalog-api'
-import { listLearningProfiles } from '@/lib/profile-api'
+import { getWordOfDay, listCategories, listCategoriesWithProgress, type RemoteCategory, type WordOfDay } from '@/lib/catalog-api'
+import { getAvailability, listSessions } from '@/lib/learn-api'
+import { getStats, listLearningProfiles } from '@/lib/profile-api'
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome'
 import {
   faCircle,
@@ -73,6 +74,42 @@ const fadeUp = {
   animate: { opacity: 1, y: 0 },
 }
 
+const DAILY_WORD_TARGET = 20
+
+function plural(n: number, forms: [string, string, string]): string {
+  const m10 = n % 10
+  const m100 = n % 100
+  if (m10 === 1 && m100 !== 11) return forms[0]
+  if (m10 >= 2 && m10 <= 4 && (m100 < 12 || m100 > 14)) return forms[1]
+  return forms[2]
+}
+
+function greetingByHour(h: number): string {
+  if (h >= 5 && h < 12) return 'Доброе утро'
+  if (h >= 12 && h < 18) return 'Добрый день'
+  if (h >= 18 && h < 23) return 'Добрый вечер'
+  return 'Доброй ночи'
+}
+
+function todayKey(d = new Date()): string {
+  const m = String(d.getMonth() + 1).padStart(2, '0')
+  const day = String(d.getDate()).padStart(2, '0')
+  return `${d.getFullYear()}-${m}-${day}`
+}
+
+interface LiveHome {
+  wordsToday: number
+  minutesToday: number
+  wordsLearned: number
+  streak: number
+  bestStreak: number
+  accuracy: number
+  level: string
+  due: number
+  fresh: number
+  hasActive: boolean
+}
+
 // Memoized — не пересоздаётся на каждый рендер Home, UI тот же
 const ProgressRing = memo(function ProgressRing({ value }: { value: number }) {
   const { circumference, dashOffset } = useMemo(() => {
@@ -103,7 +140,7 @@ const ProgressRing = memo(function ProgressRing({ value }: { value: number }) {
         />
       </svg>
       <span className="relative z-10 flex items-center justify-center w-full h-full text-[15px] font-black tracking-tight tabular-nums">
-        <CountUp to={12} duration={1.2} className="tabular-nums leading-none" />
+        {Math.round(value * 100)}%
       </span>
     </motion.div>
   )
@@ -368,6 +405,89 @@ export default function Home() {
     })
   }, [verbsCategories])
 
+  const [live, setLive] = useState<LiveHome | null>(null)
+  const [wotd, setWotd] = useState<WordOfDay | null>(null)
+
+  const greeting = useMemo(() => greetingByHour(new Date().getHours()), [])
+
+  // Live numbers for authed users: stats + availability + today's sessions.
+  // Guests keep the static demo numbers below.
+  useEffect(() => {
+    if (!authReady || !user || !token) {
+      setLive(null)
+      return
+    }
+    let cancelled = false
+    const load = async () => {
+      try {
+        const profiles = await listLearningProfiles(user.id, token)
+        const active = profiles.find((p) => p.is_active) ?? profiles[0]
+        if (!active) return
+        const [stat, avail, sessions] = await Promise.all([
+          getStats(user.id, token, active.id).catch(() => null),
+          getAvailability(user.id, token, active.id).catch(() => null),
+          listSessions(user.id, token, active.id).catch(() => []),
+        ])
+        if (cancelled) return
+        const today = new Date().toDateString()
+        const todays = sessions.filter(
+          (s) => s.started_at && new Date(s.started_at).toDateString() === today,
+        )
+        const wordsToday = todays.reduce((a, s) => a + s.answered, 0)
+        const minutesToday = Math.round(
+          todays.reduce((a, s) => {
+            if (!s.started_at || !s.finished_at) return a
+            return (
+              a +
+              Math.max(
+                0,
+                (new Date(s.finished_at).getTime() - new Date(s.started_at).getTime()) / 60000,
+              )
+            )
+          }, 0),
+        )
+        setLive({
+          wordsToday,
+          minutesToday,
+          wordsLearned: stat?.words_learned ?? 0,
+          streak: stat?.streak_days ?? 0,
+          bestStreak: stat?.best_streak ?? 0,
+          accuracy: stat?.accuracy ?? 0,
+          level: active.level,
+          due: avail?.due ?? 0,
+          fresh: avail?.new ?? 0,
+          hasActive: sessions.some((s) => s.status === 'active'),
+        })
+      } catch {
+        /* keep demo numbers */
+      }
+    }
+    load()
+    return () => {
+      cancelled = true
+    }
+  }, [authReady, user, token])
+
+  // Word of the day: deterministic per date, public endpoint.
+  useEffect(() => {
+    let cancelled = false
+    getWordOfDay(todayKey())
+      .then((w) => {
+        if (!cancelled) setWotd(w)
+      })
+      .catch(() => undefined)
+    return () => {
+      cancelled = true
+    }
+  }, [])
+
+  const dailyPct = live ? Math.min(100, Math.round((live.wordsToday / DAILY_WORD_TARGET) * 100)) : 60
+  const focusLine = !live
+    ? 'Еда, travel-фразы и глаголы — сегодня в фокусе.'
+    : live.due + live.fresh === 0
+      ? 'Всё выучено — так держать.'
+      : `${live.due} на повторение • ${live.fresh} новых — сегодня в фокусе.`
+
   const topicNameById = useMemo(() => {
     const map: Record<string, string> = {}
     themeCategories.forEach((c) => {
@@ -414,7 +534,7 @@ export default function Home() {
       <motion.header className="topbar relative" variants={fadeUp} transition={{ duration: 0.5 }}>
         <div>
           <p className="brand">Lexio</p>
-          <p className="greeting">Добрый день • Готов к прорыву?</p>
+          <p className="greeting">{greeting} • Готов к прорыву?</p>
           <h1>
             Продолжим <span className="text-transparent bg-clip-text bg-gradient-to-r from-[#5AD4B5] to-[#5B74FF]">учить?</span>
           </h1>
@@ -432,7 +552,7 @@ export default function Home() {
           <span className="streak-badge__fire">
             <FontAwesomeIcon icon={faFire} />
           </span>
-          <CountUp to={7} /> дней подряд
+          {live?.streak ?? 7} {plural(live?.streak ?? 7, ['день', 'дня', 'дней'])} подряд
         </motion.div>
       </motion.header>
 
@@ -442,33 +562,33 @@ export default function Home() {
           <div className="relative rounded-[24px] border border-[#262626] bg-[#171717] p-5 sm:p-6 flex flex-col lg:flex-row lg:items-center gap-5 overflow-hidden">
             <div className="absolute right-0 top-0 w-64 h-64 rounded-full bg-[#5AD4B5]/[0.04] blur-3xl pointer-events-none" />
             <div className="flex gap-4 items-center flex-1 min-w-0">
-              <ProgressRing value={0.6} />
+              <ProgressRing value={live ? Math.min(1, live.wordsToday / DAILY_WORD_TARGET) : 0.6} />
               <div className="min-w-0">
                 <p className="eyebrow flex items-center gap-2 !mt-0">
                   <FontAwesomeIcon icon={faBolt} className="text-[#5AD4B5]" /> Дневная цель
                 </p>
                 <h2 className="text-[18px] sm:text-[20px] font-black tracking-tight leading-tight mt-1">
-                  <CountUp to={12} /> из <CountUp to={20} /> слов • <span className="text-white/60 font-semibold">60%</span>
+                  <CountUp to={live?.wordsToday ?? 12} /> из <CountUp to={DAILY_WORD_TARGET} /> слов • <span className="text-white/60 font-semibold">{dailyPct}%</span>
                 </h2>
-                <p className="text-white/50 text-[13px] leading-snug mt-1">Еда, travel-фразы и глаголы — сегодня в фокусе.</p>
+                <p className="text-white/50 text-[13px] leading-snug mt-1">{focusLine}</p>
               </div>
             </div>
             <div className="flex gap-2.5 flex-wrap lg:flex-nowrap">
               <div className="flex-1 lg:flex-none min-w-[110px] rounded-2xl bg-white/[0.04] border border-white/[0.06] px-4 py-3 text-center">
                 <div className="text-[11px] tracking-[0.10em] uppercase opacity-50 font-bold">Сегодня</div>
-                <div className="text-[18px] font-black"><CountUp to={18} /> мин</div>
+                <div className="text-[18px] font-black"><CountUp to={live?.wordsToday ?? 18} /> {live ? plural(live.wordsToday, ['слово', 'слова', 'слов']) : 'мин'}</div>
               </div>
               <div className="flex-1 lg:flex-none min-w-[110px] rounded-2xl bg-[#5AD4B5]/[0.08] border border-[#5AD4B5]/20 px-4 py-3 text-center">
-                <div className="text-[11px] tracking-[0.10em] uppercase opacity-60 font-bold text-[#5AD4B5]">Серия</div>
-                <div className="text-[18px] font-black text-[#5AD4B5]"><CountUp to={92} />%</div>
+                <div className="text-[11px] tracking-[0.10em] uppercase opacity-60 font-bold text-[#5AD4B5]">{live ? 'Точность' : 'Серия'}</div>
+                <div className="text-[18px] font-black text-[#5AD4B5]"><CountUp to={live ? Math.round(live.accuracy * 100) : 92} />%</div>
               </div>
               <div className="hidden sm:flex min-w-[90px] rounded-2xl bg-white/[0.04] border border-white/[0.06] px-4 py-3 flex-col items-center justify-center">
                 <div className="text-[11px] tracking-[0.10em] uppercase opacity-50 font-bold flex items-center gap-1"><FontAwesomeIcon icon={faTrophy} className="text-[#DB9F3A]" /> Уровень</div>
-                <div className="text-[16px] font-black">A2</div>
+                <div className="text-[16px] font-black">{live?.level ?? 'A2'}</div>
               </div>
             </div>
             <motion.button onClick={() => navigate('/learn')} className="primary-action !m-0 lg:ml-auto group shrink-0" type="button" whileHover={{ y: -2, scale: 1.02 }} whileTap={{ scale: 0.97 }}>
-              Продолжить <FontAwesomeIcon icon={faArrowRight} className="ml-1.5 group-hover:translate-x-0.5 transition-transform" />
+              {live?.hasActive ? 'Продолжить урок' : 'Продолжить'} <FontAwesomeIcon icon={faArrowRight} className="ml-1.5 group-hover:translate-x-0.5 transition-transform" />
             </motion.button>
           </div>
         </SpotlightCard>
@@ -489,21 +609,30 @@ export default function Home() {
             <div className="relative flex flex-wrap items-start justify-between gap-4">
               <div className="min-w-0">
                 <div className="inline-flex items-center gap-2 px-2.5 py-1 rounded-full bg-white/[0.06] border border-white/[0.06] text-[11px] font-bold tracking-widest uppercase">
-                  <span className="w-1.5 h-1.5 rounded-full bg-[#5AD4B5] animate-pulse" /> EN • сущ. • B2
+                  <span className="w-1.5 h-1.5 rounded-full bg-[#5AD4B5] animate-pulse" /> EN • {wotd?.part_of_speech ?? 'сущ.'} • {wotd?.level ?? 'B2'}
                 </div>
-                <h4 className="text-[34px] sm:text-[42px] font-black tracking-[-0.04em] leading-none mt-3">Serendipity</h4>
-                <p className="text-white/40 text-[13px] font-medium mt-1">/ˌser.ənˈdɪp.ɪ.ti/</p>
-                <p className="text-white/70 text-[14px] leading-relaxed mt-3 max-w-[42ch]">Счастливая случайность — когда находишь ценное, не искав.</p>
-                <p className="text-white/35 text-[13px] mt-2 leading-relaxed max-w-[42ch]">“It was pure <span className="text-white/80 font-medium">serendipity</span> that we met after the rain in Prague.”</p>
+                <h4 className="text-[34px] sm:text-[42px] font-black tracking-[-0.04em] leading-none mt-3 break-words">{wotd?.word ?? 'Serendipity'}</h4>
+                <p className="text-white/40 text-[13px] font-medium mt-1">{wotd?.transcription ? `/${wotd.transcription}/` : ' '}</p>
+                <p className="text-white/70 text-[14px] leading-relaxed mt-3 max-w-[42ch]">{wotd?.translation ?? 'Счастливая случайность — когда находишь ценное, не искав.'}</p>
+                {wotd?.example ? (
+                  <p className="text-white/35 text-[13px] mt-2 leading-relaxed max-w-[42ch]">“{wotd.example}”</p>
+                ) : !wotd ? (
+                  <p className="text-white/35 text-[13px] mt-2 leading-relaxed max-w-[42ch]">“It was pure <span className="text-white/80 font-medium">serendipity</span> that we met after the rain in Prague.”</p>
+                ) : null}
               </div>
-              <button type="button" onClick={() => handleSpeak('serendipity', 'Serendipity')} className="w-12 h-12 rounded-full bg-[#5AD4B5] text-black grid place-items-center hover:scale-105 hover:brightness-110 transition shadow-[0_8px_20px_rgba(90,212,181,0.22)] flex-shrink-0">
+              <button type="button" onClick={() => handleSpeak(wotd?.word ?? 'serendipity', wotd?.word ?? 'Serendipity')} className="w-12 h-12 rounded-full bg-[#5AD4B5] text-black grid place-items-center hover:scale-105 hover:brightness-110 transition shadow-[0_8px_20px_rgba(90,212,181,0.22)] flex-shrink-0">
                 ▶
               </button>
             </div>
             <div className="relative mt-5 flex flex-wrap gap-2">
               <span className="px-3 py-1.5 rounded-full bg-white text-black text-xs font-bold">Запомнить</span>
-              <span className="px-3 py-1.5 rounded-full bg-white/[0.06] border border-white/[0.08] text-white/70 text-xs font-semibold">Примеры 3</span>
-              <span className="px-3 py-1.5 rounded-full bg-white/[0.06] border border-white/[0.08] text-white/50 text-xs">Синонимы: luck, chance</span>
+              {wotd ? (
+                wotd.forms.length > 0 ? (
+                  <span className="px-3 py-1.5 rounded-full bg-white/[0.06] border border-white/[0.08] text-white/70 text-xs font-semibold">Формы: {wotd.forms.join(', ')}</span>
+                ) : null
+              ) : (
+                <span className="px-3 py-1.5 rounded-full bg-white/[0.06] border border-white/[0.08] text-white/50 text-xs">Синонимы: luck, chance</span>
+              )}
             </div>
           </div>
         </SpotlightCard>
@@ -589,10 +718,10 @@ export default function Home() {
       <motion.section className="content-section !mt-6" variants={fadeUp} transition={{ duration: 0.5 }}>
         <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
           {[
-            { label: 'Слов выучено', value: 142, sub: 'всего', color: '#5AD4B5' },
-            { label: 'Дней подряд', value: 7, sub: '🔥 рекорд', color: '#F5C16A' },
-            { label: 'Точность', value: 92, suffix: '%', color: '#5B74FF' },
-            { label: 'Минут сегодня', value: 18, sub: 'из 20', color: '#F08AB4' },
+            { label: 'Слов выучено', value: live?.wordsLearned ?? 142, sub: 'всего', color: '#5AD4B5' },
+            { label: 'Дней подряд', value: live?.streak ?? 7, sub: live ? `🔥 рекорд ${live.bestStreak}` : '🔥 рекорд', color: '#F5C16A' },
+            { label: 'Точность', value: live ? Math.round(live.accuracy * 100) : 92, suffix: '%', color: '#5B74FF' },
+            { label: 'Минут сегодня', value: live?.minutesToday ?? 18, sub: live ? 'сегодня' : 'из 20', color: '#F08AB4' },
           ].map((s) => (
             <div key={s.label} className="rounded-[20px] border border-white/[0.06] bg-white/[0.03] p-4 backdrop-blur flex flex-col items-center gap-1 text-center">
               <span className="text-[11px] tracking-[0.10em] uppercase opacity-50 font-bold">{s.label}</span>
