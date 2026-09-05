@@ -147,20 +147,22 @@ export default function StudyFlashcard({
                   <FontAwesomeIcon icon={faKeyboard} className="text-[10px]" /> Напиши на английском
                 </span>
               )}
-              <button
-                onClick={(e) => {
-                  e.stopPropagation()
-                  onSpeak(displayText, displayLang, 'front')
-                }}
-                aria-label="Озвучить слово"
-                className={`ml-auto w-10 h-10 rounded-full grid place-items-center border transition-all ${
-                  speakingKey === 'front'
-                    ? 'bg-[#5AD4B5] text-black border-[#5AD4B5]'
-                    : 'bg-white/[0.06] border-white/[0.08] hover:bg-white/[0.12]'
-                }`}
-              >
-                <FontAwesomeIcon icon={faVolumeHigh} className="text-sm" />
-              </button>
+              {mode === 'f2n' && (
+                <button
+                  onClick={(e) => {
+                    e.stopPropagation()
+                    onSpeak(displayText, displayLang, 'front')
+                  }}
+                  aria-label="Озвучить слово"
+                  className={`ml-auto w-10 h-10 rounded-full grid place-items-center border transition-all ${
+                    speakingKey === 'front'
+                      ? 'bg-[#5AD4B5] text-black border-[#5AD4B5]'
+                      : 'bg-white/[0.06] border-white/[0.08] hover:bg-white/[0.12]'
+                  }`}
+                >
+                  <FontAwesomeIcon icon={faVolumeHigh} className="text-sm" />
+                </button>
+              )}
             </div>
 
             <div className="flex-1 grid place-items-center py-6 relative">
@@ -260,20 +262,22 @@ export default function StudyFlashcard({
                     className={`flex items-center gap-3 rounded-2xl bg-white/[0.05] border border-white/[0.07] px-4 ${answers.length > 3 ? 'py-1.5' : 'py-2.5'}`}
                   >
                     <span className={`flex-1 min-w-0 font-black leading-snug break-words ${answers.length > 3 ? 'text-[15px]' : 'text-[19px] sm:text-[22px]'}`}>{t}</span>
-                    <button
-                      onClick={(e) => {
-                        e.stopPropagation()
-                        onSpeak(t, answerLang, `back-${i}`)
-                      }}
-                      aria-label={`Озвучить: ${t}`}
-                      className={`w-9 h-9 shrink-0 rounded-full grid place-items-center border transition-all ${
-                        speakingKey === `back-${i}`
-                          ? 'bg-[#5AD4B5] text-black border-[#5AD4B5]'
-                          : 'bg-white/[0.06] border-white/[0.08] hover:bg-white/[0.12]'
-                      }`}
-                    >
-                      <FontAwesomeIcon icon={faVolumeHigh} className="text-xs" />
-                    </button>
+                    {mode !== 'f2n' && (
+                      <button
+                        onClick={(e) => {
+                          e.stopPropagation()
+                          onSpeak(t, answerLang, `back-${i}`)
+                        }}
+                        aria-label={`Озвучить: ${t}`}
+                        className={`w-9 h-9 shrink-0 rounded-full grid place-items-center border transition-all ${
+                          speakingKey === `back-${i}`
+                            ? 'bg-[#5AD4B5] text-black border-[#5AD4B5]'
+                            : 'bg-white/[0.06] border-white/[0.08] hover:bg-white/[0.12]'
+                        }`}
+                      >
+                        <FontAwesomeIcon icon={faVolumeHigh} className="text-xs" />
+                      </button>
+                    )}
                   </div>
                 ))
               ) : (
