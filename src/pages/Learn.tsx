@@ -5,14 +5,13 @@ import { FontAwesomeIcon } from '@fortawesome/react-fontawesome'
 import {
   faArrowLeft,
   faBolt,
-  faBookOpen,
   faCheck,
   faFlag,
   faPlay,
   faRotateRight,
   faTrophy,
 } from '@fortawesome/free-solid-svg-icons'
-import FlipCard from '@/components/FlipCard'
+import StudyFlashcard from '@/components/StudyFlashcard'
 import { useSpeech } from '@/hooks/useSpeech'
 import { useAuth } from '@/context/AuthContext'
 import {
@@ -157,7 +156,7 @@ export default function Learn() {
   const [sessionXp, setSessionXp] = useState(0)
   const [unlocked, setUnlocked] = useState<string[]>([])
   const [unlockTitles, setUnlockTitles] = useState<Record<string, string>>({})
-  const [speaking, setSpeaking] = useState(false)
+  const [speakingKey, setSpeakingKey] = useState<string | null>(null)
 
   // profiles + resumable session
   useEffect(() => {
@@ -324,17 +323,31 @@ export default function Learn() {
     setPhase('finished')
   }, [user, token, session, refreshSessions])
 
-  const speakCard = useCallback(() => {
-    if (!card) return
-    if (isSpeaking) {
-      cancel()
-      setSpeaking(false)
-      return
+  const speakCard = useCallback(
+    (text: string, lang: string, key: string) => {
+      if (isSpeaking) {
+        cancel()
+        setSpeakingKey(null)
+        return
+      }
+      setSpeakingKey(key)
+      speak(text, lang)
+      window.setTimeout(() => setSpeakingKey(null), 4000)
+    },
+    [isSpeaking, speak, cancel],
+  )
+
+  const voiceLangs = useMemo(() => {
+    const active = profiles.find((p) => p.id === profileId)
+    const code = (id?: string) => {
+      const c = id ? (langMap[id] ?? '') : ''
+      return c ? `${c.toLowerCase()}-${c.toUpperCase()}` : 'en-US'
+    };
+    return {
+      front: code(active?.target_language_id) || 'en-US',
+      back: code(active?.native_language_id) || 'ru-RU',
     }
-    setSpeaking(true)
-    speak(card.card.front_text)
-    window.setTimeout(() => setSpeaking(false), 4000)
-  }, [card, isSpeaking, speak, cancel])
+  }, [profiles, profileId, langMap])
 
   const { bindings } = useShortcuts()
 
@@ -392,8 +405,6 @@ export default function Learn() {
     if (!p) return ''
     return `${langMap[p.target_language_id] ?? ''} • ${p.level}`.trim()
   }, [profiles, profileId, langMap])
-
-  const backText = card ? card.card.back_texts.join(' / ') || '—' : ''
 
   return (
     <motion.div
@@ -636,17 +647,19 @@ export default function Learn() {
               exit={{ opacity: 0, x: -60 }}
               transition={{ duration: 0.25 }}
             >
-              <FlipCard
-                label={card.card.hint ?? 'СЛОВО'}
-                labelAccent=""
-                icon={faBookOpen}
-                title={card.card.front_text}
-                translation={backText}
+              <StudyFlashcard
+                frontText={card.card.front_text}
                 transcription={card.card.front_transcription}
-                isFlipped={flipped}
-                isSpeaking={speaking}
+                hint={card.card.hint}
+                backTexts={card.card.back_texts}
+                flipped={flipped}
+                speakingKey={speakingKey}
+                frontLang={voiceLangs.front}
+                backLang={voiceLangs.back}
                 onFlip={() => setFlipped((v) => !v)}
-                onSpeak={speakCard}
+                onSpeak={(text, lang, key) => speakCard(text, lang, key)}
+                onSwipeLeft={() => grade(1)}
+                onSwipeRight={() => grade(4)}
               />
             </motion.div>
           </AnimatePresence>
