@@ -45,6 +45,15 @@ const GRADES = [
 
 const LIMITS = [10, 20, 30]
 
+type Direction = 'f2n' | 'n2f' | 'typing' | 'mixed'
+
+const DIRECTIONS: { id: Direction; label: string; hint: string }[] = [
+  { id: 'f2n', label: 'EN → RU', hint: 'видишь слово, вспоминаешь перевод' },
+  { id: 'n2f', label: 'RU → EN', hint: 'видишь перевод, вспоминаешь слово' },
+  { id: 'typing', label: '⌨️ Ввод', hint: 'печатаешь слово на английском' },
+  { id: 'mixed', label: '🔀 Микс', hint: 'направление случайно для каждой карточки' },
+]
+
 function Kbd({ children }: { children: React.ReactNode }) {
   return (
     <kbd className="px-1.5 py-0.5 rounded-md bg-white/[0.08] border border-white/[0.12] text-[10.5px] font-black text-white/85 font-sans">
@@ -65,6 +74,12 @@ export default function Learn() {
   const [profileId, setProfileId] = useState<string | null>(null)
   const [sessions, setSessions] = useState<RemoteSession[]>([])
   const [source, setSource] = useState<'mixed' | 'due' | 'new'>('mixed')
+  const [direction, setDirection] = useState<Direction>(() => {
+    const saved = localStorage.getItem('lexio:card-direction')
+    return saved === 'f2n' || saved === 'n2f' || saved === 'typing' || saved === 'mixed'
+      ? saved
+      : 'mixed'
+  })
   const [limit, setLimit] = useState(20)
   const [offset, setOffset] = useState(0)
   const [categoryId, setCategoryId] = useState<string | null>(null)
@@ -344,10 +359,38 @@ export default function Learn() {
       return c ? `${c.toLowerCase()}-${c.toUpperCase()}` : 'en-US'
     };
     return {
-      front: code(active?.target_language_id) || 'en-US',
-      back: code(active?.native_language_id) || 'ru-RU',
+      target: code(active?.target_language_id) || 'en-US',
+      native: code(active?.native_language_id) || 'ru-RU',
     }
   }, [profiles, profileId, langMap])
+
+  useEffect(() => {
+    localStorage.setItem('lexio:card-direction', direction)
+  }, [direction])
+
+  // Both word lists per card (backend sends target/native, fallback to legacy fields).
+  const cardTexts = useMemo(() => {
+    const c = card?.card
+    return {
+      target: c?.target_texts?.length ? c.target_texts : c ? [c.front_text] : [],
+      native: c?.native_texts ?? c?.back_texts ?? [],
+    }
+  }, [card])
+
+  // Effective mode for the current card: fixed direction or a stable
+  // per-card pick for mixed (falls back to f2n when a side is missing).
+  const cardMode = useMemo<'f2n' | 'n2f' | 'typing'>(() => {
+    const pick = (d: Direction): 'f2n' | 'n2f' | 'typing' => {
+      if (d !== 'mixed') return d
+      const id = card?.card.learnable_id ?? ''
+      let h = 0
+      for (let i = 0; i < id.length; i++) h = (h * 31 + id.charCodeAt(i)) >>> 0
+      return (['f2n', 'n2f', 'typing'] as const)[h % 3]
+    }
+    const m = pick(direction)
+    if (m !== 'f2n' && cardTexts.native.length === 0) return 'f2n'
+    return m
+  }, [direction, card, cardTexts])
 
   const { bindings } = useShortcuts()
 
@@ -359,6 +402,8 @@ export default function Learn() {
       const target = e.target as HTMLElement | null
       if (target && (target.tagName === 'INPUT' || target.tagName === 'TEXTAREA')) return
       if (e.key === ' ') {
+        // In typing mode Space belongs to the answer — never flip/grade.
+        if (cardMode === 'typing' && !flipped) return
         e.preventDefault()
         e.stopPropagation()
         if (!flipped) setFlipped(true)
@@ -379,7 +424,7 @@ export default function Learn() {
     }
     window.addEventListener('keydown', handler, true)
     return () => window.removeEventListener('keydown', handler, true)
-  }, [phase, grade, flipped, bindings, setFlipped])
+  }, [phase, grade, flipped, bindings, setFlipped, cardMode])
 
   // achievement titles for the finish screen
   useEffect(() => {
@@ -470,7 +515,7 @@ export default function Learn() {
             <h3 className="text-[14px] font-black tracking-tight flex items-center gap-2">
               <FontAwesomeIcon icon={faPlay} className="text-[#5AD4B5]" /> Новый урок
             </h3>
-            <div className="text-xs opacity-40 mt-1">Три шага — и погнали: что учим, сколько берём, жмём старт</div>
+            <div className="text-xs opacity-40 mt-1">Пара шагов — и погнали: что учим, как спрашиваем, сколько берём, жмём старт</div>
             {categoryId && (
               <div className="mt-3 inline-flex items-center gap-2 px-3 py-1.5 rounded-full bg-[#5B74FF]/10 border border-[#5B74FF]/30 text-xs font-bold text-[#8b9bff] w-fit">
                 <span>Тема: {categoryName ?? '…'}</span>
@@ -515,7 +560,22 @@ export default function Learn() {
               </div>
             )}
             <div className="text-[11px] font-black uppercase tracking-widest opacity-40 mt-4 mb-1.5">
-              Шаг 2 — сколько берём
+              Шаг 2 — как спрашиваем
+            </div>
+            <div className="flex flex-wrap gap-1.5">
+              {DIRECTIONS.map((d) => (
+                <button
+                  key={d.id}
+                  onClick={() => setDirection(d.id)}
+                  title={d.hint}
+                  className={`px-3 py-1.5 rounded-full text-xs font-bold border transition-all ${direction === d.id ? 'bg-[#5B74FF]/20 border-[#5B74FF]/50 text-[#8b9bff]' : 'bg-white/[0.04] border-white/[0.06] hover:bg-white/[0.08]'}`}
+                >
+                  {d.label}
+                </button>
+              ))}
+            </div>
+            <div className="text-[11px] font-black uppercase tracking-widest opacity-40 mt-4 mb-1.5">
+              Шаг 3 — сколько берём
             </div>
             <div className="flex items-center gap-2">
               <span className="text-xs opacity-40 font-bold">Слов в уроке:</span>
@@ -612,7 +672,7 @@ export default function Learn() {
               </span>
             </div>
             <div className="text-[11px] font-black uppercase tracking-widest opacity-40 mt-4 mb-1.5">
-              Шаг 3 — погнали
+              Шаг 4 — погнали
             </div>
             <button
               onClick={() => beginSession()}
@@ -648,14 +708,15 @@ export default function Learn() {
               transition={{ duration: 0.25 }}
             >
               <StudyFlashcard
-                frontText={card.card.front_text}
+                mode={cardMode}
+                targetTexts={cardTexts.target}
+                nativeTexts={cardTexts.native}
                 transcription={card.card.front_transcription}
                 hint={card.card.hint}
-                backTexts={card.card.back_texts}
                 flipped={flipped}
                 speakingKey={speakingKey}
-                frontLang={voiceLangs.front}
-                backLang={voiceLangs.back}
+                targetLang={voiceLangs.target}
+                nativeLang={voiceLangs.native}
                 onFlip={() => setFlipped((v) => !v)}
                 onSpeak={(text, lang, key) => speakCard(text, lang, key)}
                 onSwipeLeft={() => grade(1)}
@@ -666,12 +727,18 @@ export default function Learn() {
 
           <div className="rounded-[20px] border border-white/[0.06] bg-[#171717] p-4">
             {!flipped ? (
-              <button
-                onClick={() => setFlipped(true)}
-                className="w-full py-3 rounded-2xl bg-white/[0.06] border border-white/[0.08] text-sm font-black hover:bg-white/[0.1] transition"
-              >
-                Показать перевод
-              </button>
+              cardMode === 'typing' ? (
+                <div className="text-center text-[13px] font-bold text-white/45 py-3">
+                  ⌨️ Напечатай ответ на карточке ↑ и жми Enter
+                </div>
+              ) : (
+                <button
+                  onClick={() => setFlipped(true)}
+                  className="w-full py-3 rounded-2xl bg-white/[0.06] border border-white/[0.08] text-sm font-black hover:bg-white/[0.1] transition"
+                >
+                  {cardMode === 'n2f' ? 'Показать слово' : 'Показать перевод'}
+                </button>
+              )
             ) : (
               <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
                 {GRADES.map((g) => (
@@ -694,12 +761,21 @@ export default function Learn() {
 
           <div className="rounded-2xl bg-white/[0.03] border border-white/[0.05] px-3.5 py-2.5 flex flex-wrap items-center justify-center gap-x-4 gap-y-1.5 text-[11.5px] text-white/55">
             {!flipped ? (
-              <>
-                <span>
-                  <Kbd>Пробел</Kbd> — открыть перевод
-                </span>
-                <span>🖱️ или кликни по карточке</span>
-              </>
+              cardMode === 'typing' ? (
+                <>
+                  <span>
+                    <Kbd>Enter</Kbd> — проверить ответ
+                  </span>
+                  <span>оценка — после проверки ↓</span>
+                </>
+              ) : (
+                <>
+                  <span>
+                    <Kbd>Пробел</Kbd> — {cardMode === 'n2f' ? 'открыть слово' : 'открыть перевод'}
+                  </span>
+                  <span>🖱️ или кликни по карточке</span>
+                </>
+              )
             ) : (
               <>
                 <span>

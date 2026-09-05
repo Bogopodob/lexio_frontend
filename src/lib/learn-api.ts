@@ -21,6 +21,8 @@ export interface RemoteStudyCard {
   front_transcription: string | null
   back_texts: string[]
   hint: string | null
+  target_texts?: string[]
+  native_texts?: string[]
 }
 
 export interface NextCardData {

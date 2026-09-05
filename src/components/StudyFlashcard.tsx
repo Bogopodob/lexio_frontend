@@ -1,36 +1,42 @@
-import { useRef } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import {
   motion,
   useMotionValue,
   useTransform,
 } from 'framer-motion'
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome'
-import { faVolumeHigh, faCheck, faRotateLeft, faEye, faLanguage } from '@fortawesome/free-solid-svg-icons'
+import { faVolumeHigh, faCheck, faRotateLeft, faEye, faLanguage, faKeyboard } from '@fortawesome/free-solid-svg-icons'
+
+export type CardMode = 'f2n' | 'n2f' | 'typing'
 
 interface StudyFlashcardProps {
-  frontText: string
+  mode: CardMode
+  targetTexts: string[]
+  nativeTexts: string[]
   transcription: string | null
   hint: string | null
-  backTexts: string[]
   flipped: boolean
   speakingKey: string | null
-  frontLang: string
-  backLang: string
+  targetLang: string
+  nativeLang: string
   onFlip: () => void
   onSpeak: (text: string, lang: string, key: string) => void
   onSwipeLeft: () => void
   onSwipeRight: () => void
 }
 
+const normalize = (s: string) => s.trim().toLowerCase().replace(/\s+/g, ' ')
+
 export default function StudyFlashcard({
-  frontText,
+  mode,
+  targetTexts,
+  nativeTexts,
   transcription,
   hint,
-  backTexts,
   flipped,
   speakingKey,
-  frontLang,
-  backLang,
+  targetLang,
+  nativeLang,
   onFlip,
   onSpeak,
   onSwipeLeft,
@@ -42,7 +48,30 @@ export default function StudyFlashcard({
   const suppressed = useRef(false)
   const dragState = useRef<{ id: number; startX: number } | null>(null)
 
-  const firstLetter = (frontText.trim()[0] ?? '?').toUpperCase()
+  const isTyping = mode === 'typing'
+  const displayText = mode === 'f2n' ? (targetTexts[0] ?? '') : (nativeTexts[0] ?? '')
+  const displayLang = mode === 'f2n' ? targetLang : nativeLang
+  const answers = mode === 'f2n' ? nativeTexts : targetTexts
+  const answerLang = mode === 'f2n' ? nativeLang : targetLang
+  const backLabel = mode === 'f2n' ? 'Перевод' : mode === 'n2f' ? 'Слово' : 'Ответ'
+
+  const [value, setValue] = useState('')
+  const [result, setResult] = useState<boolean | null>(null)
+
+  useEffect(() => {
+    setValue('')
+    setResult(null)
+  }, [displayText, mode])
+
+  const firstLetter = (displayText.trim()[0] ?? '?').toUpperCase()
+
+  const check = () => {
+    const v = normalize(value)
+    if (!v || flipped) return
+    const ok = targetTexts.some((t) => normalize(t) === v)
+    setResult(ok)
+    onFlip()
+  }
 
   return (
     <div className="relative" style={{ perspective: 1400 }}>
@@ -84,6 +113,7 @@ export default function StudyFlashcard({
               suppressed.current = false
               return
             }
+            if (isTyping && !flipped) return
             onFlip()
           }}
         >
@@ -108,10 +138,15 @@ export default function StudyFlashcard({
                   {hint}
                 </span>
               )}
+              {isTyping && (
+                <span className="px-2.5 py-1 rounded-full bg-[#5B74FF]/15 border border-[#5B74FF]/30 text-[#8b9bff] text-[11px] font-black uppercase tracking-widest flex items-center gap-1.5">
+                  <FontAwesomeIcon icon={faKeyboard} className="text-[10px]" /> Напиши на английском
+                </span>
+              )}
               <button
                 onClick={(e) => {
                   e.stopPropagation()
-                  onSpeak(frontText, frontLang, 'front')
+                  onSpeak(displayText, displayLang, 'front')
                 }}
                 aria-label="Озвучить слово"
                 className={`ml-auto w-10 h-10 rounded-full grid place-items-center border transition-all ${
@@ -125,21 +160,47 @@ export default function StudyFlashcard({
             </div>
 
             <div className="flex-1 grid place-items-center py-6 relative">
-              <div className="text-center">
+              <div className="text-center w-full max-w-[420px]">
                 <h2 className="text-[40px] sm:text-[52px] font-black tracking-tight leading-none">
-                  {frontText}
+                  {displayText}
                 </h2>
-                {transcription ? (
+                {mode === 'f2n' && transcription ? (
                   <div className="mt-3 inline-block px-4 py-1.5 rounded-full bg-[#5AD4B5]/[0.08] border border-[#5AD4B5]/25 text-[#5AD4B5] text-[17px] font-bold tabular-nums tracking-wide">
                     [{transcription}]
                   </div>
                 ) : null}
+                {isTyping && (
+                  <div className="mt-5 flex gap-2" onClick={(e) => e.stopPropagation()}>
+                    <input
+                      autoFocus
+                      value={value}
+                      onChange={(e) => setValue(e.target.value)}
+                      onKeyDown={(e) => {
+                        e.stopPropagation()
+                        if (e.key === 'Enter') check()
+                      }}
+                      placeholder="Type in English…"
+                      autoComplete="off"
+                      autoCapitalize="off"
+                      spellCheck={false}
+                      aria-label="Ответ на английском"
+                      className="flex-1 min-w-0 px-4 py-3 rounded-2xl bg-black/30 border border-white/[0.12] text-[17px] font-bold text-center placeholder:text-white/25 placeholder:font-medium focus:outline-none focus:border-[#5AD4B5]/60"
+                    />
+                    <button
+                      onClick={check}
+                      disabled={normalize(value) === ''}
+                      className="px-5 rounded-2xl bg-[#5AD4B5] text-black text-sm font-black hover:brightness-110 transition disabled:opacity-40"
+                    >
+                      ✓
+                    </button>
+                  </div>
+                )}
               </div>
             </div>
 
             <div className="flex items-center justify-center gap-2 text-[12px] font-bold text-white/35 relative">
               <FontAwesomeIcon icon={faEye} className="text-[11px]" />
-              клик / пробел — перевод
+              {isTyping ? 'Enter — проверить' : 'клик / пробел — перевод'}
             </div>
           </div>
 
@@ -149,27 +210,43 @@ export default function StudyFlashcard({
             style={{ backfaceVisibility: 'hidden', transform: 'rotateY(180deg)' }}
           >
             <div className="absolute -left-14 -top-14 w-52 h-52 rounded-full bg-[#5AD4B5]/[0.1] blur-3xl pointer-events-none" />
-            <div className="flex items-center gap-2 relative">
+            <div className="flex items-center gap-2 relative flex-wrap">
               <span className="px-2.5 py-1 rounded-full bg-white text-black text-[11px] font-black uppercase tracking-widest">
-                Перевод
+                {backLabel}
               </span>
               <span className="text-[11px] text-white/40 font-bold flex items-center gap-1.5">
-                <FontAwesomeIcon icon={faLanguage} /> {backTexts.length > 1 ? `${backTexts.length} варианта` : '1 вариант'}
+                <FontAwesomeIcon icon={faLanguage} /> {answers.length > 1 ? `${answers.length} варианта` : '1 вариант'}
               </span>
+              {isTyping && result !== null && (
+                <span
+                  className={`px-2.5 py-1 rounded-full text-[11px] font-black uppercase tracking-widest ${
+                    result
+                      ? 'bg-[#5AD4B5]/15 border border-[#5AD4B5]/40 text-[#5AD4B5]'
+                      : 'bg-[#f43f5e]/15 border border-[#f43f5e]/40 text-[#fb7185]'
+                  }`}
+                >
+                  {result ? 'Верно 🎉' : 'Мимо'}
+                </span>
+              )}
             </div>
 
-            <div className="flex-1 flex flex-col justify-center gap-2 py-4 relative">
-              {backTexts.length > 0 ? (
-                backTexts.map((t, i) => (
+            <div className="flex-1 flex flex-col justify-center gap-2 py-4 relative overflow-y-auto">
+              {isTyping && result === false && (
+                <div className="text-[13px] font-bold text-white/50">
+                  Ты написал: <span className="text-[#fb7185]">«{value.trim()}»</span>
+                </div>
+              )}
+              {answers.length > 0 ? (
+                answers.map((t, i) => (
                   <div
                     key={`${t}-${i}`}
-                    className={`flex items-center gap-3 rounded-2xl bg-white/[0.05] border border-white/[0.07] px-4 ${backTexts.length > 3 ? 'py-1.5' : 'py-2.5'}`}
+                    className={`flex items-center gap-3 rounded-2xl bg-white/[0.05] border border-white/[0.07] px-4 ${answers.length > 3 ? 'py-1.5' : 'py-2.5'}`}
                   >
-                    <span className={`flex-1 font-black leading-snug ${backTexts.length > 3 ? 'text-[15px]' : 'text-[19px] sm:text-[22px]'}`}>{t}</span>
+                    <span className={`flex-1 font-black leading-snug ${answers.length > 3 ? 'text-[15px]' : 'text-[19px] sm:text-[22px]'}`}>{t}</span>
                     <button
                       onClick={(e) => {
                         e.stopPropagation()
-                        onSpeak(t, backLang, `back-${i}`)
+                        onSpeak(t, answerLang, `back-${i}`)
                       }}
                       aria-label={`Озвучить: ${t}`}
                       className={`w-9 h-9 shrink-0 rounded-full grid place-items-center border transition-all ${
@@ -185,6 +262,9 @@ export default function StudyFlashcard({
               ) : (
                 <div className="text-white/40 text-sm">Перевода пока нет</div>
               )}
+              {mode !== 'f2n' && transcription ? (
+                <div className="text-[13px] font-bold text-[#5AD4B5]/80 tabular-nums">[{transcription}]</div>
+              ) : null}
             </div>
 
             <div className="text-center text-[12px] font-bold text-white/35 relative">
