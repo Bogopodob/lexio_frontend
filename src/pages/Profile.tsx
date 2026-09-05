@@ -47,6 +47,7 @@ import {
   updateGoal,
   updateLearningProfile,
   updateProfile,
+  uploadAvatar,
   type FriendRequestRow,
   type RemoteAchievement,
   type RemoteFriend,
@@ -55,6 +56,7 @@ import {
   type RemoteStat,
   type UserSearchHit,
 } from '@/lib/profile-api'
+import { sanitizeAvatarImage } from '@/lib/image-upload'
 import { DatePicker, DateField, Calendar } from '@heroui/react'
 import { parseDate, getLocalTimeZone, today } from '@internationalized/date'
 import type { DateValue } from '@internationalized/date'
@@ -335,6 +337,8 @@ export default function Profile() {
   const [profileStats, setProfileStats] = useState<Record<string, RemoteStat>>({})
   const [goal, setGoal] = useState(20)
   const fileRef = useRef<HTMLInputElement>(null)
+  // Sanitized avatar blob waiting for upload on save (preview is a blob: URL).
+  const pendingAvatar = useRef<{ blob: Blob; preview: string } | null>(null)
   const { user, token, ready: authReady } = useAuth()
   const tagOptions = ['Путешествия', 'Работа', 'Кино', 'Кофе', 'Еда', 'Эмоции', 'Музыка', 'Спорт', 'Книги', 'Технологии']
   const langOptions = [
@@ -557,20 +561,45 @@ export default function Profile() {
       return
     }
     const snapshot = draft
-    setProfile(snapshot)
-    setIsEditing(false)
     setSaveError(null)
-    if (!user || !token) return
-    setSaving(true)
-    const payload: { name?: string | null; city?: string | null; birth_date?: string | null; tags?: string[]; avatar?: string | null; gender?: string | null } = {
-      name: snapshot.name.trim() || null,
-      city: snapshot.city.trim() || null,
-      birth_date: snapshot.birthDate || null,
-      tags: snapshot.tags,
-      gender: snapshot.gender === 'male' || snapshot.gender === 'female' ? snapshot.gender : null,
+    if (!user || !token) {
+      setProfile(snapshot)
+      setIsEditing(false)
+      return
     }
-    if (snapshot.avatar && snapshot.avatar.length <= 2000) payload.avatar = snapshot.avatar
-    updateProfile(user.id, token, payload)
+    setSaving(true)
+    // Upload a freshly picked avatar first; the file was already
+    // validated + re-encoded on pick, the server verifies it again.
+    const pending = pendingAvatar.current
+    const avatarPromise: Promise<string | null> = pending
+      ? uploadAvatar(user.id, token, pending.blob).then(
+          (r) => {
+            URL.revokeObjectURL(pending.preview)
+            pendingAvatar.current = null
+            return r.avatar_url as string | null
+          },
+          (e) => {
+            setSaveError(e instanceof Error ? e.message : 'Аватар не загрузился — остальное сохраняем без него')
+            return profile.avatar
+          },
+        )
+      : Promise.resolve(
+          snapshot.avatar && snapshot.avatar.startsWith('blob:') ? profile.avatar : (snapshot.avatar ?? null),
+        )
+    avatarPromise.then((avatar) => {
+      const finalSnapshot = { ...snapshot, avatar }
+      setProfile(finalSnapshot)
+      setIsEditing(false)
+      const payload: { name?: string | null; city?: string | null; birth_date?: string | null; tags?: string[]; avatar?: string | null; gender?: string | null } = {
+        name: finalSnapshot.name.trim() || null,
+        city: finalSnapshot.city.trim() || null,
+        birth_date: finalSnapshot.birthDate || null,
+        tags: finalSnapshot.tags,
+        gender: finalSnapshot.gender === 'male' || finalSnapshot.gender === 'female' ? finalSnapshot.gender : null,
+      }
+      // Legacy data-URL avatars that no longer fit the server cap stay untouched.
+      if (!(avatar && avatar.startsWith('data:') && avatar.length > 1800)) payload.avatar = avatar
+      return updateProfile(user.id, token, payload)
       .then(async () => {
         // Language IS the learning profile: ensure one exists for the chosen
         // language and make it active (backend deactivates the rest).
@@ -600,13 +629,21 @@ export default function Profile() {
       })
       .catch(() => setSaveError('Не сохранилось на сервер — проверь соединение'))
       .finally(() => setSaving(false))
-  }, [draft, user, token, learningProfiles, langIdByCode, birthDateError])
+    })
+  }, [draft, user, token, learningProfiles, langIdByCode, birthDateError, profile.avatar])
   const onAvatarChange = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
     const f = e.target.files?.[0]
+    e.target.value = ''
     if (!f) return
-    const r = new FileReader()
-    r.onload = () => setDraft((p) => ({ ...p, avatar: r.result as string }))
-    r.readAsDataURL(f)
+    setSaveError(null)
+    sanitizeAvatarImage(f).then(
+      (ok) => {
+        if (pendingAvatar.current) URL.revokeObjectURL(pendingAvatar.current.preview)
+        pendingAvatar.current = { blob: ok.blob, preview: ok.previewUrl }
+        setDraft((p) => ({ ...p, avatar: ok.previewUrl }))
+      },
+      (err) => setSaveError(err instanceof Error ? err.message : 'Файл не подошёл.'),
+    )
   }, [])
   const toggleTag = useCallback((tag: string) => {
     setDraft((p) => ({ ...p, tags: p.tags.includes(tag) ? p.tags.filter((t) => t !== tag) : p.tags.length < 6 ? [...p.tags, tag] : p.tags }))
@@ -917,7 +954,7 @@ export default function Profile() {
                     <span className="px-2.5 py-1 rounded-full bg-white text-black text-xs font-bold flex items-center gap-1"><FontAwesomeIcon icon={faCamera} /> Загрузить</span>
                   </button>
                 )}
-                <input ref={fileRef} type="file" accept="image/*" className="hidden" onChange={onAvatarChange} />
+                <input ref={fileRef} type="file" accept="image/png,image/jpeg" className="hidden" onChange={onAvatarChange} />
               </div>
               <div className="min-w-0 flex-1">
                 {isEditing ? (

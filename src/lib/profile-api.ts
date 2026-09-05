@@ -83,6 +83,33 @@ export function updateProfile(
   })
 }
 
+export interface AvatarUploadData {
+  avatar_url: string
+}
+
+export async function uploadAvatar(userId: string, token: string, blob: Blob): Promise<AvatarUploadData> {
+  const form = new FormData()
+  form.append('avatar', blob, blob.type === 'image/png' ? 'avatar.png' : 'avatar.jpg')
+  const res = await fetch(`${API_URL}/users/${userId}/avatar`, {
+    method: 'POST',
+    headers: { Authorization: `Bearer ${token}` },
+    body: form,
+  })
+  const body = (await res.json().catch(() => null)) as {
+    success?: boolean
+    data?: AvatarUploadData
+    message?: string
+    error?: string
+    errors?: Record<string, string[]>
+  } | null
+  if (!res.ok || !body || body.success === false) {
+    const fieldError = body?.errors ? Object.values(body.errors).flat()[0] : undefined
+    throw new Error(fieldError ?? body?.message ?? body?.error ?? `Upload failed (${res.status})`)
+  }
+  if (!body.data) throw new Error('Пустой ответ сервера.')
+  return body.data
+}
+
 export async function listLanguages(): Promise<RemoteLanguage[]> {
   const res = await fetch(`${API_URL}/catalog/languages`)
   const body = (await res.json().catch(() => null)) as { success?: boolean; data?: RemoteLanguage[] } | null
