@@ -20,6 +20,8 @@ interface StudyFlashcardProps {
   targetTexts: string[]
   nativeTexts: string[]
   transcription: string | null
+  forms: { form: string; form_type: string; transcription: string | null }[]
+  formsPattern: string | null
   hint: string | null
   flipped: boolean
   speakingKey: string | null
@@ -107,6 +109,8 @@ export default function StudyFlashcard({
   targetTexts,
   nativeTexts,
   transcription,
+  forms,
+  formsPattern,
   hint,
   flipped,
   speakingKey,
@@ -485,6 +489,51 @@ export default function StudyFlashcard({
                   <FontAwesomeIcon icon={faEyeSlash} className="text-[11px]" /> показать транскрипцию
                 </button>
               ) : null}
+              {(forms.length > 0 || formsPattern) && (
+                <div className="rounded-2xl bg-[#5AD4B5]/[0.06] border border-[#5AD4B5]/25 px-4 py-2.5">
+                  <div className="flex items-center gap-1.5 flex-wrap">
+                    <span className="text-[17px] font-black text-white break-words">{targetTexts[0] ?? ''}</span>
+                    {forms.map((f, i) => (
+                      <span key={`${f.form}-${f.form_type}-${i}`} className="flex items-center gap-1.5">
+                        <span className="text-[#5AD4B5] font-black">→</span>
+                        <span className="text-[17px] font-black text-white break-words">{f.form}</span>
+                      </span>
+                    ))}
+                    {formsPattern && (
+                      <span className="ml-auto px-2 py-0.5 rounded-md bg-[#5AD4B5]/15 text-[#5AD4B5] text-[11px] font-black tabular-nums whitespace-nowrap">
+                        {formsPattern}
+                      </span>
+                    )}
+                  </div>
+                  <div className="mt-1.5 flex flex-col gap-1">
+                    {forms.map((f, i) => (
+                      <div key={`tr-${f.form}-${f.form_type}-${i}`} className="flex items-center gap-2 text-[12px]">
+                        <span className="font-black uppercase tracking-widest text-white/35 text-[10px] w-[86px] shrink-0">
+                          {f.form_type === 'past' ? '2-я · past' : '3-я · participle'}
+                        </span>
+                        <span className="font-bold text-[#5AD4B5]/80 tabular-nums truncate">{f.form}</span>
+                        {f.transcription ? (
+                          <span className="text-white/40 tabular-nums truncate">[{f.transcription}]</span>
+                        ) : null}
+                        <button
+                          onClick={(e) => {
+                            e.stopPropagation()
+                            onSpeak(f.form, targetLang, `form-${i}`)
+                          }}
+                          aria-label={`Озвучить: ${f.form}`}
+                          className={`ml-auto w-7 h-7 shrink-0 rounded-full grid place-items-center border transition-all ${
+                            speakingKey === `form-${i}`
+                              ? 'bg-[#5AD4B5] text-black border-[#5AD4B5]'
+                              : 'bg-white/[0.06] border-white/[0.08] hover:bg-white/[0.12]'
+                          }`}
+                        >
+                          <FontAwesomeIcon icon={faVolumeHigh} className="text-[10px]" />
+                        </button>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
               {isTyping && nativeTexts.length > 0 && (
                 <>
                   <div className="text-[10.5px] font-black uppercase tracking-[0.18em] text-white/40 mt-1">

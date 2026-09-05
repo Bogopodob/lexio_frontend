@@ -265,6 +265,7 @@ export default function Home() {
   const { user, token, ready: authReady } = useAuth()
   const [themeCategories, setThemeCategories] = useState<RemoteCategory[]>([])
   const [grammarCategories, setGrammarCategories] = useState<RemoteCategory[]>([])
+  const [verbsCategories, setVerbsCategories] = useState<RemoteCategory[]>([])
   const [showAllTopics, setShowAllTopics] = useState(false)
 
   // Real catalog categories (guests see them too — public endpoint).
@@ -306,6 +307,66 @@ export default function Home() {
       cancelled = true
     }
   }, [authReady, user, token])
+
+  useEffect(() => {
+    let cancelled = false
+    const load = async () => {
+      try {
+        if (authReady && user && token) {
+          const profiles = await listLearningProfiles(user.id, token)
+          const active = profiles.find((p) => p.is_active) ?? profiles[0]
+          if (active) {
+            const withProgress = await listCategoriesWithProgress(user.id, token, active.id, 'verbs')
+            if (!cancelled && withProgress.length > 0) {
+              setVerbsCategories(withProgress)
+              return
+            }
+          }
+        }
+        const pub = await listCategories('verbs')
+        if (!cancelled && pub.length > 0) setVerbsCategories(pub)
+      } catch {
+        /* section stays hidden */
+      }
+    }
+    load()
+    return () => {
+      cancelled = true
+    }
+  }, [authReady, user, token])
+
+  const VERB_COVERAGE: Record<string, string> = {
+    'irr-50': '≈50% употреблений',
+    'irr-100': '≈70% употреблений',
+    'irr-150': '≈90% употреблений',
+    'irr-200': '≈93% употреблений',
+    'irr-300': '≈97% употреблений',
+    'irr-366': '≈99% употреблений',
+    'irr-700': 'редкие и производные',
+  }
+
+  const visibleVerbs: GrammarCardData[] = useMemo(() => {
+    if (verbsCategories.length === 0) return []
+    const parent = verbsCategories.find((c) => c.slug === 'irregular-verbs')
+    const bands = verbsCategories
+      .filter((c) => (parent ? c.parent_id === parent.id : c.slug.startsWith('irr-')) && !c.slug.startsWith('irr-group-'))
+      .sort((a, b) => (a.sort ?? 500) - (b.sort ?? 500))
+    return bands.map((c, i) => {
+      const palette = GRAMMAR_COLORS[(i + 2) % GRAMMAR_COLORS.length]
+      const learned = c.learned_count ?? null
+      const progress = learned !== null && c.entries_count > 0 ? Math.round((learned / c.entries_count) * 100) : 0
+      return {
+        id: c.id,
+        dot: palette.dot,
+        title: c.name ?? c.slug,
+        subtitle: `${c.entries_count} глаголов${learned !== null ? ` • ${learned} выучено` : ''}`,
+        progress,
+        level: VERB_COVERAGE[c.slug] ?? (learned !== null ? `${learned} ✓` : 'глаголы'),
+        accent: palette.accent,
+        color: palette.color,
+      }
+    })
+  }, [verbsCategories])
 
   const topicNameById = useMemo(() => {
     const map: Record<string, string> = {}
@@ -479,6 +540,23 @@ export default function Home() {
           ))}
         </div>
       </motion.section>
+
+      {/* IRREGULAR VERBS — отдельная секция */}
+      {visibleVerbs.length > 0 && (
+        <motion.section className="content-section !mt-6" variants={fadeUp} transition={{ duration: 0.5 }}>
+          <div className="section-header section-header--stacked">
+            <div>
+              <h3>Неправильные глаголы</h3>
+              <p>Три формы сразу: go → went → gone. Частые — первые.</p>
+            </div>
+          </div>
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
+            {visibleVerbs.map((card, index) => (
+              <MemoGrammarCard key={card.title} card={card} index={index} onOpen={openCategory} />
+            ))}
+          </div>
+        </motion.section>
+      )}
 
       {/* WEEKLY TREND — lazy, не блокирует первый paint */}
       <motion.section className="content-section !mt-6" variants={fadeUp} transition={{ duration: 0.5 }}>

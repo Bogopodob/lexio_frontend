@@ -1108,6 +1108,8 @@ export default function Learn() {
                   targetTexts={cardTexts.target}
                   nativeTexts={cardTexts.native}
                   transcription={card.card.front_transcription}
+                  forms={card.card.forms ?? []}
+                  formsPattern={card.card.forms_pattern ?? null}
                   hint={card.card.hint}
                   flipped={flipped}
                   speakingKey={speakingKey}

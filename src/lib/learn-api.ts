@@ -14,6 +14,12 @@ export interface RemoteSession {
   finished_at: string | null
 }
 
+export interface RemoteWordForm {
+  form: string
+  form_type: string
+  transcription: string | null
+}
+
 export interface RemoteStudyCard {
   learnable_type: string
   learnable_id: string
@@ -24,6 +30,8 @@ export interface RemoteStudyCard {
   target_texts?: string[]
   native_texts?: string[]
   own_hint?: string | null
+  forms?: RemoteWordForm[]
+  forms_pattern?: string | null
 }
 
 export interface RemoteProgress {
