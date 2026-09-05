@@ -47,6 +47,16 @@ export function getWordOfDay(date: string): Promise<WordOfDay> {
   return get(`/catalog/word-of-day?date=${encodeURIComponent(date)}`)
 }
 
+export interface QuizRound {
+  question: { word: string; transcription: string | null }
+  options: string[]
+  correct_index: number
+}
+
+export function getQuizRound(count = 4): Promise<QuizRound> {
+  return get(`/catalog/quiz-round?count=${count}`)
+}
+
 export function listCategoriesWithProgress(
   userId: string,
   token: string,

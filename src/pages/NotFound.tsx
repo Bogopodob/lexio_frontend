@@ -1,8 +1,9 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { AnimatePresence, motion, useMotionValue, useSpring, useTransform } from 'framer-motion'
+import { motion, useMotionValue, useSpring, useTransform } from 'framer-motion'
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome'
-import { faHouse, faArrowLeft, faCompass, faGhost, faBug, faTerminal, faTrophy } from '@fortawesome/free-solid-svg-icons'
+import { faHouse, faArrowLeft, faCompass, faGhost, faCheck, faTrophy, faRotateRight, faSpellCheck, faLanguage } from '@fortawesome/free-solid-svg-icons'
+import { getQuizRound, type QuizRound } from '@/lib/catalog-api'
 
 const ORBIT_WORDS = [
   { text: 'undefined', x: '-38%', y: '-34%', d: 0, color: '#8b9bff' },
@@ -23,63 +24,81 @@ const STARS = Array.from({ length: 42 }, (_, i) => ({
   duration: 2 + (i % 5) * 0.6,
 }))
 
-interface LogLine {
-  text: string
-  color: string
-  pause?: number
-  fast?: boolean
+interface CheckSegment {
+  t: string
+  wrong?: boolean
 }
 
-const LOG_LINES: LogLine[] = [
-  { text: '$ qwicki open /nowhere --please', color: 'rgba(255,255,255,0.45)', pause: 350 },
-  { text: '✓ compiled successfully in 0.4s', color: '#5AD4B5', pause: 300 },
-  { text: "Error: Cannot find module './common-sense'", color: '#f43f5e', pause: 420 },
-  { text: '    at Brain.think (developer.js:404:13)', color: 'rgba(255,255,255,0.4)', fast: true },
-  { text: '    at Coffee.drink (morning.js:800:77)', color: 'rgba(255,255,255,0.4)', fast: true },
-  { text: 'ReferenceError: sleep is not defined', color: '#f43f5e', pause: 420 },
-  { text: '    at Developer.wakeup (monday.js:9:00)', color: 'rgba(255,255,255,0.4)', fast: true },
-  { text: 'Warning: 3 cups of coffee deprecated, use 4', color: '#F5C16A', pause: 380 },
-  { text: '> 418 I\'m a teapot — я чайник, а не страница', color: '#8b9bff', pause: 500 },
-  { text: 'hint: have you tried turning it off and on again?', color: '#5AD4B5', pause: 900 },
+interface CheckExample {
+  student: CheckSegment[]
+  teacher: string
+  note: string
+}
+
+const CHECK_EXAMPLES: CheckExample[] = [
+  {
+    student: [{ t: 'I ' }, { t: 'have 5 years', wrong: true }],
+    teacher: 'I am 5 years old',
+    note: 'возраст — только через to be',
+  },
+  {
+    student: [{ t: 'He ' }, { t: 'go', wrong: true }, { t: ' to school every day' }],
+    teacher: 'He goes to school every day',
+    note: 'he / she / it → глагол + s',
+  },
+  {
+    student: [{ t: 'There ', wrong: true }, { t: 'house is big' }],
+    teacher: 'Their house is big',
+    note: 'their — их, there — там',
+  },
+  {
+    student: [{ t: 'I ' }, { t: 'am agree', wrong: true }, { t: ' with you' }],
+    teacher: 'I agree with you',
+    note: 'agree — без to be',
+  },
+  {
+    student: [{ t: 'Он ' }, { t: 'звОнит', wrong: true }, { t: ' мне каждый день' }],
+    teacher: 'Он звонИт мне каждый день',
+    note: 'ударение на И',
+  },
 ]
 
-function Terminal() {
-  const [rendered, setRendered] = useState<{ text: string; color: string }[]>([])
+function GrammarCheck() {
+  const [round, setRound] = useState(0)
+  const [stage, setStage] = useState(0) // 0 — пишут, 1 — ошибка подсвечена, 2 — верный вариант
+  const [typed, setTyped] = useState(0)
+  const ex = CHECK_EXAMPLES[round % CHECK_EXAMPLES.length]
 
   useEffect(() => {
-    let li = 0
-    let ci = 0
-    let cancelled = false
-    let timer = 0
-    const tick = () => {
-      if (cancelled) return
-      const line = LOG_LINES[li]
-      ci += 1
-      const partial = line.text.slice(0, ci)
-      setRendered((prev) => [...prev.slice(0, li), { text: partial, color: line.color }])
-      if (ci < line.text.length) {
-        timer = window.setTimeout(tick, line.fast ? 7 : 14 + Math.random() * 30)
-      } else {
-        li += 1
-        ci = 0
-        if (li >= LOG_LINES.length) {
-          timer = window.setTimeout(() => {
-            li = 0
-            ci = 0
-            setRendered([])
-            timer = window.setTimeout(tick, 500)
-          }, 4200)
-        } else {
-          timer = window.setTimeout(tick, line.pause ?? 240)
-        }
-      }
-    }
-    timer = window.setTimeout(tick, 700)
+    setStage(0)
+    setTyped(0)
+    const t1 = window.setTimeout(() => setStage(1), 1600)
+    const t2 = window.setTimeout(() => setStage(2), 2500)
     return () => {
-      cancelled = true
-      window.clearTimeout(timer)
+      window.clearTimeout(t1)
+      window.clearTimeout(t2)
     }
-  }, [])
+  }, [round])
+
+  useEffect(() => {
+    if (stage !== 2) return
+    if (typed >= ex.teacher.length) {
+      const t = window.setTimeout(
+        () => setRound((r) => (r + 1) % CHECK_EXAMPLES.length),
+        3000,
+      )
+      return () => window.clearTimeout(t)
+    }
+    const t = window.setTimeout(() => setTyped((v) => v + 1), 24)
+    return () => window.clearTimeout(t)
+  }, [stage, typed, ex.teacher])
+
+  const words = ex.student.flatMap((s, si) =>
+    s.t
+      .split(' ')
+      .filter((w) => w !== '')
+      .map((w, wi) => ({ key: `${si}-${wi}`, w, wrong: s.wrong })),
+  )
 
   return (
     <div className="nf-terminal">
@@ -88,70 +107,111 @@ function Terminal() {
         <span className="nf-terminal__dot nf-terminal__dot--y" />
         <span className="nf-terminal__dot nf-terminal__dot--g" />
         <span className="nf-terminal__title">
-          <FontAwesomeIcon icon={faTerminal} /> build.log — live
+          <FontAwesomeIcon icon={faSpellCheck} /> grammar-check — live
         </span>
       </div>
       <div className="nf-terminal__body">
-        {rendered.slice(-9).map((l, i) => (
-          <div key={`${i}-${l.text.length}`} className="nf-terminal__line" style={{ color: l.color }}>
-            {l.text}
-            {i === Math.min(rendered.length, 9) - 1 && <span className="nf-terminal__caret" />}
-          </div>
-        ))}
+        <div className="nf-check__who">ученик пишет</div>
+        <div className="nf-check__student" key={`s-${round}`}>
+          {words.map((w, i) => (
+            <motion.span
+              key={w.key}
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              transition={{ delay: i * 0.09 }}
+              className={w.wrong && stage >= 1 ? 'nf-check__wrong' : undefined}
+            >
+              {w.w}
+              {i < words.length - 1 ? ' ' : ''}
+            </motion.span>
+          ))}
+        </div>
+        {stage >= 2 && (
+          <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ duration: 0.3 }}>
+            <div className="nf-check__who">правильно</div>
+            <div className="nf-check__teacher">
+              <FontAwesomeIcon icon={faCheck} /> {ex.teacher.slice(0, typed)}
+              {typed < ex.teacher.length && <span className="nf-terminal__caret" />}
+            </div>
+            {typed >= ex.teacher.length && <div className="nf-check__note">{ex.note}</div>}
+          </motion.div>
+        )}
       </div>
     </div>
   )
 }
 
-function BugHunt() {
+function WordQuiz() {
+  const [round, setRound] = useState<QuizRound | null>(null)
+  const [picked, setPicked] = useState<number | null>(null)
   const [score, setScore] = useState(0)
   const [best, setBest] = useState(() => {
     try {
-      return Number(localStorage.getItem('qwicki:bug-best') || 0)
+      return Number(localStorage.getItem('qwicki:quiz-best') || 0)
     } catch {
       return 0
     }
   })
-  const [pos, setPos] = useState({ x: 50, y: 50 })
-  const [pop, setPop] = useState<{ id: number; x: number; y: number } | null>(null)
-  const popId = useRef(0)
+  const [loading, setLoading] = useState(true)
+  const [failed, setFailed] = useState(false)
+  const timer = useRef(0)
 
-  const move = useCallback(() => {
-    setPos({ x: 10 + Math.random() * 80, y: 16 + Math.random() * 68 })
+  const load = useCallback(async () => {
+    setLoading(true)
+    setFailed(false)
+    try {
+      const r = await getQuizRound(4)
+      setRound(r)
+      setPicked(null)
+    } catch {
+      setFailed(true)
+    } finally {
+      setLoading(false)
+    }
   }, [])
+
+  useEffect(() => {
+    load()
+    return () => window.clearTimeout(timer.current)
+  }, [load])
 
   useEffect(() => {
     if (score > best) {
       setBest(score)
       try {
-        localStorage.setItem('qwicki:bug-best', String(score))
+        localStorage.setItem('qwicki:quiz-best', String(score))
       } catch {
         /* ignore */
       }
     }
   }, [score, best])
 
-  useEffect(() => {
-    const delay = score === 0 ? 700 : Math.max(450, 1300 - score * 45)
-    const t = window.setTimeout(move, delay)
-    return () => window.clearTimeout(t)
-  }, [score, pos, move])
+  const answer = useCallback(
+    (i: number) => {
+      if (picked !== null || !round || i >= round.options.length) return
+      setPicked(i)
+      if (i === round.correct_index) setScore((s) => s + 1)
+      timer.current = window.setTimeout(load, 1150)
+    },
+    [picked, round, load],
+  )
 
-  const catchBug = () => {
-    const id = ++popId.current
-    setPop({ id, x: pos.x, y: pos.y })
-    window.setTimeout(() => {
-      setPop((p) => (p && p.id === id ? null : p))
-    }, 650)
-    setScore((s) => s + 1)
-    move()
-  }
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      const n = ['1', '2', '3', '4', '5', '6'].indexOf(e.key)
+      if (n >= 0) answer(n)
+    }
+    window.addEventListener('keydown', onKey)
+    return () => window.removeEventListener('keydown', onKey)
+  }, [answer])
+
+  const done = picked !== null
 
   return (
     <div className="nf-arena">
       <div className="nf-arena__head">
         <span className="nf-arena__title">
-          <FontAwesomeIcon icon={faBug} /> Поймай баг
+          <FontAwesomeIcon icon={faLanguage} /> Переведи слово
         </span>
         <span className="nf-arena__score">
           счёт <b>{score}</b>
@@ -160,37 +220,43 @@ function BugHunt() {
           </span>
         </span>
       </div>
-      <div className="nf-arena__field">
-        <AnimatePresence>
-          {pop && (
-            <motion.span
-              key={pop.id}
-              initial={{ opacity: 0, y: 0, scale: 0.6 }}
-              animate={{ opacity: [0, 1, 1, 0], y: -34, scale: 1.15 }}
-              exit={{ opacity: 0 }}
-              transition={{ duration: 0.65, ease: 'easeOut' }}
-              className="nf-arena__pop"
-              style={{ left: `${pop.x}%`, top: `${pop.y}%` }}
-            >
-              +1
-            </motion.span>
+      {loading ? (
+        <div className="nf-quiz" aria-hidden>
+          <div className="h-9 w-44 rounded-xl bg-white/[0.07] animate-pulse" />
+          <div className="h-4 w-28 rounded-lg bg-white/[0.06] animate-pulse" />
+          {[0, 1, 2, 3].map((i) => (
+            <div key={i} className="h-11 rounded-xl bg-white/[0.05] animate-pulse" />
+          ))}
+        </div>
+      ) : failed || !round ? (
+        <div className="nf-quiz">
+          <p className="nf-quiz__err">Слова не загрузились — страница и так потерялась</p>
+          <button onClick={load} className="nf-quiz__opt" style={{ justifyContent: 'center' }}>
+            <FontAwesomeIcon icon={faRotateRight} /> Попробовать снова
+          </button>
+        </div>
+      ) : (
+        <div className="nf-quiz" key={round.question.word}>
+          <div className="nf-quiz__q">{round.question.word}</div>
+          {round.question.transcription && (
+            <div className="nf-quiz__tr">[{round.question.transcription}]</div>
           )}
-        </AnimatePresence>
-        <motion.button
-          key={`${pos.x.toFixed(1)}-${pos.y.toFixed(1)}`}
-          initial={{ scale: 0 }}
-          animate={{ scale: 1 }}
-          transition={{ type: 'spring', stiffness: 500, damping: 18 }}
-          whileTap={{ scale: 1.5, rotate: 20 }}
-          onClick={catchBug}
-          className="nf-arena__bug"
-          style={{ left: `${pos.x}%`, top: `${pos.y}%` }}
-          aria-label="Поймать баг"
-        >
-          <span className="nf-arena__bug-emoji">🐛</span>
-        </motion.button>
-        <span className="nf-arena__hint">он убегает — кликай быстрее</span>
-      </div>
+          <div className="nf-quiz__opts">
+            {round.options.map((o, i) => (
+              <button
+                key={`${o}-${i}`}
+                onClick={() => answer(i)}
+                disabled={done}
+                className={`nf-quiz__opt${done && i === round.correct_index ? ' nf-quiz__opt--ok' : ''}${done && i === picked && i !== round.correct_index ? ' nf-quiz__opt--bad' : ''}`}
+              >
+                <span className="nf-quiz__num">{i + 1}</span>
+                {o}
+              </button>
+            ))}
+          </div>
+          <div className="nf-quiz__foot">клик или клавиши 1–4 • слова из словаря</div>
+        </div>
+      )}
     </div>
   )
 }
@@ -298,8 +364,8 @@ export default function NotFound() {
       </div>
 
       <div className="nf-grid">
-        <Terminal />
-        <BugHunt />
+        <GrammarCheck />
+        <WordQuiz />
       </div>
 
       <motion.div
