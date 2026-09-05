@@ -111,7 +111,7 @@ interface LiveHome {
 }
 
 // Memoized — не пересоздаётся на каждый рендер Home, UI тот же
-const ProgressRing = memo(function ProgressRing({ value }: { value: number }) {
+const ProgressRing = memo(function ProgressRing({ value, loading }: { value: number; loading?: boolean }) {
   const { circumference, dashOffset } = useMemo(() => {
     const radius = 28
     const c = 2 * Math.PI * radius
@@ -318,6 +318,8 @@ export default function Home() {
   )
   const { user, token, ready: authReady } = useAuth()
   const isAuthed = authReady && !!user && !!token
+  // Known guest only after auth settles; until then skeletons, never guest mocks.
+  const isGuest = authReady && !user && !token
   const [themeCategories, setThemeCategories] = useState<RemoteCategory[]>([])
   const [grammarCategories, setGrammarCategories] = useState<RemoteCategory[]>([])
   const [verbsCategories, setVerbsCategories] = useState<RemoteCategory[]>([])
@@ -441,7 +443,7 @@ export default function Home() {
   const [liveDone, setLiveDone] = useState(false)
   const [wotdDone, setWotdDone] = useState(false)
   // Authed users see skeletons until their data settles — no mock flash.
-  const heroLoading = isAuthed && !liveDone
+  const heroLoading = !isGuest && !liveDone
 
   const greeting = useMemo(() => greetingByHour(new Date().getHours()), [])
 
@@ -628,7 +630,7 @@ export default function Home() {
           <div className="relative rounded-[24px] border border-[#262626] bg-[#171717] p-5 sm:p-6 flex flex-col lg:flex-row lg:items-center gap-5 overflow-hidden">
             <div className="absolute right-0 top-0 w-64 h-64 rounded-full bg-[#5AD4B5]/[0.04] blur-3xl pointer-events-none" />
             <div className="flex gap-4 items-center flex-1 min-w-0">
-              <ProgressRing value={live ? Math.min(1, live.wordsToday / DAILY_WORD_TARGET) : 0.6} />
+              <ProgressRing value={heroLoading ? 0 : (live ? Math.min(1, live.wordsToday / DAILY_WORD_TARGET) : 0.6)} loading={heroLoading} />
               <div className="min-w-0">
                 <p className="eyebrow flex items-center gap-2 !mt-0">
                   <FontAwesomeIcon icon={faBolt} className="text-[#5AD4B5]" /> Дневная цель
@@ -727,7 +729,7 @@ export default function Home() {
           )}
         </div>
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
-          {isAuthed && !themesDone ? (
+          {!isGuest && !themesDone ? (
             topicSkeletons.map((i) => <SkeletonCard key={i} />)
           ) : visibleTopics.length > 0 ? (
             visibleTopics.map((card, index) => (
@@ -748,7 +750,7 @@ export default function Home() {
           </div>
         </div>
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
-          {isAuthed && !grammarDone ? (
+          {!isGuest && !grammarDone ? (
             grammarSkeletons.map((i) => <SkeletonCard key={i} />)
           ) : visibleGrammar.length > 0 ? (
             visibleGrammar.map((card, index) => (
@@ -761,7 +763,7 @@ export default function Home() {
       </motion.section>
 
       {/* IRREGULAR VERBS — отдельная секция */}
-      {(visibleVerbs.length > 0 || (isAuthed && !verbsDone)) && (
+      {(visibleVerbs.length > 0 || (!isGuest && !verbsDone)) && (
         <motion.section className="content-section !mt-6" variants={fadeUp} transition={{ duration: 0.5 }}>
           <div className="section-header section-header--stacked">
             <div>
@@ -770,7 +772,7 @@ export default function Home() {
             </div>
           </div>
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
-            {isAuthed && !verbsDone ? (
+            {!isGuest && !verbsDone ? (
               grammarSkeletons.map((i) => <SkeletonCard key={i} />)
             ) : (
               visibleVerbs.map((card, index) => (
@@ -790,7 +792,7 @@ export default function Home() {
           <span className="text-[11px] tracking-[0.12em] uppercase opacity-50 font-bold">интерактив • наведи</span>
         </div>
         <div className="rounded-[24px] border border-white/[0.06] bg-white/[0.02] p-3 sm:p-5 backdrop-blur">
-          {isAuthed && !liveDone ? (
+          {!isGuest && !liveDone ? (
             <div className="h-[220px] w-full animate-pulse rounded-xl bg-white/[0.04]" aria-hidden />
           ) : (
             <Suspense fallback={<div className="h-[220px] w-full animate-pulse rounded-xl bg-white/[0.04]" />}>
