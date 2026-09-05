@@ -27,7 +27,7 @@ async function get<T>(path: string, token?: string): Promise<T> {
   return (body.data ?? []) as T
 }
 
-export function listCategories(type?: string, locale = 'ru'): Promise<RemoteCategory[]> {
+export function listCategories(type?: string, locale: string = getUiLang()): Promise<RemoteCategory[]> {
   const params = new URLSearchParams()
   if (type) params.set('type', type)
   params.set('locale', locale)
@@ -64,7 +64,7 @@ export function listCategoriesWithProgress(
   token: string,
   profileId: string,
   type?: string,
-  locale = 'ru',
+  locale: string = getUiLang(),
 ): Promise<RemoteCategory[]> {
   const params = new URLSearchParams()
   if (type) params.set('type', type)
