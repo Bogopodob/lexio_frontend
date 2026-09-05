@@ -46,6 +46,9 @@ export default function AnagramCard({
   const [mistakes, setMistakes] = useState(0)
   const [flash, setFlash] = useState(false)
   const [givenUp, setGivenUp] = useState(false)
+  const [denied, setDenied] = useState<{ ch: string; msg: string; seq: number } | null>(null)
+  const denyTimer = useRef<number | null>(null)
+  const denySeq = useRef(0)
   const done = useRef(false)
   // NB: mistakes lives in a ref for the check effect — keeping it in state
   // deps restarts the effect on every increment and kills the clear timer,
@@ -86,6 +89,22 @@ export default function AnagramCard({
   const removeR = useRef(removeLast)
   removeR.current = removeLast
 
+  const deny = (ch: string, msg: string) => {
+    if (denyTimer.current) window.clearTimeout(denyTimer.current)
+    denySeq.current += 1
+    setDenied({ ch, msg, seq: denySeq.current })
+    denyTimer.current = window.setTimeout(() => {
+      denyTimer.current = null
+      setDenied(null)
+    }, 800)
+  }
+  const denyR = useRef(deny)
+  denyR.current = deny
+
+  useEffect(() => () => {
+    if (denyTimer.current) window.clearTimeout(denyTimer.current)
+  }, [])
+
   useEffect(() => {
     keyRef.current = (key: string) => {
       if (key === 'Backspace') {
@@ -93,16 +112,25 @@ export default function AnagramCard({
         return
       }
       if (/^[a-zA-Zа-яА-ЯёЁ]$/.test(key)) {
+        if (done.current || givenUp) return
         const low = key.toLowerCase()
         const avail = tiles.filter((t) => !placedRef.current.includes(t.id))
         const found = avail.find((t) => t.ch.toLowerCase() === low)
-        if (found) putR.current(found.id)
+        if (found) {
+          putR.current(found.id)
+          return
+        }
+        const inWord = tiles.some((t) => t.ch.toLowerCase() === low)
+        denyR.current(
+          key.toUpperCase(),
+          inWord ? 'все такие буквы уже на местах' : 'такой буквы нет в слове',
+        )
       }
     }
     return () => {
       keyRef.current = null
     }
-  }, [keyRef, tiles])
+  }, [keyRef, tiles, givenUp])
   const placedRef = useRef(placed)
   placedRef.current = placed
 
@@ -203,7 +231,14 @@ export default function AnagramCard({
         })()}
       </div>
       {/* tiles */}
-      <div className="flex flex-wrap justify-center gap-1.5 relative min-h-[52px]">
+      <motion.div
+        key={denied ? `deny-${denied.seq}` : 'tiles'}
+        animate={denied ? { x: [0, -10, 10, -6, 6, 0] } : { x: 0 }}
+        transition={{ duration: 0.4 }}
+        className={`flex flex-wrap justify-center gap-1.5 relative min-h-[52px] rounded-2xl border px-2 py-2 transition-colors ${
+          denied ? 'border-[#f43f5e]/60 bg-[#f43f5e]/[0.06]' : 'border-transparent'
+        }`}
+      >
         {available.map((t) => (
           <motion.button
             key={t.id}
@@ -217,7 +252,12 @@ export default function AnagramCard({
         {available.length === 0 && !givenUp && (
           <span className="text-[13px] font-bold text-white/35 self-center">все буквы на местах…</span>
         )}
-      </div>
+      </motion.div>
+      {denied && (
+        <div className="text-center text-[13px] font-black text-[#fb7185] relative -mt-1">
+          «{denied.ch}» — {denied.msg}
+        </div>
+      )}
 
       {givenUp && (
         <div className="text-center text-[24px] font-black text-white break-words relative">
