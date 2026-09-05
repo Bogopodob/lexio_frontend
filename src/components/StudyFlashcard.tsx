@@ -485,6 +485,24 @@ export default function StudyFlashcard({
                   <FontAwesomeIcon icon={faEyeSlash} className="text-[11px]" /> показать транскрипцию
                 </button>
               ) : null}
+              {isTyping && nativeTexts.length > 0 && (
+                <>
+                  <div className="text-[10.5px] font-black uppercase tracking-[0.18em] text-white/40 mt-1">
+                    Перевод
+                  </div>
+                  {nativeTexts.slice(0, 6).map((t, i) => (
+                    <div
+                      key={`tr-${t}-${i}`}
+                      className={`flex items-center gap-3 rounded-2xl bg-[#5B74FF]/[0.07] border border-[#5B74FF]/20 px-4 ${nativeTexts.length > 3 ? 'py-1.5' : 'py-2.5'}`}
+                    >
+                      <span className={`flex-1 min-w-0 font-black leading-snug break-words text-[#aebbff] ${nativeTexts.length > 3 ? 'text-[15px]' : 'text-[19px] sm:text-[22px]'}`}>{t}</span>
+                    </div>
+                  ))}
+                  {nativeTexts.length > 6 && (
+                    <div className="text-center text-[12px] font-bold text-white/35">…и ещё {nativeTexts.length - 6}</div>
+                  )}
+                </>
+              )}
               <OwnHintBlock hint={ownHint} onSave={onSaveHint} />
             </div>
 
