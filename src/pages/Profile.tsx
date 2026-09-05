@@ -714,6 +714,20 @@ export default function Profile() {
     phrases_50: faComments,
     streak_7: faBolt,
     accuracy_95: faMedal,
+    words_200: faBook,
+    reviews_100: faDumbbell,
+    accuracy_90: faMedal,
+    own_words_30: faPen,
+    goals_5: faBullseye,
+    streak_14: faFire,
+    reviews_500: faBolt,
+    goals_20: faStar,
+    xp_5000: faCrown,
+    accuracy_98: faMedal,
+    words_1000: faCrown,
+    streak_30: faFire,
+    reviews_2000: faBolt,
+    xp_20000: faTrophy,
   }
 
   // Goals + achievements of the active language profile (guests keep mocks).
