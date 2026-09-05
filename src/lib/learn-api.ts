@@ -23,6 +23,16 @@ export interface RemoteStudyCard {
   hint: string | null
   target_texts?: string[]
   native_texts?: string[]
+  own_hint?: string | null
+}
+
+export interface RemoteProgress {
+  easiness_factor: number
+  interval_days: number
+  repetition: number
+  quality_last: number
+  next_review_at: string | null
+  last_reviewed_at: string | null
 }
 
 export interface NextCardData {
@@ -31,6 +41,7 @@ export interface NextCardData {
   total: number
   answered: number
   card: RemoteStudyCard
+  progress: RemoteProgress | null
 }
 
 export interface AnswerData {
@@ -44,6 +55,7 @@ export interface AnswerData {
   xp_gained: number
   newly_unlocked: string[]
   finished: boolean
+  requeued: boolean
   next_card: RemoteStudyCard | null
 }
 
@@ -138,5 +150,48 @@ export function getAvailability(
 export function finishSession(userId: string, token: string, sessionId: string): Promise<RemoteSession> {
   return request(`/learning/users/${userId}/sessions/${sessionId}/finish`, token, {
     method: 'POST',
+  })
+}
+
+export function getDistractors(
+  userId: string,
+  token: string,
+  profileId: string,
+  opts: {
+    learnable_type: string
+    learnable_id: string
+    side: 'target' | 'native'
+    category_id?: string
+    count?: number
+  },
+): Promise<string[]> {
+  const params = new URLSearchParams({
+    learnable_type: opts.learnable_type,
+    learnable_id: opts.learnable_id,
+    side: opts.side,
+  })
+  if (opts.category_id) params.set('category_id', opts.category_id)
+  params.set('count', String(opts.count ?? 3))
+  return request<{ options: string[] }>(
+    `/learning/users/${userId}/profiles/${profileId}/distractors?${params.toString()}`,
+    token,
+  ).then((d) => d.options)
+}
+
+export interface WordHintData {
+  learnable_type: string
+  learnable_id: string
+  own_hint: string | null
+}
+
+export function saveWordHint(
+  userId: string,
+  token: string,
+  profileId: string,
+  opts: { learnable_type: string; learnable_id: string; own_hint: string },
+): Promise<WordHintData> {
+  return request(`/learning/users/${userId}/profiles/${profileId}/word-hint`, token, {
+    method: 'POST',
+    body: JSON.stringify(opts),
   })
 }

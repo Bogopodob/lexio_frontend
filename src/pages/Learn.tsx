@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useNavigate, useSearchParams } from 'react-router-dom'
 import { AnimatePresence, motion } from 'framer-motion'
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome'
@@ -6,28 +6,50 @@ import {
   faArrowLeft,
   faArrowRightArrowLeft,
   faBolt,
+  faBrain,
   faCheck,
+  faEyeSlash,
   faFlag,
+  faHeadphones,
   faKeyboard,
+  faListUl,
   faPlay,
+  faPuzzlePiece,
   faRotateRight,
+  faScaleBalanced,
   faShuffle,
   faTrophy,
+  type IconDefinition,
 } from '@fortawesome/free-solid-svg-icons'
 import StudyFlashcard from '@/components/StudyFlashcard'
+import ChoiceCard from '@/components/ChoiceCard'
+import BoolCard from '@/components/BoolCard'
+import AnagramCard from '@/components/AnagramCard'
+import BlitzBar from '@/components/BlitzBar'
 import { useSpeech } from '@/hooks/useSpeech'
 import { useAuth } from '@/context/AuthContext'
 import {
   answerCard,
   finishSession,
   getAvailability,
+  getDistractors,
   getNextCard,
   listSessions,
+  saveWordHint,
   startSession,
   type Availability,
   type NextCardData,
   type RemoteSession,
 } from '@/lib/learn-api'
+import {
+  autoQuality,
+  hashOf,
+  resolveMode,
+  shuffle,
+  wordBadge,
+  type BaseMode,
+  type Direction,
+} from '@/lib/study'
 import {
   listAchievements,
   listLanguages,
@@ -48,14 +70,37 @@ const GRADES = [
 
 const LIMITS = [10, 20, 30]
 
-type Direction = 'f2n' | 'n2f' | 'typing' | 'mixed'
+const BLITZ_SECONDS = 12
 
-const DIRECTIONS: { id: Direction; label: string; hint: string }[] = [
-  { id: 'f2n', label: 'Слово — перевод', hint: 'видишь слово, вспоминаешь перевод' },
-  { id: 'n2f', label: 'Перевод — слово', hint: 'видишь перевод, вспоминаешь слово' },
-  { id: 'typing', label: 'Ввод слова', hint: 'печатаешь слово на английском' },
-  { id: 'mixed', label: 'Микс', hint: 'направление случайно для каждой карточки' },
+const AUTO_MODES: BaseMode[] = ['typing', 'choice', 'bool', 'anagram']
+
+interface DirectionInfo {
+  id: Direction
+  label: string
+  hint: string
+  group: 'flip' | 'game' | 'auto'
+  icon?: IconDefinition
+}
+
+const DIRECTIONS: DirectionInfo[] = [
+  { id: 'f2n', label: 'Слово — перевод', hint: 'видишь слово, вспоминаешь перевод', group: 'flip' },
+  { id: 'n2f', label: 'Перевод — слово', hint: 'видишь перевод, вспоминаешь слово', group: 'flip' },
+  { id: 'typing', label: 'Ввод слова', hint: 'печатаешь слово на английском, опечатки прощаются', group: 'flip', icon: faKeyboard },
+  { id: 'audio', label: 'На слух', hint: 'слышишь слово, вспоминаешь значение', group: 'flip', icon: faHeadphones },
+  { id: 'choice', label: 'Выбор из 4', hint: 'слово + 4 варианта перевода', group: 'game', icon: faListUl },
+  { id: 'anagram', label: 'Собери слово', hint: 'буквы перемешаны — собери слово обратно', group: 'game', icon: faPuzzlePiece },
+  { id: 'bool', label: 'Верно / нет', hint: 'пара «слово — перевод»: правда или ложь?', group: 'game', icon: faScaleBalanced },
+  { id: 'mixed', label: 'Микс', hint: 'режим случаен для каждой карточки', group: 'auto', icon: faShuffle },
+  { id: 'smart', label: 'Умный микс', hint: 'режим по зрелости слова: новое — карточки, зрелое — игры', group: 'auto', icon: faBrain },
 ]
+
+const GROUP_LABELS: Record<DirectionInfo['group'], string> = {
+  flip: 'Карточки',
+  game: 'Игры',
+  auto: 'Автомикс',
+}
+
+const BLITZ_OK_MODES: Direction[] = ['choice', 'bool', 'mixed', 'smart']
 
 function LangChip({ code }: { code: string }) {
   return (
@@ -87,9 +132,7 @@ export default function Learn() {
   const [source, setSource] = useState<'mixed' | 'due' | 'new'>('mixed')
   const [direction, setDirection] = useState<Direction>(() => {
     const saved = localStorage.getItem('lexio:card-direction')
-    return saved === 'f2n' || saved === 'n2f' || saved === 'typing' || saved === 'mixed'
-      ? saved
-      : 'mixed'
+    return (DIRECTIONS.some((d) => d.id === saved) ? saved : 'mixed') as Direction
   })
   const [limit, setLimit] = useState(20)
   const [offset, setOffset] = useState(0)
@@ -97,6 +140,23 @@ export default function Learn() {
   const [categoryName, setCategoryName] = useState<string | null>(null)
   const [availability, setAvailability] = useState<Availability | null>(null)
   const [categoryNames, setCategoryNames] = useState<Record<string, string>>({})
+
+  const clearAuto = useCallback(() => {
+    if (autoTimer.current !== null) {
+      window.clearTimeout(autoTimer.current)
+      autoTimer.current = null
+    }
+  }, [])
+
+  const resetRound = useCallback(() => {
+    clearAuto()
+    setFlipped(false)
+    setForceReveal(false)
+    setRequeuedFlash(false)
+    setChoiceData(null)
+    setBoolData(null)
+    lastQuality.current = null
+  }, [clearAuto])
 
   // Resume is scoped to the current topic: each category keeps its own
   // continuation, a fresh start abandons only the matching one (backend).
@@ -157,7 +217,7 @@ export default function Learn() {
     setPhase('menu')
     setSession(null)
     setCard(null)
-    setFlipped(false)
+    resetRound()
     listCategories()
       .then((list) => {
         if (cancelled) return
@@ -170,7 +230,7 @@ export default function Learn() {
     return () => {
       cancelled = true
     }
-  }, [searchParams])
+  }, [searchParams, resetRound])
   const [starting, setStarting] = useState(false)
   const [error, setError] = useState<string | null>(null)
 
@@ -183,6 +243,21 @@ export default function Learn() {
   const [unlocked, setUnlocked] = useState<string[]>([])
   const [unlockTitles, setUnlockTitles] = useState<Record<string, string>>({})
   const [speakingKey, setSpeakingKey] = useState<string | null>(null)
+  const [blitz, setBlitz] = useState(() => localStorage.getItem('lexio:blitz') === '1')
+  const [hideTr, setHideTr] = useState(() => localStorage.getItem('lexio:hide-tr') === '1')
+  const [streak, setStreak] = useState(0)
+  const [maxStreak, setMaxStreak] = useState(0)
+  const [best, setBest] = useState(() => Number(localStorage.getItem('lexio:blitz-best') ?? 0) || 0)
+  const [requeuedFlash, setRequeuedFlash] = useState(false)
+  const [forceReveal, setForceReveal] = useState(false)
+  const [choiceData, setChoiceData] = useState<{ forId: string; options: string[]; correctIdx: number } | 'loading' | 'short' | null>(null)
+  const [boolData, setBoolData] = useState<{ forId: string; shown: string; isCorrect: boolean } | 'loading' | 'short' | null>(null)
+
+  const choicePickRef = useRef<((i: number) => void) | null>(null)
+  const boolAnswerRef = useRef<((v: boolean) => void) | null>(null)
+  const anagramKeyRef = useRef<((key: string) => void) | null>(null)
+  const autoTimer = useRef<number | null>(null)
+  const lastQuality = useRef<number | null>(null)
 
   // profiles + resumable session
   useEffect(() => {
@@ -245,9 +320,9 @@ export default function Learn() {
       setSession((prev) =>
         prev ? { ...prev, answered: next.answered, total: next.total } : prev,
       )
-      setFlipped(false)
+      resetRound()
     },
-    [],
+    [resetRound],
   )
 
   const beginSession = useCallback(
@@ -263,9 +338,11 @@ export default function Learn() {
           const found = list.find((s) => s.id === sessionId)
           if (found) setSession(found)
           setCard(next)
-          setFlipped(false)
+          resetRound()
           setSessionCorrect(0)
           setSessionXp(0)
+          setStreak(0)
+          setMaxStreak(0)
           setUnlocked([])
           setPhase('study')
           return
@@ -294,6 +371,8 @@ export default function Learn() {
         })
         setSessionCorrect(0)
         setSessionXp(0)
+        setStreak(0)
+        setMaxStreak(0)
         setUnlocked([])
         await loadCard(user.id, token, created.id)
         setPhase('study')
@@ -303,18 +382,39 @@ export default function Learn() {
         setStarting(false)
       }
     },
-    [user, token, profileId, source, limit, categoryId, offset, loadCard],
+    [user, token, profileId, source, limit, categoryId, offset, loadCard, resetRound],
   )
 
-  const grade = useCallback(
+  useEffect(() => clearAuto, [clearAuto])
+
+  const submitAnswer = useCallback(
     async (quality: number) => {
-      if (!user || !token || !session || !card || answering || !flipped) return
+      if (!user || !token || !session || !card || answering) return
+      clearAuto()
+      lastQuality.current = quality
+      setError(null)
       setAnswering(true)
       try {
         const res = await answerCard(user.id, token, session.id, card.card.learnable_id, quality)
         setSession(res.session)
         setSessionCorrect((c) => c + (quality >= 3 ? 1 : 0))
         setSessionXp((x) => x + res.xp_gained)
+        setRequeuedFlash(res.requeued)
+        setStreak((s) => {
+          const ns = quality >= 3 ? s + 1 : 0
+          setMaxStreak((m) => {
+            const nm = Math.max(m, ns)
+            setBest((b) => {
+              if (nm > b) {
+                localStorage.setItem('lexio:blitz-best', String(nm))
+                return nm
+              }
+              return b
+            })
+            return nm
+          })
+          return ns
+        })
         if (res.newly_unlocked.length > 0) {
           setUnlocked((prev) => [...prev, ...res.newly_unlocked.filter((c) => !prev.includes(c))])
         }
@@ -327,6 +427,8 @@ export default function Learn() {
             prev ? { ...prev, answered: next.answered, total: next.total } : prev,
           )
           setFlipped(false)
+          setForceReveal(false)
+          setRequeuedFlash(false)
         }
       } catch (e) {
         setError(e instanceof Error ? e.message : 'Не получилось ответить')
@@ -334,11 +436,36 @@ export default function Learn() {
         setAnswering(false)
       }
     },
-    [user, token, session, card, answering, flipped],
+    [user, token, session, card, answering, clearAuto],
+  )
+
+  // Manual grade (flip modes): only after seeing the answer.
+  const grade = useCallback(
+    (quality: number) => {
+      if (!flipped) return
+      void submitAnswer(quality)
+    },
+    [flipped, submitAnswer],
+  )
+
+  // Auto grade (typing/choice/bool/anagram): verified fact, delayed so
+  // the feedback stays visible.
+  const scheduleAuto = useCallback(
+    (quality: number, delayMs: number) => {
+      clearAuto()
+      setAnswering(true)
+      autoTimer.current = window.setTimeout(() => {
+        autoTimer.current = null
+        setAnswering(false)
+        void submitAnswer(quality)
+      }, delayMs)
+    },
+    [clearAuto, submitAnswer],
   )
 
   const finishEarly = useCallback(async () => {
     if (!user || !token || !session) return
+    clearAuto()
     try {
       const done = await finishSession(user.id, token, session.id)
       setSession(done)
@@ -347,7 +474,7 @@ export default function Learn() {
     }
     refreshSessions()
     setPhase('finished')
-  }, [user, token, session, refreshSessions])
+  }, [user, token, session, refreshSessions, clearAuto])
 
   const speakCard = useCallback(
     (text: string, lang: string, key: string) => {
@@ -379,6 +506,14 @@ export default function Learn() {
     localStorage.setItem('lexio:card-direction', direction)
   }, [direction])
 
+  useEffect(() => {
+    localStorage.setItem('lexio:blitz', blitz ? '1' : '0')
+  }, [blitz])
+
+  useEffect(() => {
+    localStorage.setItem('lexio:hide-tr', hideTr ? '1' : '0')
+  }, [hideTr])
+
   // Both word lists per card (backend sends target/native, fallback to legacy fields).
   const cardTexts = useMemo(() => {
     const c = card?.card
@@ -388,39 +523,184 @@ export default function Learn() {
     }
   }, [card])
 
-  // Effective mode for the current card: fixed direction or a stable
-  // per-card pick for mixed (falls back to f2n when a side is missing).
-  const cardMode = useMemo<'f2n' | 'n2f' | 'typing'>(() => {
-    const pick = (d: Direction): 'f2n' | 'n2f' | 'typing' => {
-      if (d !== 'mixed') return d
-      const id = card?.card.learnable_id ?? ''
-      let h = 0
-      for (let i = 0; i < id.length; i++) h = (h * 31 + id.charCodeAt(i)) >>> 0
-      return (['f2n', 'n2f', 'typing'] as const)[h % 3]
-    }
-    const m = pick(direction)
-    if (m !== 'f2n' && cardTexts.native.length === 0) return 'f2n'
-    return m
+  // Sync mode resolution (mixed / smart mix by word maturity).
+  // Choice/bool distractor sufficiency is checked async after that.
+  const cardMode = useMemo<BaseMode>(() => {
+    const c = card?.card
+    return resolveMode(
+      direction,
+      c?.learnable_id ?? '',
+      card?.progress
+        ? {
+            repetition: card.progress.repetition,
+            interval_days: card.progress.interval_days,
+            easiness_factor: card.progress.easiness_factor,
+          }
+        : null,
+      cardTexts.native.length > 0,
+    )
   }, [direction, card, cardTexts])
+
+  const cardBadge = useMemo(
+    () =>
+      wordBadge(
+        card?.progress
+          ? {
+              repetition: card.progress.repetition,
+              interval_days: card.progress.interval_days,
+              easiness_factor: card.progress.easiness_factor,
+            }
+          : null,
+      ),
+    [card],
+  )
+
+  const saveOwnHint = useCallback(
+    async (hintText: string) => {
+      if (!user || !token || !profileId || !card) return
+      try {
+        const res = await saveWordHint(user.id, token, profileId, {
+          learnable_type: card.card.learnable_type,
+          learnable_id: card.card.learnable_id,
+          own_hint: hintText,
+        })
+        setCard((prev) =>
+          prev ? { ...prev, card: { ...prev.card, own_hint: res.own_hint } } : prev,
+        )
+      } catch {
+        setError('Не получилось сохранить подсказку')
+      }
+    },
+    [user, token, profileId, card],
+  )
+
+  // Quiz data: distractors for choice / wrong-pair material for bool.
+  useEffect(() => {
+    if (phase !== 'study' || !card || !user || !token || !profileId || cardMode !== 'choice') {
+      if (cardMode !== 'choice') setChoiceData(null)
+      return
+    }
+    const c = card.card
+    if (choiceData && typeof choiceData === 'object' && choiceData.forId === c.learnable_id) return
+    setChoiceData('loading')
+    let cancelled = false
+    getDistractors(user.id, token, profileId, {
+      learnable_type: c.learnable_type,
+      learnable_id: c.learnable_id,
+      side: 'native',
+      category_id: session?.category_id ?? undefined,
+      count: 3,
+    })
+      .then((opts) => {
+        if (cancelled) return
+        if (opts.length < 2) {
+          setChoiceData('short')
+          return
+        }
+        const correct = cardTexts.native[0]
+        const options = shuffle([correct, ...opts.slice(0, 3)])
+        setChoiceData({ forId: c.learnable_id, options, correctIdx: options.indexOf(correct) })
+      })
+      .catch(() => {
+        if (!cancelled) setChoiceData('short')
+      })
+    return () => {
+      cancelled = true
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [phase, card, cardMode, cardTexts, user, token, profileId, session?.category_id])
+
+  useEffect(() => {
+    if (phase !== 'study' || !card || !user || !token || !profileId || cardMode !== 'bool') {
+      if (cardMode !== 'bool') setBoolData(null)
+      return
+    }
+    const c = card.card
+    if (boolData && typeof boolData === 'object' && boolData.forId === c.learnable_id) return
+    setBoolData('loading')
+    let cancelled = false
+    getDistractors(user.id, token, profileId, {
+      learnable_type: c.learnable_type,
+      learnable_id: c.learnable_id,
+      side: 'native',
+      category_id: session?.category_id ?? undefined,
+      count: 1,
+    })
+      .then((opts) => {
+        if (cancelled) return
+        if (opts.length === 0) {
+          setBoolData('short')
+          return
+        }
+        const showCorrect = hashOf(c.learnable_id) % 2 === 0
+        setBoolData({
+          forId: c.learnable_id,
+          shown: showCorrect ? cardTexts.native[0] : opts[0],
+          isCorrect: showCorrect,
+        })
+      })
+      .catch(() => {
+        if (!cancelled) setBoolData('short')
+      })
+    return () => {
+      cancelled = true
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [phase, card, cardMode, cardTexts, user, token, profileId, session?.category_id])
+
+  const choiceReady = cardMode === 'choice' && choiceData !== null && typeof choiceData === 'object'
+  const boolReady = cardMode === 'bool' && boolData !== null && typeof boolData === 'object'
+  const choiceForCard =
+    choiceReady && typeof choiceData === 'object' && card && choiceData.forId === card.card.learnable_id
+      ? choiceData
+      : null
+  const boolForCard =
+    boolReady && typeof boolData === 'object' && card && boolData.forId === card.card.learnable_id
+      ? boolData
+      : null
+  const choiceFallback = cardMode === 'choice' && choiceData !== null && choiceData !== 'loading' && !choiceReady
+  const boolFallback = cardMode === 'bool' && boolData !== null && boolData !== 'loading' && !boolReady
+  const choiceLoading = cardMode === 'choice' && !choiceForCard && !choiceFallback
+  const boolLoading = cardMode === 'bool' && !boolForCard && !boolFallback
+  const blitzActive = blitz && (choiceForCard !== null || boolForCard !== null)
+  const quizActive = choiceReady || boolReady || cardMode === 'anagram'
+  const manualMode = !AUTO_MODES.includes(cardMode) || choiceFallback || boolFallback
 
   const { bindings } = useShortcuts()
 
-  // Keyboard-first lesson: Space flips / advances, grade keys evaluate.
+  // Keyboard-first lesson: Space flips / advances, grade keys evaluate,
+  // quiz modes answer from the keyboard too.
   // Capture phase + stopPropagation so the focused card doesn't double-flip.
   useEffect(() => {
     if (phase !== 'study') return
     const handler = (e: KeyboardEvent) => {
       const target = e.target as HTMLElement | null
       if (target && (target.tagName === 'INPUT' || target.tagName === 'TEXTAREA')) return
+      if (choiceReady && ['1', '2', '3', '4'].includes(e.key)) {
+        e.preventDefault()
+        choicePickRef.current?.(Number(e.key) - 1)
+        return
+      }
+      if (boolReady && (e.key === '1' || e.key === '2')) {
+        e.preventDefault()
+        boolAnswerRef.current?.(e.key === '1')
+        return
+      }
+      if (cardMode === 'anagram' && (e.key === 'Backspace' || /^[a-zA-Zа-яА-ЯёЁ]$/.test(e.key))) {
+        e.preventDefault()
+        anagramKeyRef.current?.(e.key)
+        return
+      }
       if (e.key === ' ') {
-        // In typing mode Space belongs to the answer — never flip/grade.
-        if (cardMode === 'typing' && !flipped) return
+        // In auto modes Space belongs to the answer — never flip/grade.
+        if (!manualMode && !flipped) return
         e.preventDefault()
         e.stopPropagation()
         if (!flipped) setFlipped(true)
         else grade(4)
         return
       }
+      if (!manualMode) return
       if (flipped && matchesShortcut(e, bindings.flip_back)) {
         e.preventDefault()
         e.stopPropagation()
@@ -435,7 +715,7 @@ export default function Learn() {
     }
     window.addEventListener('keydown', handler, true)
     return () => window.removeEventListener('keydown', handler, true)
-  }, [phase, grade, flipped, bindings, setFlipped, cardMode])
+  }, [phase, grade, flipped, bindings, setFlipped, manualMode, cardMode, choiceReady, boolReady])
 
   // achievement titles for the finish screen
   useEffect(() => {
@@ -581,27 +861,59 @@ export default function Learn() {
             <div className="text-[11px] font-black uppercase tracking-widest opacity-40 mt-4 mb-1.5">
               Шаг 2 — как спрашиваем
             </div>
-            <div className="flex flex-wrap gap-1.5">
-              {DIRECTIONS.map((d) => (
-                <button
-                  key={d.id}
-                  onClick={() => setDirection(d.id)}
-                  title={`${d.label} — ${d.hint}`}
-                  aria-pressed={direction === d.id}
-                  className={`h-9 px-3 rounded-full text-xs font-bold border transition-all flex items-center gap-1.5 ${direction === d.id ? 'bg-[#5B74FF]/20 border-[#5B74FF]/60 text-white shadow-[0_0_18px_rgba(91,116,255,0.3)]' : 'bg-white/[0.04] border-white/[0.06] hover:bg-white/[0.08]'}`}
-                >
-                  {(d.id === 'f2n' || d.id === 'n2f') && (
-                    <>
-                      <LangChip code={d.id === 'f2n' ? langCodes.target : langCodes.native} />
-                      <FontAwesomeIcon icon={faArrowRightArrowLeft} className="text-[10px] opacity-60" />
-                      <LangChip code={d.id === 'f2n' ? langCodes.native : langCodes.target} />
-                    </>
-                  )}
-                  {d.id === 'typing' && <FontAwesomeIcon icon={faKeyboard} className="text-xs opacity-80" />}
-                  {d.id === 'mixed' && <FontAwesomeIcon icon={faShuffle} className="text-xs opacity-80" />}
-                  <span>{d.label}</span>
-                </button>
-              ))}
+            {(['flip', 'game', 'auto'] as const).map((group) => (
+              <div key={group} className="mb-1.5">
+                <div className="text-[10px] font-black uppercase tracking-widest opacity-30 mb-1">
+                  {GROUP_LABELS[group]}
+                </div>
+                <div className="flex flex-wrap gap-1.5">
+                  {DIRECTIONS.filter((d) => d.group === group).map((d) => (
+                    <button
+                      key={d.id}
+                      onClick={() => setDirection(d.id)}
+                      title={`${d.label} — ${d.hint}`}
+                      aria-pressed={direction === d.id}
+                      className={`h-9 px-3 rounded-full text-xs font-bold border transition-all flex items-center gap-1.5 ${direction === d.id ? 'bg-[#5B74FF]/20 border-[#5B74FF]/60 text-white shadow-[0_0_18px_rgba(91,116,255,0.3)]' : 'bg-white/[0.04] border-white/[0.06] hover:bg-white/[0.08]'}`}
+                    >
+                      {(d.id === 'f2n' || d.id === 'n2f') && (
+                        <>
+                          <LangChip code={d.id === 'f2n' ? langCodes.target : langCodes.native} />
+                          <FontAwesomeIcon icon={faArrowRightArrowLeft} className="text-[10px] opacity-60" />
+                          <LangChip code={d.id === 'f2n' ? langCodes.native : langCodes.target} />
+                        </>
+                      )}
+                      {d.icon && d.id !== 'f2n' && d.id !== 'n2f' && (
+                        <FontAwesomeIcon icon={d.icon} className="text-xs opacity-80" />
+                      )}
+                      <span>{d.label}</span>
+                    </button>
+                  ))}
+                </div>
+              </div>
+            ))}
+            <div className="text-[11.5px] opacity-50 mt-1">
+              {DIRECTIONS.find((d) => d.id === direction)?.hint}
+            </div>
+            <div className="flex flex-wrap gap-1.5 mt-2.5">
+              <button
+                onClick={() => setBlitz((v) => !v)}
+                disabled={!BLITZ_OK_MODES.includes(direction)}
+                title={BLITZ_OK_MODES.includes(direction) ? 'Таймер 12 сек + серия верных ответов' : 'Блиц работает с выбором, парами и миксом'}
+                aria-pressed={blitz}
+                className={`h-9 px-3 rounded-full text-xs font-bold border transition-all flex items-center gap-1.5 disabled:opacity-30 ${blitz && BLITZ_OK_MODES.includes(direction) ? 'bg-[#F5C16A]/20 border-[#F5C16A]/60 text-[#F5C16A]' : 'bg-white/[0.04] border-white/[0.06] hover:bg-white/[0.08]'}`}
+              >
+                <FontAwesomeIcon icon={faBolt} className="text-xs" />
+                <span>Блиц ⏱ {BLITZ_SECONDS}с</span>
+              </button>
+              <button
+                onClick={() => setHideTr((v) => !v)}
+                title="Транскрипция скрыта — открывается по тапу"
+                aria-pressed={hideTr}
+                className={`h-9 px-3 rounded-full text-xs font-bold border transition-all flex items-center gap-1.5 ${hideTr ? 'bg-white/[0.12] border-white/25 text-white' : 'bg-white/[0.04] border-white/[0.06] hover:bg-white/[0.08]'}`}
+              >
+                <FontAwesomeIcon icon={faEyeSlash} className="text-xs opacity-80" />
+                <span>Спрятать транскрипцию</span>
+              </button>
             </div>
             <div className="text-[11px] font-black uppercase tracking-widest opacity-40 mt-4 mb-1.5">
               Шаг 3 — сколько берём
@@ -699,6 +1011,7 @@ export default function Learn() {
               <span>
                 <Kbd>{formatBinding(bindings.grade_again)}</Kbd>–<Kbd>{formatBinding(bindings.grade_easy)}</Kbd> — оценка
               </span>
+              <span>🎮 игры и ввод оцениваются сами</span>
             </div>
             <div className="text-[11px] font-black uppercase tracking-widest opacity-40 mt-4 mb-1.5">
               Шаг 4 — погнали
@@ -728,47 +1041,108 @@ export default function Learn() {
             />
           </div>
 
+          {blitzActive && (
+            <BlitzBar
+              seconds={BLITZ_SECONDS}
+              streak={streak}
+              best={best}
+              onTimeout={() => setForceReveal(true)}
+            />
+          )}
+
           <AnimatePresence mode="wait">
             <motion.div
-              key={card.card.learnable_id}
+              key={`${card.card.learnable_id}:${card.position}`}
               initial={{ opacity: 0, x: 60 }}
               animate={{ opacity: 1, x: 0 }}
               exit={{ opacity: 0, x: -60 }}
               transition={{ duration: 0.25 }}
             >
-              <StudyFlashcard
-                mode={cardMode}
-                targetTexts={cardTexts.target}
-                nativeTexts={cardTexts.native}
-                transcription={card.card.front_transcription}
-                hint={card.card.hint}
-                flipped={flipped}
-                speakingKey={speakingKey}
-                targetLang={voiceLangs.target}
-                nativeLang={voiceLangs.native}
-                onFlip={() => setFlipped((v) => !v)}
-                onSpeak={(text, lang, key) => speakCard(text, lang, key)}
-                onSwipeLeft={() => grade(1)}
-                onSwipeRight={() => grade(4)}
-              />
+              {choiceForCard && (
+                <ChoiceCard
+                  question={cardTexts.target[0] ?? ''}
+                  transcription={card.card.front_transcription}
+                  questionSpeak={{ text: cardTexts.target[0] ?? '', lang: voiceLangs.target }}
+                  options={choiceForCard.options}
+                  correctIdx={choiceForCard.correctIdx}
+                  speakingKey={speakingKey}
+                  forceReveal={forceReveal}
+                  pickRef={choicePickRef}
+                  onSpeak={(text, lang, key) => speakCard(text, lang, key)}
+                  onAnswer={(ok) => scheduleAuto(ok ? 4 : 1, 900)}
+                />
+              )}
+              {boolForCard && (
+                <BoolCard
+                  word={cardTexts.target[0] ?? ''}
+                  translation={boolForCard.shown}
+                  isCorrect={boolForCard.isCorrect}
+                  wordSpeak={{ text: cardTexts.target[0] ?? '', lang: voiceLangs.target }}
+                  speakingKey={speakingKey}
+                  forceReveal={forceReveal}
+                  answerRef={boolAnswerRef}
+                  onSpeak={(text, lang, key) => speakCard(text, lang, key)}
+                  onAnswer={(ok) => scheduleAuto(ok ? 4 : 1, 900)}
+                />
+              )}
+              {cardMode === 'anagram' && (
+                <AnagramCard
+                  word={cardTexts.target[0] ?? ''}
+                  transcription={card.card.front_transcription}
+                  wordSpeak={{ text: cardTexts.target[0] ?? '', lang: voiceLangs.target }}
+                  speakingKey={speakingKey}
+                  keyRef={anagramKeyRef}
+                  onSpeak={(text, lang, key) => speakCard(text, lang, key)}
+                  onSolved={(mistakes) => scheduleAuto(mistakes === 0 ? 5 : 3, 900)}
+                  onGiveUp={() => scheduleAuto(1, 1200)}
+                />
+              )}
+              {(choiceLoading || boolLoading) && (
+                <div className="rounded-[24px] border border-white/[0.08] bg-[#171717] p-10 grid place-items-center min-h-[320px]">
+                  <span className="text-sm opacity-50 animate-pulse">Подбираем варианты…</span>
+                </div>
+              )}
+              {(cardMode !== 'choice' && cardMode !== 'bool' && cardMode !== 'anagram') || choiceFallback || boolFallback ? (
+                <StudyFlashcard
+                  mode={cardMode === 'choice' || cardMode === 'bool' ? 'f2n' : cardMode}
+                  targetTexts={cardTexts.target}
+                  nativeTexts={cardTexts.native}
+                  transcription={card.card.front_transcription}
+                  hint={card.card.hint}
+                  flipped={flipped}
+                  speakingKey={speakingKey}
+                  targetLang={voiceLangs.target}
+                  nativeLang={voiceLangs.native}
+                  hideTranscription={hideTr}
+                  badge={cardBadge}
+                  ownHint={card.card.own_hint ?? null}
+                  onSaveHint={(h) => void saveOwnHint(h)}
+                  onFlip={() => setFlipped((v) => !v)}
+                  onSpeak={(text, lang, key) => speakCard(text, lang, key)}
+                  onSwipeLeft={() => grade(1)}
+                  onSwipeRight={() => grade(4)}
+                  onChecked={(kind, hints) => scheduleAuto(autoQuality(kind, hints), 1500)}
+                  onMountAudio={() => speakCard(cardTexts.target[0] ?? '', voiceLangs.target, 'audio-q')}
+                />
+              ) : null}
             </motion.div>
           </AnimatePresence>
 
+          {requeuedFlash && (
+            <div className="rounded-2xl border border-[#ff9d5c]/30 bg-[#ff9d5c]/[0.07] px-3.5 py-2 text-center text-[12.5px] font-bold text-[#ff9d5c]">
+              🔁 Не запомнилось — слово вернётся в конце урока
+            </div>
+          )}
+
           <div className="rounded-[20px] border border-white/[0.06] bg-[#171717] p-4">
-            {!flipped ? (
-              cardMode === 'typing' ? (
-                <div className="text-center text-[13px] font-bold text-white/45 py-3">
-                  ⌨️ Напечатай ответ на карточке ↑ и жми Enter
-                </div>
-              ) : (
-                <button
-                  onClick={() => setFlipped(true)}
-                  className="w-full py-3 rounded-2xl bg-white/[0.06] border border-white/[0.08] text-sm font-black hover:bg-white/[0.1] transition"
-                >
-                  {cardMode === 'n2f' ? 'Показать слово' : 'Показать перевод'}
-                </button>
-              )
-            ) : (
+            {manualMode && !flipped ? (
+              <button
+                onClick={() => setFlipped(true)}
+                className="w-full py-3 rounded-2xl bg-white/[0.06] border border-white/[0.08] text-sm font-black hover:bg-white/[0.1] transition"
+              >
+                {cardMode === 'n2f' || cardMode === 'audio' ? 'Показать слово' : 'Показать перевод'}
+              </button>
+            ) : manualMode ? (
               <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
                 {GRADES.map((g) => (
                   <button
@@ -785,6 +1159,32 @@ export default function Learn() {
                   </button>
                 ))}
               </div>
+            ) : (
+              <div className="text-center text-[13px] font-bold text-white/45 py-3">
+                {choiceLoading || boolLoading ? (
+                  'Подбираем варианты…'
+                ) : error && lastQuality.current !== null ? (
+                  <button
+                    onClick={() => {
+                      setError(null)
+                      if (lastQuality.current !== null) void submitAnswer(lastQuality.current)
+                    }}
+                    className="px-4 py-2 rounded-xl bg-[#f43f5e]/15 border border-[#f43f5e]/40 text-[#fb7185] hover:bg-[#f43f5e]/25 transition"
+                  >
+                    Не отправилось — попробовать снова
+                  </button>
+                ) : answering ? (
+                  '⏳ Ставим оценку…'
+                ) : cardMode === 'typing' ? (
+                  '⌨️ Напечатай ответ на карточке ↑ и жми Enter'
+                ) : cardMode === 'choice' ? (
+                  'Выбери верный вариант ↑ — оценка сама'
+                ) : cardMode === 'bool' ? (
+                  'Пара верна? Ответь ↑ — оценка сама'
+                ) : (
+                  'Собери слово из букв ↑ — оценка сама'
+                )}
+              </div>
             )}
           </div>
 
@@ -795,7 +1195,33 @@ export default function Learn() {
                   <span>
                     <Kbd>Enter</Kbd> — проверить ответ
                   </span>
-                  <span>оценка — после проверки ↓</span>
+                  <span>💡 — подсказать букву</span>
+                </>
+              ) : cardMode === 'audio' ? (
+                <>
+                  <span>
+                    <Kbd>Пробел</Kbd> — открыть слово
+                  </span>
+                  <span>🔊 слушай и вспоминай</span>
+                </>
+              ) : cardMode === 'choice' ? (
+                <>
+                  <span>
+                    <Kbd>1</Kbd>–<Kbd>4</Kbd> — выбрать вариант
+                  </span>
+                  {blitzActive && <span>⏱ успей за {BLITZ_SECONDS}с</span>}
+                </>
+              ) : cardMode === 'bool' ? (
+                <>
+                  <span>
+                    <Kbd>1</Kbd> — верно, <Kbd>2</Kbd> — неверно
+                  </span>
+                  {blitzActive && <span>⏱ успей за {BLITZ_SECONDS}с</span>}
+                </>
+              ) : cardMode === 'anagram' ? (
+                <>
+                  <span>печатай буквы • <Kbd>⌫</Kbd> — убрать</span>
+                  <span>клик — тоже работает</span>
                 </>
               ) : (
                 <>
@@ -860,6 +1286,12 @@ export default function Learn() {
               </div>
               <div className="text-[11px] opacity-40 font-bold">слов</div>
             </div>
+            {blitz && maxStreak > 1 && (
+              <div>
+                <div className="text-[26px] font-black tabular-nums text-[#ff9d5c]">×{maxStreak}</div>
+                <div className="text-[11px] opacity-40 font-bold">серия</div>
+              </div>
+            )}
           </div>
           {unlocked.length > 0 && (
             <div className="mt-4 rounded-2xl border border-[#F5C16A]/30 bg-[#F5C16A]/[0.07] p-3.5">
