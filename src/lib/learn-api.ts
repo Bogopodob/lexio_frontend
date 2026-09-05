@@ -142,6 +142,25 @@ export interface Availability {
   new: number
 }
 
+export interface WeeklyDay {
+  date: string
+  minutes: number
+  words: number
+  xp: number
+}
+
+export function getWeekly(
+  userId: string,
+  token: string,
+  profileId: string,
+  days = 7,
+): Promise<WeeklyDay[]> {
+  return request(
+    `/learning/users/${userId}/profiles/${profileId}/weekly?days=${days}`,
+    token,
+  )
+}
+
 export function getAvailability(
   userId: string,
   token: string,

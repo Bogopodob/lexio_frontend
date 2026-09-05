@@ -3,7 +3,7 @@ import { useNavigate } from 'react-router-dom'
 import { motion } from 'framer-motion'
 import { useAuth } from '@/context/AuthContext'
 import { getWordOfDay, listCategories, listCategoriesWithProgress, type RemoteCategory, type WordOfDay } from '@/lib/catalog-api'
-import { getAvailability, listSessions } from '@/lib/learn-api'
+import { getAvailability, getWeekly, listSessions, type WeeklyDay } from '@/lib/learn-api'
 import { getStats, listLearningProfiles } from '@/lib/profile-api'
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome'
 import {
@@ -294,7 +294,6 @@ export default function Home() {
     [isSpeaking, speakingId, speak, cancel],
   )
   const handleFlip = useCallback((title: string) => setFlippedId((v) => (v === title ? null : title)), [])
-  const memoWeeklyData = useMemo(() => weeklyData, [])
   const openCategory = useCallback(
     (categoryId: string) => navigate(`/learn?category=${encodeURIComponent(categoryId)}`),
     [navigate],
@@ -407,14 +406,16 @@ export default function Home() {
 
   const [live, setLive] = useState<LiveHome | null>(null)
   const [wotd, setWotd] = useState<WordOfDay | null>(null)
+  const [weekly, setWeekly] = useState<WeeklyDay[] | null>(null)
 
   const greeting = useMemo(() => greetingByHour(new Date().getHours()), [])
 
-  // Live numbers for authed users: stats + availability + today's sessions.
+  // Live numbers for authed users: stats + availability + today's sessions + week.
   // Guests keep the static demo numbers below.
   useEffect(() => {
     if (!authReady || !user || !token) {
       setLive(null)
+      setWeekly(null)
       return
     }
     let cancelled = false
@@ -423,12 +424,14 @@ export default function Home() {
         const profiles = await listLearningProfiles(user.id, token)
         const active = profiles.find((p) => p.is_active) ?? profiles[0]
         if (!active) return
-        const [stat, avail, sessions] = await Promise.all([
+        const [stat, avail, sessions, week] = await Promise.all([
           getStats(user.id, token, active.id).catch(() => null),
           getAvailability(user.id, token, active.id).catch(() => null),
           listSessions(user.id, token, active.id).catch(() => []),
+          getWeekly(user.id, token, active.id, 7).catch(() => null),
         ])
         if (cancelled) return
+        if (week) setWeekly(week)
         const today = new Date().toDateString()
         const todays = sessions.filter(
           (s) => s.started_at && new Date(s.started_at).toDateString() === today,
@@ -480,6 +483,21 @@ export default function Home() {
       cancelled = true
     }
   }, [])
+
+  const memoWeeklyData = useMemo(
+    () =>
+      weekly
+        ? weekly.map((d) => ({ date: new Date(`${d.date}T12:00:00`), minutes: d.minutes }))
+        : weeklyData,
+    [weekly],
+  )
+
+  const weekPeak = useMemo(() => {
+    if (!weekly || weekly.every((d) => d.minutes === 0)) return null
+    const best = weekly.reduce((a, b) => (b.minutes > a.minutes ? b : a))
+    const names = ['воскресенье', 'понедельник', 'вторник', 'среду', 'четверг', 'пятницу', 'субботу']
+    return { minutes: best.minutes, day: names[new Date(`${best.date}T12:00:00`).getDay()] }
+  }, [weekly])
 
   const dailyPct = live ? Math.min(100, Math.round((live.wordsToday / DAILY_WORD_TARGET) * 100)) : 60
   const focusLine = !live
@@ -707,8 +725,8 @@ export default function Home() {
             </div>
           </Suspense>
           <div className="flex gap-2 mt-3 flex-wrap">
-            <span className="px-3 py-1 rounded-full bg-[#5AD4B5]/15 text-[#5AD4B5] text-xs font-bold border border-[#5AD4B5]/20">18 мин сегодня</span>
-            <span className="px-3 py-1 rounded-full bg-white/5 text-white/60 text-xs font-semibold border border-white/10">Пик: 30 мин в субботу</span>
+            <span className="px-3 py-1 rounded-full bg-[#5AD4B5]/15 text-[#5AD4B5] text-xs font-bold border border-[#5AD4B5]/20">{live?.minutesToday ?? 18} мин сегодня</span>
+            <span className="px-3 py-1 rounded-full bg-white/5 text-white/60 text-xs font-semibold border border-white/10">{weekPeak ? `Пик: ${weekPeak.minutes} мин в ${weekPeak.day}` : 'Пик: 30 мин в субботу'}</span>
             <span className="px-3 py-1 rounded-full bg-[#5B74FF]/15 text-[#8b9bff] text-xs font-semibold border border-[#5B74FF]/20">Цель: 20 мин/день</span>
           </div>
         </div>
