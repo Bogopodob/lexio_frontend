@@ -361,6 +361,13 @@ export default function Profile() {
   const [searching, setSearching] = useState(false)
 
   const isAuthed = Boolean(user && token)
+  // Settled flags: authed users see skeletons until server data arrives,
+  // mocks are for guests only — no mock flash.
+  const [goalsLoaded, setGoalsLoaded] = useState(false)
+  const [achievementsLoaded, setAchievementsLoaded] = useState(false)
+  const headerLoading = isAuthed && (remote === 'idle' || remote === 'loading')
+  const goalsLoading = isAuthed && !goalsLoaded
+  const achievementsLoading = isAuthed && !achievementsLoaded
 
   // Friends from the server (guests keep mocks).
   useEffect(() => {
@@ -718,7 +725,11 @@ export default function Profile() {
     const pid = activeProfileId
     listGoals(uid, tk, pid)
       .then((list) => {
-        if (cancelled || list.length === 0) return
+        if (cancelled) return
+        if (list.length === 0) {
+          setGoals([])
+          return
+        }
         setGoals(
           list.map((g, i) => ({
             id: g.id,
@@ -732,9 +743,16 @@ export default function Profile() {
         )
       })
       .catch(() => undefined)
+      .finally(() => {
+        if (!cancelled) setGoalsLoaded(true)
+      })
     listAchievements(uid, tk, pid)
       .then((list) => {
-        if (cancelled || list.length === 0) return
+        if (cancelled) return
+        if (list.length === 0) {
+          setAchievements([])
+          return
+        }
         setAchievements(
           list.map((a) => ({
             icon: ACHIEVEMENT_ICONS[a.code] ?? faStar,
@@ -751,10 +769,21 @@ export default function Profile() {
         )
       })
       .catch(() => undefined)
+      .finally(() => {
+        if (!cancelled) setAchievementsLoaded(true)
+      })
     return () => {
       cancelled = true
     }
   }, [user, token, activeProfileId])
+
+  // No learning profile: nothing will load the lists — settle quietly.
+  useEffect(() => {
+    if (isAuthed && remote === 'ready' && !activeProfileId) {
+      setGoalsLoaded(true)
+      setAchievementsLoaded(true)
+    }
+  }, [isAuthed, remote, activeProfileId])
 
   // Mini-stats for every language profile (shown under each language card).
   useEffect(() => {
@@ -865,10 +894,10 @@ export default function Profile() {
               <div className="relative shrink-0 group/avatar">
                 <div className="w-[84px] h-[84px] rounded-[20px] bg-gradient-to-br from-[#5AD4B5] to-[#5B74FF] p-[2px] shadow-[0_12px_32px_rgba(91,116,255,0.22)]">
                   <div className="w-full h-full rounded-[18px] bg-[#0f0f0f] grid place-items-center text-[28px] overflow-hidden">
-                    {isEditing && draft.avatar ? <img src={draft.avatar} alt="avatar" className="w-full h-full object-cover" /> : !isEditing && profile.avatar ? <img src={profile.avatar} alt="avatar" className="w-full h-full object-cover" /> : draft.name[0] || '?'}
+                    {headerLoading ? <span className="w-full h-full animate-pulse bg-white/[0.07]" aria-hidden /> : isEditing && draft.avatar ? <img src={draft.avatar} alt="avatar" className="w-full h-full object-cover" /> : !isEditing && profile.avatar ? <img src={profile.avatar} alt="avatar" className="w-full h-full object-cover" /> : draft.name[0] || '?'}
                   </div>
                 </div>
-                <span className="absolute -bottom-1 -right-1 w-7 h-7 rounded-full bg-[#5AD4B5] text-black grid place-items-center text-[11px] font-black border-2 border-[#171717]">{profile.level}</span>
+                <span className="absolute -bottom-1 -right-1 w-7 h-7 rounded-full bg-[#5AD4B5] text-black grid place-items-center text-[11px] font-black border-2 border-[#171717]">{headerLoading ? '–' : profile.level}</span>
                 {isEditing && (
                   <button onClick={() => fileRef.current?.click()} className="absolute inset-0 rounded-[20px] bg-black/60 backdrop-blur grid place-items-center opacity-0 group-hover/avatar:opacity-100 transition-opacity">
                     <span className="px-2.5 py-1 rounded-full bg-white text-black text-xs font-bold flex items-center gap-1"><FontAwesomeIcon icon={faCamera} /> Загрузить</span>
@@ -915,7 +944,11 @@ export default function Profile() {
                 ) : (
                   <>
                     <div className="flex flex-wrap items-center gap-2">
-                      <h1 className="text-[26px] sm:text-[30px] font-black tracking-tight leading-none">{profile.name || 'Без имени'}</h1>
+                      {headerLoading ? (
+                        <span className="inline-block h-8 w-44 max-w-full rounded-xl bg-white/[0.07] animate-pulse" aria-hidden />
+                      ) : (
+                        <h1 className="text-[26px] sm:text-[30px] font-black tracking-tight leading-none">{profile.name || 'Без имени'}</h1>
+                      )}
                       {profile.gender === 'female' && (
                         <span title="Женский" className="w-7 h-7 rounded-full grid place-items-center border bg-[#f43f5e]/10 border-[#f43f5e]/30 text-[#f43f5e] text-sm"><FontAwesomeIcon icon={faVenus} /></span>
                       )}
@@ -926,24 +959,36 @@ export default function Profile() {
                       {remote === 'loading' && (
                         <span className="px-2.5 py-1 rounded-full bg-white/[0.06] border border-white/[0.08] text-white/50 text-[11px] font-bold animate-pulse">Загрузка…</span>
                       )}
-                <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-white/[0.06] border border-white/[0.08] text-white/60 text-xs font-medium">
-                  <FontAwesomeIcon icon={faLocationDot} className="opacity-60" /> {(isEditing ? draft.city : profile.city) || 'Город не указан'}{age !== null ? ` • ${age} лет` : ''}
-                </span>
-                    </div>
-                    <div className="flex flex-wrap gap-1.5 mt-3">
-                      {(isEditing ? draft.tags : profile.tags).map((t) => (
-                        <span key={t} className="px-2.5 py-1 rounded-full bg-white/[0.06] border border-white/[0.06] text-white/70 text-xs font-semibold">{t}</span>
-                      ))}
-                      {(isEditing ? draft.tags : profile.tags).length === 0 && (
-                        <span className="px-2.5 py-1 rounded-full border border-dashed border-white/[0.12] text-white/35 text-xs font-semibold">Нет тегов — добавь через «Редактировать»</span>
-                      )}
-                    </div>
-                  </>
+                {headerLoading ? (
+                  <span className="inline-block h-6 w-36 max-w-full rounded-full bg-white/[0.06] animate-pulse" aria-hidden />
+                ) : (
+                  <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-white/[0.06] border border-white/[0.08] text-white/60 text-xs font-medium">
+                    <FontAwesomeIcon icon={faLocationDot} className="opacity-60" /> {(isEditing ? draft.city : profile.city) || 'Город не указан'}{age !== null ? ` • ${age} лет` : ''}
+                  </span>
                 )}
+              </div>
+              {headerLoading ? (
+                <div className="flex flex-wrap gap-1.5 mt-3" aria-hidden>
+                  <span className="h-6 w-20 rounded-full bg-white/[0.06] animate-pulse" />
+                  <span className="h-6 w-16 rounded-full bg-white/[0.06] animate-pulse" />
+                  <span className="h-6 w-24 rounded-full bg-white/[0.06] animate-pulse" />
+                </div>
+              ) : (
+                <div className="flex flex-wrap gap-1.5 mt-3">
+                  {(isEditing ? draft.tags : profile.tags).map((t) => (
+                    <span key={t} className="px-2.5 py-1 rounded-full bg-white/[0.06] border border-white/[0.06] text-white/70 text-xs font-semibold">{t}</span>
+                  ))}
+                  {(isEditing ? draft.tags : profile.tags).length === 0 && (
+                    <span className="px-2.5 py-1 rounded-full border border-dashed border-white/[0.12] text-white/35 text-xs font-semibold">Нет тегов — добавь через «Редактировать»</span>
+                  )}
+                </div>
+              )}
+            </>
+          )}
               </div>
             </div>
             <div className="hidden sm:flex flex-col items-end gap-1.5 shrink-0">
-              <button onClick={isEditing ? saveEdit : startEdit} disabled={saving} className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-black border ${isEditing ? 'bg-[#5AD4B5] text-black border-[#5AD4B5]' : 'bg-white text-black border-white'} ${saving ? 'opacity-60' : ''}`}>
+              <button onClick={isEditing ? saveEdit : startEdit} disabled={saving || headerLoading} className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-black border ${isEditing ? 'bg-[#5AD4B5] text-black border-[#5AD4B5]' : 'bg-white text-black border-white'} ${saving || headerLoading ? 'opacity-60' : ''}`}>
                 <FontAwesomeIcon icon={isEditing ? faCheck : faPen} /> {isEditing ? (saving ? 'Сохраняем…' : 'Сохранить') : 'Редактировать'}
               </button>
               {saveError && <span className="text-[11px] font-bold text-[#f43f5e]">{saveError}</span>}
@@ -985,6 +1030,16 @@ export default function Profile() {
       <div className="settings-group !mb-0">
         <h3><FontAwesomeIcon icon={faLanguage} className="mr-2 opacity-60" /> Язык обучения</h3>
         <p className="text-xs opacity-40 -mt-2 mb-2">Выбери язык — изменится контент</p>
+        {headerLoading ? (
+          <div className="grid grid-cols-2 sm:grid-cols-4 gap-2" aria-hidden>
+            {[0, 1, 2, 3].map((i) => (
+              <div key={i} className="p-3 rounded-xl border border-white/[0.06] bg-white/[0.03] animate-pulse">
+                <div className="h-4 w-2/3 rounded-lg bg-white/[0.07]" />
+                <div className="h-3 w-1/2 rounded-lg bg-white/[0.06] mt-2" />
+              </div>
+            ))}
+          </div>
+        ) : (
         <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
           {langOptions.map((l) => {
             const active = (isEditing ? draft.language : profile.language) === l.id
@@ -1020,7 +1075,8 @@ export default function Profile() {
             )
           })}
         </div>
-        {!isEditing && <div className="text-xs opacity-40 mt-2">Текущий: Русский → {langOptions.find((l) => l.id === profile.language)?.label}</div>}
+        )}
+        {!isEditing && <div className="text-xs opacity-40 mt-2">Текущий: Русский → {headerLoading ? '…' : langOptions.find((l) => l.id === profile.language)?.label}</div>}
         {isEditing && <div className="text-xs opacity-40 mt-2">Нажми на язык, чтобы выбрать (до сохранения)</div>}
       </div>
 
@@ -1030,7 +1086,17 @@ export default function Profile() {
           <span className="text-[11px] opacity-40 font-bold">май • 2026</span>
         </div>
         <div className="mt-4 grid gap-3 sm:grid-cols-3">
-          {goals.map((g) => (
+          {goalsLoading ? (
+            [0, 1, 2].map((i) => (
+              <div key={i} className="rounded-xl bg-white/[0.03] border border-white/[0.04] p-3.5 animate-pulse" aria-hidden>
+                <div className="h-4 w-3/4 rounded-lg bg-white/[0.07]" />
+                <div className="h-3 w-1/2 rounded-lg bg-white/[0.06] mt-2" />
+                <div className="h-1.5 rounded-full bg-white/[0.06] mt-2.5" />
+              </div>
+            ))
+          ) : goals.length === 0 ? (
+            <div className="text-xs opacity-40 sm:col-span-3 py-2">Целей пока нет — добавь через «Редактировать» выше 👆</div>
+          ) : goals.map((g) => (
             <div key={g.id ?? g.title} className="rounded-xl bg-white/[0.03] border border-white/[0.04] p-3.5 relative">
               {isEditing && (
                 <button onClick={() => removeGoal(g)} className="absolute -top-1.5 -right-1.5 w-5 h-5 rounded-full bg-[#f43f5e] text-white grid place-items-center text-[10px] border border-[#171717]">×</button>
@@ -1174,7 +1240,22 @@ export default function Profile() {
       </div>
 
       {/* achievements — переделано: много, hover с прогрессом */}
-      <AchievementsBlock items={achievements ?? achievementsFallback} />
+      {achievementsLoading ? (
+        <div className="rounded-[20px] border border-white/[0.06] bg-[#171717] p-5" aria-hidden>
+          <div className="h-5 w-40 rounded-lg bg-white/[0.07] animate-pulse" />
+          <div className="mt-4 flex gap-3 overflow-hidden">
+            {[0, 1, 2, 3, 4].map((i) => (
+              <div key={i} className="flex-none w-[148px] rounded-[20px] border border-white/[0.06] p-3 pt-4 flex flex-col items-center gap-2 animate-pulse">
+                <div className="w-[72px] h-[72px] rounded-full bg-white/[0.07]" />
+                <div className="h-4 w-24 rounded-lg bg-white/[0.07]" />
+                <div className="h-3 w-16 rounded-lg bg-white/[0.06]" />
+              </div>
+            ))}
+          </div>
+        </div>
+      ) : (
+        <AchievementsBlock items={achievements ?? achievementsFallback} />
+      )}
 
       {/* friends / community */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
@@ -1182,7 +1263,7 @@ export default function Profile() {
           <div className="flex items-center justify-between">
             <h3 className="text-[14px] font-black tracking-tight flex items-center gap-2"><FontAwesomeIcon icon={faUsers} className="text-[#5B74FF]" /> Друзья учат</h3>
             <span className="text-[11px] opacity-40 font-bold">
-              {(remoteFriends ?? friends).length} друга
+              {isAuthed ? (remoteFriends === null ? '…' : `${remoteFriends.length} друга`) : `${friends.length} друга`}
               {incoming.length > 0 && <span className="ml-1.5 px-1.5 py-0.5 rounded-full bg-[#F5C16A]/15 border border-[#F5C16A]/25 text-[#F5C16A]">+{incoming.length} заявки</span>}
             </span>
           </div>
