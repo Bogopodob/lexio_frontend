@@ -105,6 +105,18 @@ export function deleteCategory(userId: string, token: string, id: string): Promi
   return mutateCategory(userId, token, 'DELETE', id).then(() => undefined)
 }
 
+export function listMyCategories(
+  userId: string,
+  token: string,
+  type?: string,
+): Promise<RemoteCategory[]> {
+  const params = new URLSearchParams()
+  if (type) params.set('type', type)
+  params.set('locale', getUiLang())
+  const query = params.toString()
+  return get(`/catalog/categories/mine${query ? `?${query}` : ''}`, token)
+}
+
 export function getWordOfDay(date: string): Promise<WordOfDay> {
   return get(`/catalog/word-of-day?date=${encodeURIComponent(date)}`)
 }

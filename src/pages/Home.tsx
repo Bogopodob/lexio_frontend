@@ -2,7 +2,7 @@ import { useState, useCallback, useEffect, useMemo, memo, lazy, Suspense } from 
 import { useNavigate } from 'react-router-dom'
 import { motion } from 'framer-motion'
 import { useAuth } from '@/context/AuthContext'
-import { createCategory, deleteCategory, getWordOfDay, listCategories, listCategoriesWithProgress, updateCategory, type RemoteCategory, type WordOfDay } from '@/lib/catalog-api'
+import { createCategory, deleteCategory, getWordOfDay, listCategories, listCategoriesWithProgress, listMyCategories, updateCategory, type RemoteCategory, type WordOfDay } from '@/lib/catalog-api'
 import { getAvailability, getWeekly, listSessions, type WeeklyDay } from '@/lib/learn-api'
 import { getStats, listLanguages, listLearningProfiles } from '@/lib/profile-api'
 import { createUserEntry } from '@/lib/library-api'
@@ -426,7 +426,7 @@ export default function Home() {
   const [wordAdded, setWordAdded] = useState(false)
   const [langIds, setLangIds] = useState<{ en: string; ru: string } | null>(null)
 
-  // Own categories (authed only).
+  // Own categories (authed only, no learning profile needed).
   useEffect(() => {
     if (!authReady || !user || !token) {
       setOwnCats([])
@@ -434,17 +434,9 @@ export default function Home() {
       return
     }
     let cancelled = false
-    const uid = user.id
-    const tk = token
-    listLearningProfiles(uid, tk)
-      .then((profiles) => {
-        const active = profiles.find((p) => p.is_active) ?? profiles[0]
-        if (!active) return null
-        return listCategoriesWithProgress(uid, tk, active.id, 'theme')
-      })
+    listMyCategories(user.id, token, 'theme')
       .then((list) => {
-        if (cancelled || !list) return
-        setOwnCats(list.filter((c) => c.user_id === uid))
+        if (!cancelled) setOwnCats(list)
       })
       .catch(() => undefined)
       .finally(() => {
@@ -505,8 +497,12 @@ export default function Home() {
   const submitWord = async () => {
     if (!user || !token || wordBusy) return
     const targetCat = wordCat || ownCats[0]?.id
-    if (!targetCat || wordEn.trim() === '' || wordRu.trim() === '') {
+    if (!targetCat) {
       setWordError(t('home.addWord.needCategory'))
+      return
+    }
+    if (wordEn.trim() === '' || wordRu.trim() === '') {
+      setWordError(t('home.addWord.fillBoth'))
       return
     }
     setWordBusy(true)

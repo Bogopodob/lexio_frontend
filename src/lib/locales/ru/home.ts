@@ -74,6 +74,7 @@ export default {
     deleteBtn: 'Удалить',
   },
   addWord: {
+    fillBoth: 'Введи слово и перевод',
     open: '＋ Слово',
     wordPh: 'Слово (EN)',
     translationPh: 'Перевод',

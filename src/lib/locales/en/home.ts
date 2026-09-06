@@ -76,6 +76,7 @@ const en: typeof ruHome = {
     deleteBtn: 'Delete',
   },
   addWord: {
+    fillBoth: 'Enter the word and its translation',
     open: '＋ Word',
     wordPh: 'Word (EN)',
     translationPh: 'Translation',
