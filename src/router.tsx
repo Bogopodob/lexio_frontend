@@ -6,6 +6,7 @@ import Settings from '@/pages/Settings'
 import Auth from '@/pages/Auth'
 import Learn from '@/pages/Learn'
 import Premium from '@/pages/Premium'
+import TopicDetail from '@/pages/TopicDetail'
 import NotFound from '@/pages/NotFound'
 import RequireAuth from '@/components/RequireAuth'
 
@@ -30,6 +31,14 @@ export default function Router() {
         element={
           <RequireAuth>
             <Learn />
+          </RequireAuth>
+        }
+      />
+      <Route
+        path="/topics/:id"
+        element={
+          <RequireAuth>
+            <TopicDetail />
           </RequireAuth>
         }
       />

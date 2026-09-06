@@ -915,7 +915,11 @@ export default function Home() {
               ) : mineTopics.length > 0 ? (
                 mineTopics.map((card, index) => (
                   <div key={card.id ?? card.title} className="relative">
-                    <MemoTopicCard card={card} index={index} onOpen={openCategory} />
+                    <MemoTopicCard
+                      card={card}
+                      index={index}
+                      onOpen={(id) => navigate(`/topics/${encodeURIComponent(id)}`)}
+                    />
                     <div className="absolute top-2 right-2 flex gap-1">
                       <button
                         onClick={(e) => {

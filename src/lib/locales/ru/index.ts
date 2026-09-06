@@ -11,6 +11,7 @@ import notfound from './notfound'
 import widgets from './widgets'
 import components from './components'
 import lib from './lib'
+import topics from './topics'
 import premium from './premium'
 
 const ru = {
@@ -27,7 +28,7 @@ const ru = {
   widgets,
   components,
   lib,
-  premium,
+  topics,
 }
 
 export default ru
