@@ -56,6 +56,17 @@ const en: typeof ruTopics = {
     badFile: 'File rejected',
     recordDenied: 'No microphone access',
   },
+  share: {
+    title: 'Friend access',
+    pickPh: 'Pick a friend…',
+    grant: 'Share',
+    empty: 'Not shared with anyone yet. Mutual friends only.',
+    revoke: 'Revoke',
+    sharedBy: 'Shared by {name}',
+  },
+  sharedSection: {
+    title: 'Shared with me',
+  },
   settings: {
     title: 'Topic settings',
     namePh: 'Topic name…',

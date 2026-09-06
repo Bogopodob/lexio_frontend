@@ -188,6 +188,63 @@ export function mediaStreamPath(userId: string, mediaId: string): string {
   return `/library/users/${userId}/media/${mediaId}`
 }
 
+export interface LibraryShare {
+  id: string
+  friend_user_id: string
+  friend_name: string | null
+}
+
+export interface SharedTopic {
+  id: string
+  name: string | null
+  owner_name: string | null
+  words_count: number
+}
+
+export function shareCategory(
+  userId: string,
+  token: string,
+  payload: { category_id: string; friend_user_id: string },
+): Promise<LibraryShare> {
+  return post(`/library/users/${userId}/shares`, token, payload)
+}
+
+export function listShares(userId: string, token: string, categoryId: string): Promise<LibraryShare[]> {
+  return request(`/library/users/${userId}/shares?category_id=${encodeURIComponent(categoryId)}`, token)
+}
+
+export function revokeShare(userId: string, token: string, shareId: string): Promise<void> {
+  return request(`/library/users/${userId}/shares/${shareId}`, token, { method: 'DELETE' }).then(
+    () => undefined,
+  )
+}
+
+export function listSharedWithMe(userId: string, token: string): Promise<SharedTopic[]> {
+  return request(`/library/users/${userId}/shared-with-me`, token)
+}
+
+export function listSharedEntries(
+  userId: string,
+  token: string,
+  categoryId: string,
+): Promise<RemoteUserEntry[]> {
+  return request(
+    `/library/users/${userId}/shared/entries?category_id=${encodeURIComponent(categoryId)}`,
+    token,
+  )
+}
+
+export function listSharedPhrases(
+  userId: string,
+  token: string,
+  categoryId: string,
+): Promise<RemoteUserPhrase[]> {
+  return request(
+    `/library/users/${userId}/shared/phrases?category_id=${encodeURIComponent(categoryId)}`,
+    token,
+  )
+}
+
 export function speakText(
   userId: string,
   token: string,

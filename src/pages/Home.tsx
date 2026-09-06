@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom'
 import { motion } from 'framer-motion'
 import { useAuth } from '@/context/AuthContext'
 import { createCategory, deleteCategory, getWordOfDay, listCategories, listCategoriesWithProgress, listMyCategories, updateCategory, type RemoteCategory, type WordOfDay } from '@/lib/catalog-api'
+import { listSharedWithMe, type SharedTopic } from '@/lib/library-api'
 import { getAvailability, getWeekly, listSessions, type WeeklyDay } from '@/lib/learn-api'
 import { getStats, listLanguages, listLearningProfiles } from '@/lib/profile-api'
 import { createUserEntry } from '@/lib/library-api'
@@ -406,6 +407,28 @@ export default function Home() {
   }, [authReady, user, token])
 
   const [topicsTab, setTopicsTab] = useState<'system' | 'mine'>('system')
+  const [sharedTopics, setSharedTopics] = useState<SharedTopic[]>([])
+  const [sharedDone, setSharedDone] = useState(false)
+
+  useEffect(() => {
+    if (!authReady || !user || !token) {
+      setSharedTopics([])
+      setSharedDone(false)
+      return
+    }
+    let cancelled = false
+    listSharedWithMe(user.id, token)
+      .then((list) => {
+        if (!cancelled) setSharedTopics(list)
+      })
+      .catch(() => undefined)
+      .finally(() => {
+        if (!cancelled) setSharedDone(true)
+      })
+    return () => {
+      cancelled = true
+    }
+  }, [authReady, user, token])
   const [ownCats, setOwnCats] = useState<RemoteCategory[]>([])
   const [ownDone, setOwnDone] = useState(false)
   const [catDialog, setCatDialog] = useState<
@@ -1080,6 +1103,37 @@ export default function Home() {
             </div>
           </div>
         </div>
+      )}
+
+      {(sharedTopics.length > 0 || (!isGuest && !sharedDone)) && (
+        <motion.section className="content-section !mt-6" variants={fadeUp} transition={{ duration: 0.5 }}>
+          <div className="section-header section-header--stacked">
+            <div>
+              <h3>{t('home.sharedSection.title')}</h3>
+            </div>
+          </div>
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
+            {!isGuest && !sharedDone ? (
+              topicSkeletons.map((i) => <SkeletonCard key={i} />)
+            ) : (
+              sharedTopics.map((c, index) => (
+                <MemoTopicCard
+                  key={c.id}
+                  card={{
+                    id: c.id,
+                    emoji: '🤝',
+                    title: c.name ?? c.id,
+                    count: `${c.words_count} ${pickPlural(c.words_count, heroWordsForms)}`,
+                    sub: c.owner_name ?? '',
+                    tone: TOPIC_TONES[(index + 1) % TOPIC_TONES.length],
+                  }}
+                  index={index}
+                  onOpen={(cid) => navigate(`/topics/${encodeURIComponent(cid)}`)}
+                />
+              ))
+            )}
+          </div>
+        </motion.section>
       )}
 
       {/* GRAMMAR — мемоизированы */}

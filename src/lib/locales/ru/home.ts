@@ -82,6 +82,9 @@ export default {
     added: 'Добавлено ✓',
     needCategory: 'Сначала создай тему выше',
   },
+  sharedSection: {
+    title: 'Мне открыли доступ',
+  },
   topics: {
     title: 'По теме',
     all: 'Все темы ({n})',

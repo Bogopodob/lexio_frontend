@@ -20,21 +20,27 @@ import {
   type RemoteCategory,
 } from '@/lib/catalog-api'
 import { listCategoriesWithProgress } from '@/lib/catalog-api'
-import { listLanguages, listLearningProfiles } from '@/lib/profile-api'
+import { listFriends, listLanguages, listLearningProfiles, type RemoteFriend } from '@/lib/profile-api'
 import WordDialog, { type WordFormValue } from '@/components/WordDialog'
 import {
   createUserEntry,
   createUserPhrase,
   deleteUserEntry,
   deleteUserPhrase,
+  listSharedEntries,
+  listSharedPhrases,
+  listSharedWithMe,
+  listShares,
   listUserEntries,
   listUserPhrases,
   mediaSrc,
+  revokeShare,
+  shareCategory,
   updateUserEntry,
   updateUserPhrase,
-  type RemoteUserEntry,
-  type RemoteUserPhrase,
+  type LibraryShare,
 } from '@/lib/library-api'
+import type { RemoteUserEntry, RemoteUserPhrase } from '@/lib/library-api'
 
 interface Row {
   key: string
@@ -96,16 +102,33 @@ export default function TopicDetail() {
   }, [])
 
   const isOwn = !!category && !!user && category.user_id === user.id
+  // Owner name when the topic was shared with me (read-only mode).
+  const [sharedFrom, setSharedFrom] = useState<string | null>(null)
+  const [shares, setShares] = useState<LibraryShare[]>([])
+  const [friends, setFriends] = useState<RemoteFriend[]>([])
+  const [shareFriend, setShareFriend] = useState('')
+  const [shareBusy, setShareBusy] = useState(false)
+  const isShared = !isOwn && sharedFrom !== null
 
-  const reloadWords = useCallback(async () => {
-    if (!user || !token || !id) return
-    const [e, p] = await Promise.all([
-      listUserEntries(user.id, token, { category_id: id }),
-      listUserPhrases(user.id, token, { category_id: id }),
-    ])
-    setEntries(e)
-    setPhrases(p)
-  }, [user, token, id])
+  const loadWords = useCallback(
+    async (shared: boolean) => {
+      if (!user || !token || !id) return
+      const [e, p] = shared
+        ? await Promise.all([
+            listSharedEntries(user.id, token, id),
+            listSharedPhrases(user.id, token, id),
+          ])
+        : await Promise.all([
+            listUserEntries(user.id, token, { category_id: id }),
+            listUserPhrases(user.id, token, { category_id: id }),
+          ])
+      setEntries(e)
+      setPhrases(p)
+    },
+    [user, token, id],
+  )
+
+  const reloadWords = useCallback(() => loadWords(isShared), [loadWords, isShared])
 
   useEffect(() => {
     if (!authReady || !user || !token || !id) return
@@ -117,10 +140,31 @@ export default function TopicDetail() {
         const mine = await listMyCategories(user.id, token)
         if (cancelled) return
         let found = mine.find((c) => c.id === id) ?? null
+        let shared: typeof sharedFrom = null
         if (!found) {
           const pub = await listCategories()
           if (cancelled) return
           found = pub.find((c) => c.id === id) ?? null
+        }
+        if (!found) {
+          const sharedList = await listSharedWithMe(user.id, token).catch(() => [])
+          if (cancelled) return
+          const row = sharedList.find((c) => c.id === id)
+          if (row) {
+            found = {
+              id: row.id,
+              parent_id: null,
+              user_id: '__shared__',
+              slug: row.id,
+              type: 'theme',
+              color: null,
+              icon: null,
+              sort: 500,
+              name: row.name,
+              entries_count: row.words_count,
+            }
+            shared = row.owner_name
+          }
         }
         if (cancelled) return
         if (!found) {
@@ -128,9 +172,24 @@ export default function TopicDetail() {
           return
         }
         setCategory(found)
+        setSharedFrom(shared)
         setCatName(found.name ?? '')
-        await reloadWords()
+        await loadWords(shared !== null)
         if (cancelled) return
+        if (found.user_id === user.id) {
+          try {
+            const [s, f] = await Promise.all([
+              listShares(user.id, token, id),
+              listFriends(user.id, token),
+            ])
+            if (!cancelled) {
+              setShares(s)
+              setFriends(f)
+            }
+          } catch {
+            /* optional */
+          }
+        }
         try {
           const profiles = await listLearningProfiles(user.id, token)
           const active = profiles.find((p) => p.is_active) ?? profiles[0]
@@ -212,6 +271,33 @@ export default function TopicDetail() {
       navigate('/')
     } catch {
       setCatBusy(false)
+    }
+  }
+
+  const grantAccess = async () => {
+    if (!user || !token || !id || shareFriend === '' || shareBusy) return
+    setShareBusy(true)
+    try {
+      const created = await shareCategory(user.id, token, {
+        category_id: id,
+        friend_user_id: shareFriend,
+      })
+      setShares((prev) => [...prev, created])
+      setShareFriend('')
+    } catch {
+      /* keep open */
+    } finally {
+      setShareBusy(false)
+    }
+  }
+
+  const revokeAccess = async (shareId: string) => {
+    if (!user || !token) return
+    try {
+      await revokeShare(user.id, token, shareId)
+      setShares((prev) => prev.filter((s) => s.id !== shareId))
+    } catch {
+      /* ignore */
     }
   }
 
@@ -325,6 +411,7 @@ export default function TopicDetail() {
           <p className="text-xs opacity-40 mt-1 tabular-nums">
             {rows.length} {t('topics.words')}
             {learned !== null && ` • ${learned} ${t('topics.learned')}`}
+            {isShared && sharedFrom && ` • ${t('topics.share.sharedBy', { name: sharedFrom })}`}
           </p>
         </div>
         {isOwn && (
@@ -357,6 +444,54 @@ export default function TopicDetail() {
               className="px-4 py-2 rounded-xl bg-white text-black text-xs font-black hover:brightness-110 disabled:opacity-50"
             >
               {t('topics.settings.save')}
+            </button>
+          </div>
+          <div className="text-[11px] font-black uppercase tracking-widest opacity-40 mt-1">
+            {t('topics.share.title')}
+          </div>
+          {shares.length > 0 ? (
+            <div className="flex flex-col gap-1.5">
+              {shares.map((s) => (
+                <div key={s.id} className="flex items-center gap-2 text-[13px]">
+                  <span className="w-6 h-6 rounded-full bg-white/[0.08] grid place-items-center font-bold text-[11px] shrink-0">
+                    {(s.friend_name?.[0] || '?').toUpperCase()}
+                  </span>
+                  <span className="flex-1 min-w-0 font-bold truncate">
+                    {s.friend_name ?? s.friend_user_id}
+                  </span>
+                  <button
+                    onClick={() => void revokeAccess(s.id)}
+                    className="text-[11px] font-bold text-white/40 hover:text-[#f43f5e]"
+                  >
+                    {t('topics.share.revoke')}
+                  </button>
+                </div>
+              ))}
+            </div>
+          ) : (
+            <div className="text-xs opacity-40">{t('topics.share.empty')}</div>
+          )}
+          <div className="flex gap-2">
+            <select
+              value={shareFriend}
+              onChange={(e) => setShareFriend(e.target.value)}
+              className="flex-1 min-w-0 px-3 py-2 rounded-xl bg-black/20 border border-white/[0.08] text-sm focus:outline-none"
+            >
+              <option value="">{t('topics.share.pickPh')}</option>
+              {friends
+                .filter((f) => !shares.some((s) => s.friend_user_id === f.user_id))
+                .map((f) => (
+                  <option key={f.user_id} value={f.user_id}>
+                    {f.name ?? f.user_id}
+                  </option>
+                ))}
+            </select>
+            <button
+              onClick={() => void grantAccess()}
+              disabled={shareBusy || shareFriend === ''}
+              className="px-4 py-2 rounded-xl bg-[#5B74FF]/20 border border-[#5B74FF]/40 text-[#8b9bff] text-xs font-black hover:bg-[#5B74FF]/30 disabled:opacity-40"
+            >
+              {t('topics.share.grant')}
             </button>
           </div>
           {!confirmDeleteCat ? (

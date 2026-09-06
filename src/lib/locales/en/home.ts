@@ -84,6 +84,9 @@ const en: typeof ruHome = {
     added: 'Added ✓',
     needCategory: 'Create a topic above first',
   },
+  sharedSection: {
+    title: 'Shared with me',
+  },
   topics: {
     title: 'By topic',
     all: 'All topics ({n})',

@@ -54,6 +54,17 @@ export default {
     badFile: 'Файл не подошёл',
     recordDenied: 'Нет доступа к микрофону',
   },
+  share: {
+    title: 'Доступ для друга',
+    pickPh: 'Выбери друга…',
+    grant: 'Открыть',
+    empty: 'Пока никому не открыто. Доступ — только взаимным друзьям.',
+    revoke: 'Закрыть',
+    sharedBy: 'Открыл: {name}',
+  },
+  sharedSection: {
+    title: 'Мне открыли доступ',
+  },
   settings: {
     title: 'Настройки темы',
     namePh: 'Название темы…',
