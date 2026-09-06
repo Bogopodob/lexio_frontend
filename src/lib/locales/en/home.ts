@@ -87,6 +87,14 @@ const en: typeof ruHome = {
   sharedSection: {
     title: 'Shared with me',
   },
+  phrases: {
+    title: 'Spoken phrases',
+    sub: 'Ready-made lines: hear it — say it. With transcriptions.',
+    unit: 'phrases',
+    learnedSuffix: 'learned',
+    levelLearned: '{n} ✓',
+    levelDict: 'phrases',
+  },
   topics: {
     title: 'By topic',
     all: 'All topics ({n})',

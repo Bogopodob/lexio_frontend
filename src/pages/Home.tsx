@@ -406,6 +406,63 @@ export default function Home() {
     }
   }, [authReady, user, token])
 
+  const [phraseCategories, setPhraseCategories] = useState<RemoteCategory[]>([])
+  const [phrasesDone, setPhrasesDone] = useState(false)
+
+  useEffect(() => {
+    let cancelled = false
+    const load = async () => {
+      try {
+        if (authReady && user && token) {
+          const profiles = await listLearningProfiles(user.id, token)
+          const active = profiles.find((p) => p.is_active) ?? profiles[0]
+          if (active) {
+            const withProgress = await listCategoriesWithProgress(user.id, token, active.id, 'phrase')
+            if (!cancelled && withProgress.length > 0) {
+              setPhraseCategories(withProgress)
+              return
+            }
+          }
+        }
+        const pub = await listCategories('phrase')
+        if (!cancelled && pub.length > 0) setPhraseCategories(pub)
+      } catch {
+        /* section stays hidden */
+      } finally {
+        if (!cancelled) setPhrasesDone(true)
+      }
+    }
+    load()
+    return () => {
+      cancelled = true
+    }
+  }, [authReady, user, token])
+
+  const visiblePhrases: GrammarCardData[] = useMemo(() => {
+    if (phraseCategories.length === 0) return []
+    const parent = phraseCategories.find((c) => c.slug === 'phrases')
+    const bands = phraseCategories
+      .filter((c) => (parent ? c.parent_id === parent.id : c.slug.startsWith('phr-')))
+      .sort((a, b) => (a.sort ?? 500) - (b.sort ?? 500))
+    return bands.map((c, i) => {
+      const palette = GRAMMAR_COLORS[(i + 3) % GRAMMAR_COLORS.length]
+      const learned = c.learned_count ?? null
+      const total = c.phrases_count ?? 0
+      const progress = learned !== null && learned > 0 && total > 0 ? Math.round((learned / total) * 100) : 0
+      const hasLearned = learned !== null && learned > 0
+      return {
+        id: c.id,
+        dot: palette.dot,
+        title: c.name ?? c.slug,
+        subtitle: `${total} ${t('home.phrases.unit')}${hasLearned ? ` • ${learned} ${t('home.phrases.learnedSuffix')}` : ''}`,
+        progress,
+        level: hasLearned ? t('home.phrases.levelLearned', { n: learned as number }) : t('home.phrases.levelDict'),
+        accent: palette.accent,
+        color: palette.color,
+      }
+    })
+  }, [phraseCategories, t])
+
   const [topicsTab, setTopicsTab] = useState<'system' | 'mine'>('system')
   const [sharedTopics, setSharedTopics] = useState<SharedTopic[]>([])
   const [sharedDone, setSharedDone] = useState(false)
@@ -1171,6 +1228,27 @@ export default function Home() {
               grammarSkeletons.map((i) => <SkeletonCard key={i} />)
             ) : (
               visibleVerbs.map((card, index) => (
+                <MemoGrammarCard key={card.title} card={card} index={index} onOpen={openCategory} />
+              ))
+            )}
+          </div>
+        </motion.section>
+      )}
+
+      {/* PHRASES — разговорные блоки */}
+      {(visiblePhrases.length > 0 || (!isGuest && !phrasesDone)) && (
+        <motion.section className="content-section !mt-6" variants={fadeUp} transition={{ duration: 0.5 }}>
+          <div className="section-header section-header--stacked">
+            <div>
+              <h3>{t('home.phrases.title')}</h3>
+              <p>{t('home.phrases.sub')}</p>
+            </div>
+          </div>
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
+            {!isGuest && !phrasesDone ? (
+              grammarSkeletons.map((i) => <SkeletonCard key={i} />)
+            ) : (
+              visiblePhrases.map((card, index) => (
                 <MemoGrammarCard key={card.title} card={card} index={index} onOpen={openCategory} />
               ))
             )}

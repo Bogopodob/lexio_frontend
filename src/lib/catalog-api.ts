@@ -13,6 +13,7 @@ export interface RemoteCategory {
   sort: number
   name: string | null
   entries_count: number
+  phrases_count?: number
   learned_count?: number
 }
 

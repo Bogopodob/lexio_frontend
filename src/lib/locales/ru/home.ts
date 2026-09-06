@@ -85,6 +85,14 @@ export default {
   sharedSection: {
     title: 'Мне открыли доступ',
   },
+  phrases: {
+    title: 'Разговорные фразы',
+    sub: 'Готовые реплики: услышал — сказал. С транскрипциями.',
+    unit: 'фраз',
+    learnedSuffix: 'выучено',
+    levelLearned: '{n} ✓',
+    levelDict: 'фразы',
+  },
   topics: {
     title: 'По теме',
     all: 'Все темы ({n})',
