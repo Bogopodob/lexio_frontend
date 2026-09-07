@@ -29,6 +29,7 @@ const ru = {
   components,
   lib,
   topics,
+  premium,
 }
 
 export default ru

@@ -166,3 +166,24 @@ export function splitPhrase(text: string): PhraseToken[] {
   }
   return out
 }
+
+/**
+ * Pick gap indices for the cloze mode: 1 gap for short phrases, up to 3 for
+ * long ones. Deterministic per card (stable across re-renders), content words
+ * (length > 2) preferred so "I / a / to" stay as context.
+ */
+export function pickClozeGaps(words: readonly string[], seed: string): number[] {
+  const n = words.length
+  if (n === 0) return []
+  const want = n <= 2 ? 1 : n <= 5 ? 2 : 3
+  const rank = (i: number) => hashOf(`${seed}:${i}:${words[i]}`)
+  const content = words
+    .map((w, i) => i)
+    .filter((i) => words[i].length > 2)
+    .sort((a, b) => rank(a) - rank(b))
+  const rest = words
+    .map((_, i) => i)
+    .filter((i) => words[i].length <= 2)
+    .sort((a, b) => rank(a) - rank(b))
+  return [...content, ...rest].slice(0, Math.min(want, n)).sort((a, b) => a - b)
+}

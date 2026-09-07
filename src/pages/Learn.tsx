@@ -24,6 +24,7 @@ import StudyFlashcard from '@/components/StudyFlashcard'
 import ChoiceCard from '@/components/ChoiceCard'
 import BoolCard from '@/components/BoolCard'
 import AssembleCard from '@/components/AssembleCard'
+import ClozeCard from '@/components/ClozeCard'
 import BlitzBar from '@/components/BlitzBar'
 import { useSpeech } from '@/hooks/useSpeech'
 import { useAuth } from '@/context/AuthContext'
@@ -43,6 +44,7 @@ import {
 import {
   autoQuality,
   hashOf,
+  pickClozeGaps,
   resolveMode,
   shuffle,
   splitPhrase,
@@ -586,6 +588,22 @@ export default function Learn() {
     : cardTexts.target
   const assembleLeads = assembleTokens ? assembleTokens.map((tok) => tok.lead) : undefined
   const assembleTrails = assembleTokens ? assembleTokens.map((tok) => tok.trail) : undefined
+  // Cloze gaps for phrases: deterministic per card, content words preferred.
+  // Tokens are lowercased — phrases are studied in one case.
+  const clozeTokens = useMemo(
+    () =>
+      assembleTokens
+        ? assembleTokens.map((tok) => ({ ...tok, word: tok.word.toLowerCase() }))
+        : null,
+    [assembleTokens],
+  )
+  const clozeGaps = useMemo(() => {
+    if (!clozeTokens) return null
+    return pickClozeGaps(
+      clozeTokens.map((tok) => tok.word),
+      card?.card.learnable_id ?? '',
+    )
+  }, [clozeTokens, card])
 
   const saveOwnHint = useCallback(
     async (hintText: string) => {
@@ -1112,13 +1130,20 @@ export default function Learn() {
                   onAnswer={(ok) => scheduleAuto(ok ? 4 : 1, 900)}
                 />
               )}
-              {cardMode === 'assemble' && !choiceFallback && !boolFallback && (
+              {cardMode === 'assemble' && !choiceFallback && !boolFallback && clozeTokens && clozeGaps && (
+                <ClozeCard
+                  tokens={clozeTokens}
+                  gaps={clozeGaps}
+                  native={cardTexts.native[0] ?? ''}
+                  onAnswer={(kind: Fuzzy, hints: number) => scheduleAuto(autoQuality(kind, hints), 900)}
+                />
+              )}
+              {cardMode === 'assemble' && !choiceFallback && !boolFallback && !clozeTokens && (
                 <AssembleCard
                   words={assembleWords}
                   native={cardTexts.native[0] ?? ''}
                   leads={assembleLeads}
                   trails={assembleTrails}
-                  wordBank={assembleTokens !== null}
                   onAnswer={(kind: Fuzzy, hints: number) => scheduleAuto(autoQuality(kind, hints), 900)}
                 />
               )}

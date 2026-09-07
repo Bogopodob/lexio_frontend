@@ -30,6 +30,7 @@ const en: RuDict = {
   components,
   lib,
   topics,
+  premium,
 }
 
 export default en

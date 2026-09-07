@@ -66,6 +66,10 @@ const en: typeof ruCards = {
     reset: 'Reset',
     clear_slot: 'Clear field',
   },
+  cloze: {
+    title: 'Fill the gaps',
+    enter_hint: 'type the missing words and press “Check”',
+  },
   anagram: {
     title: 'Unscramble the word',
     deny_used: 'all such letters are already placed',
