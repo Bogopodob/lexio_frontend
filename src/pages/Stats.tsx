@@ -86,6 +86,33 @@ function heatColor(minutes: number, isLight: boolean): string {
   return '#5AD4B5'
 }
 
+// Demo numbers for locked (non-premium) users: the API never returns real
+// stats without premium, so the blocks render fakes under a blur + paywall.
+const FAKE_STAT: RemoteStat = {
+  id: 'fake',
+  profile_id: 'fake',
+  words_learned: 248,
+  streak_days: 12,
+  best_streak: 21,
+  xp: 1340,
+  accuracy: 0.94,
+  last_activity_at: null,
+}
+const FAKE_DUE = 17
+
+function LockedOverlay() {
+  const t = useT()
+  return (
+    <div className="fixed inset-0 z-50 grid place-items-center p-4 pointer-events-none">
+      <div className="w-full max-w-[360px] pointer-events-auto">
+        <Paywall title={t('premium.stats.title')} text={t('premium.stats.text')} compact />
+      </div>
+    </div>
+  )
+}
+
+const BLURRED = 'blur-md select-none pointer-events-none'
+
 export default function Stats() {
   const { theme } = useTheme()
   const t = useT()
@@ -245,15 +272,12 @@ export default function Stats() {
   const mainIsBar = period === 'day' || period === 'year'
   const mainData = period === 'day' ? hourly : period === 'year' ? monthly : daily
 
-  // Premium gate: logged-in non-premium users see the paywall,
-  // guests keep the demo content untouched.
-  if (authReady && user && !user.is_premium) {
-    return (
-      <div className="w-full flex flex-col gap-5">
-        <Paywall title={t('premium.stats.title')} text={t('premium.stats.text')} />
-      </div>
-    )
-  }
+  // No premium gate: everyone sees the blocks. Non-premium users get fake
+  // numbers under a blur + paywall (the API never returns real stats to them).
+  const locked = authReady && !!user && !user.is_premium
+  const statShown = locked ? FAKE_STAT : realStat
+  const dueShown = locked ? FAKE_DUE : dueCount
+  const showProfileRow = statProfiles.length > 0 || locked
 
   return (
     <div className="w-full flex flex-col gap-5">
@@ -290,34 +314,43 @@ export default function Stats() {
         <span className="text-xs opacity-40">{t('stats.periodLabel', { sub: mainSub })}</span>
       </div>
 
-      {/* language profile + real stats */}
-      {statProfiles.length > 0 && (
+      {/* stats content: a single blur + a single paywall for everything when locked */}
+      <div className="relative">
+        <div className={locked ? `${BLURRED} flex flex-col gap-5` : 'flex flex-col gap-5'} aria-hidden={locked || undefined} inert={locked || undefined}>
+      {/* language profile + real stats (fakes when locked) */}
+      {showProfileRow && (
         <div className="rounded-[20px] border border-white/[0.06] bg-[#171717] p-5">
           <div className="flex flex-wrap items-center gap-2">
-            {statProfiles.map((p) => {
-              const active = p.id === statProfileId
-              return (
-                <button
-                  key={p.id}
-                  onClick={() => setStatProfileId(p.id)}
-                  className={`px-3.5 py-1.5 rounded-full text-xs font-black border transition-all ${active ? 'bg-[#5AD4B5] text-black border-[#5AD4B5]' : 'bg-white/[0.04] border-white/[0.06] text-white/60 hover:bg-white/[0.08]'}`}
-                >
-                  {statLangMap[p.target_language_id] ?? p.level} • {p.level}
-                </button>
-              )
-            })}
+            {locked && statProfiles.length === 0 ? (
+              <span className="px-3.5 py-1.5 rounded-full text-xs font-black border bg-[#5AD4B5] text-black border-[#5AD4B5]">
+                EN • A2
+              </span>
+            ) : (
+              statProfiles.map((p) => {
+                const active = p.id === statProfileId
+                return (
+                  <button
+                    key={p.id}
+                    onClick={() => setStatProfileId(p.id)}
+                    className={`px-3.5 py-1.5 rounded-full text-xs font-black border transition-all ${active ? 'bg-[#5AD4B5] text-black border-[#5AD4B5]' : 'bg-white/[0.04] border-white/[0.06] text-white/60 hover:bg-white/[0.08]'}`}
+                  >
+                    {statLangMap[p.target_language_id] ?? p.level} • {p.level}
+                  </button>
+                )
+              })
+            )}
             <span className="text-[11px] opacity-40 font-bold ml-1">{t('stats.profileStats')}</span>
           </div>
-          {realStat && (
+          {statShown && (
             <div className="mt-4 grid grid-cols-2 lg:grid-cols-5 gap-3">
               {[
-                { label: t('stats.real.words'), value: String(realStat.words_learned), color: '#5AD4B5' },
-                { label: t('stats.real.streak'), value: `${realStat.streak_days} ${t('stats.units.daysShort')}.`, color: '#F5C16A' },
-                { label: t('stats.real.best'), value: `${realStat.best_streak} ${t('stats.units.daysShort')}.`, color: '#ff9d5c' },
-                { label: t('stats.real.xp'), value: String(realStat.xp), color: '#5B74FF' },
+                { label: t('stats.real.words'), value: String(statShown.words_learned), color: '#5AD4B5' },
+                { label: t('stats.real.streak'), value: `${statShown.streak_days} ${t('stats.units.daysShort')}.`, color: '#F5C16A' },
+                { label: t('stats.real.best'), value: `${statShown.best_streak} ${t('stats.units.daysShort')}.`, color: '#ff9d5c' },
+                { label: t('stats.real.xp'), value: String(statShown.xp), color: '#5B74FF' },
                 {
                   label: t('stats.real.accuracy'),
-                  value: `${Math.round(realStat.accuracy * 100)}%`,
+                  value: `${Math.round(statShown.accuracy * 100)}%`,
                   color: '#F08AB4',
                 },
               ].map((s) => (
@@ -330,14 +363,13 @@ export default function Stats() {
               ))}
             </div>
           )}
-          {dueCount !== null && (
+          {dueShown !== null && (
             <div className="text-xs opacity-50 mt-3">
-              {t('stats.dueToday')} <span className="font-black text-white">{dueCount}</span>
+              {t('stats.dueToday')} <span className="font-black text-white">{dueShown}</span>
             </div>
           )}
         </div>
       )}
-
       {/* pills */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
         {pills.map((p, pi) => (
@@ -584,6 +616,9 @@ export default function Stats() {
           />
         </div>
         <div className="text-xs opacity-40 mt-2">{pct >= 100 ? t('stats.goalBlock.exceeded', { dur: fmtDur(avgMin - goal) }) : t('stats.goalBlock.missing', { dur: fmtDur(goal - avgMin) })}</div>
+      </div>
+        </div>
+        {locked && <LockedOverlay />}
       </div>
     </div>
   )
