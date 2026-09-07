@@ -5,11 +5,10 @@ import {
   useTransform,
 } from 'framer-motion'
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome'
-import { faVolumeHigh, faCheck, faXmark, faRotateLeft, faEye, faEyeSlash, faLanguage, faKeyboard, faHeadphones, faLightbulb, faPen, faCircleCheck } from '@fortawesome/free-solid-svg-icons'
-import { normalize, fuzzyMatch, type Fuzzy } from '@/lib/study'
+import { faVolumeHigh, faCheck, faRotateLeft, faEye, faEyeSlash, faLanguage, faHeadphones, faLightbulb, faPen, faCircleCheck } from '@fortawesome/free-solid-svg-icons'
 import { useT } from '@/lib/i18n'
 
-export type CardMode = 'f2n' | 'n2f' | 'typing' | 'audio'
+export type CardMode = 'f2n' | 'n2f' | 'audio'
 
 export interface WordBadgeData {
   label: string
@@ -38,8 +37,6 @@ interface StudyFlashcardProps {
   onSpeak: (text: string, lang: string, key: string) => void
   onSwipeLeft: () => void
   onSwipeRight: () => void
-  /** Typing check result (for auto-grade in the parent). */
-  onChecked?: (kind: Fuzzy, hintsUsed: number) => void
   /** Audio mode: play the word once when the card appears. */
   onMountAudio?: () => void
 }
@@ -126,7 +123,6 @@ export default function StudyFlashcard({
   onSpeak,
   onSwipeLeft,
   onSwipeRight,
-  onChecked,
   onMountAudio,
 }: StudyFlashcardProps) {
   const t = useT()
@@ -136,27 +132,18 @@ export default function StudyFlashcard({
   const suppressed = useRef(false)
   const dragState = useRef<{ id: number; startX: number } | null>(null)
 
-  const isTyping = mode === 'typing'
   const isAudio = mode === 'audio'
   const displayText = mode === 'f2n' ? (targetTexts[0] ?? '') : (nativeTexts[0] ?? '')
   const displayLang = mode === 'f2n' ? targetLang : nativeLang
   const answers = mode === 'f2n' ? nativeTexts : targetTexts
   const answerLang = mode === 'f2n' ? nativeLang : targetLang
-  const backLabel = mode === 'f2n' ? t('cards.flash.back_translation') : mode === 'n2f' ? t('cards.flash.back_word') : mode === 'audio' ? t('cards.flash.back_word') : t('cards.flash.back_answer')
+  const backLabel = mode === 'f2n' ? t('cards.flash.back_translation') : t('cards.flash.back_word')
 
-  const [value, setValue] = useState('')
-  const [result, setResult] = useState<Fuzzy | null>(null)
-  const [hintsUsed, setHintsUsed] = useState(0)
   const [trShown, setTrShown] = useState(false)
-  const checkedCb = useRef(onChecked)
-  checkedCb.current = onChecked
   const mountAudioCb = useRef(onMountAudio)
   mountAudioCb.current = onMountAudio
 
   useEffect(() => {
-    setValue('')
-    setResult(null)
-    setHintsUsed(0)
     setTrShown(false)
   }, [displayText, mode])
 
@@ -170,36 +157,7 @@ export default function StudyFlashcard({
   const visibleAnswers = answers.slice(0, 6)
   const hiddenCount = answers.length - visibleAnswers.length
 
-  const check = () => {
-    const v = normalize(value)
-    if (!v || flipped) return
-    const { kind } = fuzzyMatch(value, targetTexts)
-    setResult(kind)
-    onFlip()
-    checkedCb.current?.(kind, hintsUsed)
-  }
-
-  const revealLetter = () => {
-    const ans = targetTexts[0] ?? ''
-    if (!ans || flipped) return
-    const lowAns = ans.toLowerCase()
-    const lowCur = value.toLowerCase()
-    let i = 0
-    while (i < lowCur.length && i < lowAns.length && lowCur[i] === lowAns[i]) i++
-    if (i >= ans.length) return
-    setValue(ans.slice(0, i + 1))
-    setHintsUsed((h) => h + 1)
-  }
-
   const answerWord = targetTexts[0] ?? ''
-  const fullyRevealed = value.toLowerCase() === answerWord.toLowerCase() && answerWord !== ''
-
-  const resultStyle =
-    result === 'exact'
-      ? { box: 'bg-[#5AD4B5]/[0.1] border-[#5AD4B5]/50 shadow-[0_0_28px_rgba(90,212,181,0.25)]', text: 'text-[#5AD4B5]', icon: faCheck, label: t('cards.common.correct') }
-      : result === 'close'
-        ? { box: 'bg-[#ff9d5c]/[0.1] border-[#ff9d5c]/50 shadow-[0_0_28px_rgba(255,157,92,0.25)]', text: 'text-[#ff9d5c]', icon: faCheck, label: t('cards.common.almost') }
-        : { box: 'bg-[#f43f5e]/[0.1] border-[#f43f5e]/50 shadow-[0_0_28px_rgba(244,63,94,0.25)]', text: 'text-[#fb7185]', icon: faXmark, label: t('cards.common.wrong') }
 
   const showTrFront = mode === 'f2n' && transcription && (!hideTranscription || trShown)
   const showTrBack = mode !== 'f2n' && transcription && (!hideTranscription || trShown)
@@ -244,7 +202,6 @@ export default function StudyFlashcard({
               suppressed.current = false
               return
             }
-            if (isTyping && !flipped) return
             onFlip()
           }}
         >
@@ -267,11 +224,6 @@ export default function StudyFlashcard({
               {hint && (
                 <span className="px-2.5 py-1 rounded-full bg-[#5AD4B5]/10 border border-[#5AD4B5]/25 text-[#5AD4B5] text-[11px] font-black uppercase tracking-widest">
                   {hint}
-                </span>
-              )}
-              {isTyping && (
-                <span className="px-2.5 py-1 rounded-full bg-[#5B74FF]/15 border border-[#5B74FF]/30 text-[#8b9bff] text-[11px] font-black uppercase tracking-widest flex items-center gap-1.5">
-                  <FontAwesomeIcon icon={faKeyboard} className="text-[10px]" /> {t('cards.flash.typing_badge')}
                 </span>
               )}
               {isAudio && (
@@ -349,48 +301,12 @@ export default function StudyFlashcard({
                     ) : null}
                   </>
                 )}
-                {isTyping && (
-                  <div className="mt-5" onClick={(e) => e.stopPropagation()}>
-                    <div className="flex gap-2">
-                      <input
-                        autoFocus
-                        value={value}
-                        onChange={(e) => setValue(e.target.value)}
-                        onKeyDown={(e) => {
-                          e.stopPropagation()
-                          if (e.key === 'Enter') check()
-                        }}
-                        placeholder="Type in English…"
-                        autoComplete="off"
-                        autoCapitalize="off"
-                        spellCheck={false}
-                        aria-label={t('cards.flash.answer_label')}
-                        className="flex-1 min-w-0 px-4 py-3 rounded-2xl bg-black/30 border border-white/[0.12] text-[17px] font-bold text-center placeholder:text-white/25 placeholder:font-medium focus:outline-none focus:border-[#5AD4B5]/60"
-                      />
-                      <button
-                        onClick={check}
-                        disabled={normalize(value) === ''}
-                        className="px-5 rounded-2xl bg-[#5AD4B5] text-black text-sm font-black hover:brightness-110 transition disabled:opacity-40"
-                      >
-                        ✓
-                      </button>
-                    </div>
-                    <button
-                      onClick={revealLetter}
-                      disabled={fullyRevealed}
-                      className="mt-2 inline-flex items-center gap-1.5 text-[12px] font-bold text-[#F5C16A]/80 hover:text-[#F5C16A] transition disabled:opacity-30"
-                    >
-                      <FontAwesomeIcon icon={faLightbulb} className="text-[11px]" />
-                      {t('cards.flash.hint_letter', { tail: hintsUsed > 0 ? t('cards.flash.hint_used', { n: hintsUsed }) : '' })}
-                    </button>
-                  </div>
-                )}
               </div>
             </div>
 
             <div className="flex items-center justify-center gap-2 text-[12px] font-bold text-white/35 relative">
               <FontAwesomeIcon icon={faEye} className="text-[11px]" />
-              {isTyping ? t('cards.flash.footer_check') : isAudio ? t('cards.flash.footer_recall') : t('cards.flash.footer_flip')}
+              {isAudio ? t('cards.flash.footer_recall') : t('cards.flash.footer_flip')}
             </div>
           </div>
 
@@ -427,25 +343,6 @@ export default function StudyFlashcard({
                   >
                     <FontAwesomeIcon icon={faVolumeHigh} className="text-xs" />
                   </button>
-                </div>
-              )}
-              {isTyping && result !== null && (
-                <div className={`rounded-2xl border px-4 py-3 text-center ${resultStyle.box}`}>
-                  <div className={`text-[22px] font-black flex items-center justify-center gap-2 ${resultStyle.text}`}>
-                    <FontAwesomeIcon icon={resultStyle.icon} />
-                    {resultStyle.label}
-                  </div>
-                  <div className="mt-2 text-[10.5px] font-black uppercase tracking-[0.18em] text-white/40">
-                    {t('cards.flash.your_answer')}
-                  </div>
-                  <div className="mt-0.5 text-[19px] font-black text-white break-words leading-snug">
-                    «{value.trim()}»
-                  </div>
-                </div>
-              )}
-              {isTyping && (
-                <div className="text-[10.5px] font-black uppercase tracking-[0.18em] text-white/40 mt-1">
-                  {t('cards.flash.correct_is')}
                 </div>
               )}
               {visibleAnswers.length > 0 ? (
@@ -537,31 +434,11 @@ export default function StudyFlashcard({
                   </div>
                 </div>
               )}
-              {isTyping && nativeTexts.length > 0 && (
-                <>
-                  <div className="text-[10.5px] font-black uppercase tracking-[0.18em] text-white/40 mt-1">
-                    {t('cards.flash.translation')}
-                  </div>
-                  {nativeTexts.slice(0, 6).map((t, i) => (
-                    <div
-                      key={`tr-${t}-${i}`}
-                      className={`flex items-center gap-3 rounded-2xl bg-[#5B74FF]/[0.07] border border-[#5B74FF]/20 px-4 ${nativeTexts.length > 3 ? 'py-1.5' : 'py-2.5'}`}
-                    >
-                      <span className={`flex-1 min-w-0 font-black leading-snug break-words text-[#aebbff] ${nativeTexts.length > 3 ? 'text-[15px]' : 'text-[19px] sm:text-[22px]'}`}>{t}</span>
-                    </div>
-                  ))}
-                  {nativeTexts.length > 6 && (
-                    <div className="text-center text-[12px] font-bold text-white/35">{t('cards.flash.more', { n: nativeTexts.length - 6 })}</div>
-                  )}
-                </>
-              )}
               <OwnHintBlock hint={ownHint} onSave={onSaveHint} />
             </div>
 
             <div className="text-center text-[12px] font-bold text-white/35 relative">
-              {isTyping ? t('cards.flash.auto_grade') : (
-                <>{t('cards.flash.swipe')} <span className="text-[#f43f5e]">←</span> / <span className="text-[#5AD4B5]">→</span> {t('cards.flash.swipe_grade')}</>
-              )}
+              <>{t('cards.flash.swipe')} <span className="text-[#f43f5e]">←</span> / <span className="text-[#5AD4B5]">→</span> {t('cards.flash.swipe_grade')}</>
             </div>
           </div>
 

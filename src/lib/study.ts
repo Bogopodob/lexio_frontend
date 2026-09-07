@@ -1,6 +1,6 @@
 import { translate, getUiLang } from '@/lib/i18n'
 
-export type BaseMode = 'f2n' | 'n2f' | 'typing' | 'audio' | 'choice' | 'anagram' | 'bool' | 'forms'
+export type BaseMode = 'f2n' | 'n2f' | 'audio' | 'choice' | 'bool' | 'assemble'
 
 export type Direction = BaseMode | 'mixed' | 'smart'
 
@@ -66,30 +66,27 @@ export function fuzzyMatch(input: string, targets: readonly string[]): { kind: F
   return best <= threshold ? { kind: 'close', dist: best } : { kind: 'wrong', dist: best }
 }
 
-const ALL_BASE: BaseMode[] = ['f2n', 'n2f', 'typing', 'audio', 'choice', 'anagram', 'bool']
+const ALL_BASE: BaseMode[] = ['f2n', 'n2f', 'audio', 'choice', 'bool', 'assemble']
 
 function needsNative(m: BaseMode): boolean {
-  return m === 'n2f' || m === 'typing' || m === 'bool' || m === 'choice' || m === 'forms'
+  return m === 'n2f' || m === 'bool' || m === 'choice' || m === 'assemble'
 }
 
-function withFallback(m: BaseMode, hasNative: boolean, hasForms: boolean): BaseMode {
-  if (m === 'forms') return hasForms && hasNative ? 'forms' : 'typing'
+function withFallback(m: BaseMode, hasNative: boolean): BaseMode {
   if (!hasNative && needsNative(m)) return 'f2n'
   return m
 }
 
-export function pickSmart(learnableId: string, p: WordProgress | null, hasForms: boolean): BaseMode {
+export function pickSmart(learnableId: string, p: WordProgress | null): BaseMode {
   const h = hashOf(learnableId)
   const rep = p?.repetition ?? 0
   if (rep <= 0) return 'f2n'
-  if (rep <= 2) return (['typing', 'f2n', 'audio'] as const)[h % 3]
+  if (rep <= 2) return (['f2n', 'audio', 'assemble'] as const)[h % 3]
   if (rep <= 5) {
-    const pool: BaseMode[] = hasForms ? ['n2f', 'choice', 'audio', 'forms'] : ['n2f', 'choice', 'audio']
+    const pool: BaseMode[] = ['n2f', 'choice', 'audio', 'assemble']
     return pool[h % pool.length]
   }
-  const pool: BaseMode[] = hasForms
-    ? ['n2f', 'audio', 'bool', 'anagram', 'choice', 'forms']
-    : ['n2f', 'audio', 'bool', 'anagram', 'choice']
+  const pool: BaseMode[] = ['n2f', 'audio', 'bool', 'choice', 'assemble']
   return pool[h % pool.length]
 }
 
@@ -99,17 +96,14 @@ export function resolveMode(
   learnableId: string,
   progress: WordProgress | null,
   hasNative: boolean,
-  hasForms = false,
 ): BaseMode {
   switch (d) {
-    case 'mixed': {
-      const pool: BaseMode[] = hasForms ? [...ALL_BASE, 'forms'] : ALL_BASE
-      return withFallback(pool[hashOf(`mix:${learnableId}`) % pool.length], hasNative, hasForms)
-    }
+    case 'mixed':
+      return withFallback(ALL_BASE[hashOf(`mix:${learnableId}`) % ALL_BASE.length], hasNative)
     case 'smart':
-      return withFallback(pickSmart(learnableId, progress, hasForms), hasNative, hasForms)
+      return withFallback(pickSmart(learnableId, progress), hasNative)
     default:
-      return withFallback(d, hasNative, hasForms)
+      return withFallback(d, hasNative)
   }
 }
 
@@ -133,4 +127,42 @@ export function autoQuality(kind: Fuzzy, hintsUsed: number): number {
   if (kind === 'exact') return Math.max(3, 5 - hintsUsed)
   if (kind === 'close') return Math.max(1, 3 - hintsUsed)
   return 1
+}
+
+export interface PhraseToken {
+  word: string
+  /** Leading punctuation detached from the word (shown grey, not graded). */
+  lead: string
+  /** Trailing punctuation detached from the word (shown grey, not graded). */
+  trail: string
+}
+
+const EDGE_PUNCT = '[.?!,;:…«»"“”\'’()\\-—–]'
+
+/**
+ * Split a phrase into per-word tokens: `"Can I have the bill, please?"`
+ * → [{bill,', '}, {please,'','?'}, ...]. Inner apostrophes (I'd, don't) stay.
+ */
+export function splitPhrase(text: string): PhraseToken[] {
+  const out: PhraseToken[] = []
+  for (const raw of text.trim().split(/\s+/)) {
+    if (raw === '') continue
+    let lead = ''
+    let core = raw
+    let trail = ''
+    const lm = core.match(new RegExp(`^(${EDGE_PUNCT}+)(.*)$`, 'u'))
+    if (lm && lm[2] !== '') {
+      lead = lm[1]
+      core = lm[2]
+    }
+    const tm = core.match(new RegExp(`^(.*?)(${EDGE_PUNCT}+)$`, 'u'))
+    if (tm && tm[1] !== '') {
+      core = tm[1]
+      trail = tm[2]
+    }
+    if (core === '') continue
+    if (new RegExp(`^${EDGE_PUNCT}+$`, 'u').test(core)) continue
+    out.push({ word: core, lead, trail })
+  }
+  return out
 }

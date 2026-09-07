@@ -11,8 +11,6 @@ import {
   faEyeSlash,
   faFlag,
   faHeadphones,
-  faKeyboard,
-  faListCheck,
   faListUl,
   faPlay,
   faPuzzlePiece,
@@ -25,8 +23,7 @@ import {
 import StudyFlashcard from '@/components/StudyFlashcard'
 import ChoiceCard from '@/components/ChoiceCard'
 import BoolCard from '@/components/BoolCard'
-import AnagramCard from '@/components/AnagramCard'
-import FormsCard from '@/components/FormsCard'
+import AssembleCard from '@/components/AssembleCard'
 import BlitzBar from '@/components/BlitzBar'
 import { useSpeech } from '@/hooks/useSpeech'
 import { useAuth } from '@/context/AuthContext'
@@ -48,9 +45,11 @@ import {
   hashOf,
   resolveMode,
   shuffle,
+  splitPhrase,
   wordBadge,
   type BaseMode,
   type Direction,
+  type Fuzzy,
 } from '@/lib/study'
 import {
   listAchievements,
@@ -68,7 +67,7 @@ const LIMITS = [10, 20, 30]
 
 const BLITZ_SECONDS = 12
 
-const AUTO_MODES: BaseMode[] = ['typing', 'choice', 'bool', 'anagram', 'forms']
+const AUTO_MODES: BaseMode[] = ['assemble', 'choice', 'bool']
 
 interface DirectionInfo {
   id: Direction
@@ -115,12 +114,10 @@ export default function Learn() {
   const DIRECTIONS: DirectionInfo[] = [
     { id: 'f2n', label: t('learn.directions.f2n_label'), hint: t('learn.directions.f2n_hint'), group: 'flip' },
     { id: 'n2f', label: t('learn.directions.n2f_label'), hint: t('learn.directions.n2f_hint'), group: 'flip' },
-    { id: 'typing', label: t('learn.directions.typing_label'), hint: t('learn.directions.typing_hint'), group: 'flip', icon: faKeyboard },
     { id: 'audio', label: t('learn.directions.audio_label'), hint: t('learn.directions.audio_hint'), group: 'flip', icon: faHeadphones },
     { id: 'choice', label: t('learn.directions.choice_label'), hint: t('learn.directions.choice_hint'), group: 'game', icon: faListUl },
-    { id: 'anagram', label: t('learn.directions.anagram_label'), hint: t('learn.directions.anagram_hint'), group: 'game', icon: faPuzzlePiece },
+    { id: 'assemble', label: t('learn.directions.assemble_label'), hint: t('learn.directions.assemble_hint'), group: 'game', icon: faPuzzlePiece },
     { id: 'bool', label: t('learn.directions.bool_label'), hint: t('learn.directions.bool_hint'), group: 'game', icon: faScaleBalanced },
-    { id: 'forms', label: t('learn.directions.forms_label'), hint: t('learn.directions.forms_hint'), group: 'game', icon: faListCheck },
     { id: 'mixed', label: t('learn.directions.mixed_label'), hint: t('learn.directions.mixed_hint'), group: 'auto', icon: faShuffle },
     { id: 'smart', label: t('learn.directions.smart_label'), hint: t('learn.directions.smart_hint'), group: 'auto', icon: faBrain },
   ]
@@ -272,7 +269,6 @@ export default function Learn() {
 
   const choicePickRef = useRef<((i: number) => void) | null>(null)
   const boolAnswerRef = useRef<((v: boolean) => void) | null>(null)
-  const anagramKeyRef = useRef<((key: string) => void) | null>(null)
   const autoTimer = useRef<number | null>(null)
   const lastQuality = useRef<number | null>(null)
 
@@ -465,7 +461,7 @@ export default function Learn() {
     [flipped, submitAnswer],
   )
 
-  // Auto grade (typing/choice/bool/anagram): verified fact, delayed so
+  // Auto grade (assemble/choice/bool): verified fact, delayed so
   // the feedback stays visible.
   const scheduleAuto = useCallback(
     (quality: number, delayMs: number) => {
@@ -555,17 +551,8 @@ export default function Learn() {
           }
         : null,
       cardTexts.native.length > 0,
-      (c?.forms?.length ?? 0) > 0,
     )
   }, [direction, card, cardTexts])
-
-  const formsData = useMemo(() => {
-    const forms = card?.card.forms ?? []
-    return {
-      past: forms.filter((f) => f.form_type === 'past').map((f) => f.form),
-      participle: forms.filter((f) => f.form_type === 'past_participle').map((f) => f.form),
-    }
-  }, [card])
 
   const cardBadge = useMemo(
     () =>
@@ -580,6 +567,25 @@ export default function Learn() {
       ),
     [card, t],
   )
+
+  // Flashcard only handles flip modes — games fall back to f2n.
+  const flashMode: 'f2n' | 'n2f' | 'audio' =
+    cardMode === 'n2f' || cardMode === 'audio' ? cardMode : 'f2n'
+
+  // Phrases come as one string ("Where is the nearest metro?") — split into
+  // per-word slots with a word bank; single words stay a single slot.
+  const assembleTokens = useMemo(() => {
+    const first = cardTexts.target[0] ?? ''
+    if (card?.card.learnable_type !== 'phrase') return null
+    if (cardTexts.target.length !== 1) return null
+    const tokens = splitPhrase(first)
+    return tokens.length > 1 ? tokens : null
+  }, [card, cardTexts])
+  const assembleWords = assembleTokens
+    ? assembleTokens.map((tok) => tok.word.toLowerCase())
+    : cardTexts.target
+  const assembleLeads = assembleTokens ? assembleTokens.map((tok) => tok.lead) : undefined
+  const assembleTrails = assembleTokens ? assembleTokens.map((tok) => tok.trail) : undefined
 
   const saveOwnHint = useCallback(
     async (hintText: string) => {
@@ -689,7 +695,7 @@ export default function Learn() {
   const choiceLoading = cardMode === 'choice' && !choiceForCard && !choiceFallback
   const boolLoading = cardMode === 'bool' && !boolForCard && !boolFallback
   const blitzActive = blitz && (choiceForCard !== null || boolForCard !== null)
-  const quizActive = choiceReady || boolReady || cardMode === 'anagram'
+  const quizActive = choiceReady || boolReady || cardMode === 'assemble'
   const manualMode = !AUTO_MODES.includes(cardMode) || choiceFallback || boolFallback
 
   const { bindings } = useShortcuts()
@@ -710,11 +716,6 @@ export default function Learn() {
       if (boolReady && (e.key === '1' || e.key === '2')) {
         e.preventDefault()
         boolAnswerRef.current?.(e.key === '1')
-        return
-      }
-      if (cardMode === 'anagram' && (e.key === 'Backspace' || /^[a-zA-Zа-яА-ЯёЁ]$/.test(e.key))) {
-        e.preventDefault()
-        anagramKeyRef.current?.(e.key)
         return
       }
       if (e.key === ' ') {
@@ -1111,28 +1112,14 @@ export default function Learn() {
                   onAnswer={(ok) => scheduleAuto(ok ? 4 : 1, 900)}
                 />
               )}
-              {cardMode === 'forms' && (
-                <FormsCard
-                  v1forms={cardTexts.target}
-                  past={formsData.past}
-                  participle={formsData.participle}
+              {cardMode === 'assemble' && !choiceFallback && !boolFallback && (
+                <AssembleCard
+                  words={assembleWords}
                   native={cardTexts.native[0] ?? ''}
-                  wordSpeak={{ text: cardTexts.target[0] ?? '', lang: voiceLangs.target }}
-                  speakingKey={speakingKey}
-                  onSpeak={(text, lang, key) => speakCard(text, lang, key)}
-                  onAnswer={(kind, hints) => scheduleAuto(autoQuality(kind, hints), 1200)}
-                />
-              )}
-              {cardMode === 'anagram' && (
-                <AnagramCard
-                  word={cardTexts.target[0] ?? ''}
-                  transcription={card.card.front_transcription}
-                  wordSpeak={{ text: cardTexts.target[0] ?? '', lang: voiceLangs.target }}
-                  speakingKey={speakingKey}
-                  keyRef={anagramKeyRef}
-                  onSpeak={(text, lang, key) => speakCard(text, lang, key)}
-                  onSolved={(mistakes) => scheduleAuto(mistakes === 0 ? 5 : 3, 900)}
-                  onGiveUp={() => scheduleAuto(1, 1200)}
+                  leads={assembleLeads}
+                  trails={assembleTrails}
+                  wordBank={assembleTokens !== null}
+                  onAnswer={(kind: Fuzzy, hints: number) => scheduleAuto(autoQuality(kind, hints), 900)}
                 />
               )}
               {(choiceLoading || boolLoading) && (
@@ -1140,9 +1127,9 @@ export default function Learn() {
                   <span className="text-sm opacity-50 animate-pulse">{t('learn.study.picking')}</span>
                 </div>
               )}
-              {(cardMode !== 'choice' && cardMode !== 'bool' && cardMode !== 'anagram' && cardMode !== 'forms') || choiceFallback || boolFallback ? (
+              {(cardMode !== 'choice' && cardMode !== 'bool' && cardMode !== 'assemble') || choiceFallback || boolFallback ? (
                 <StudyFlashcard
-                  mode={cardMode === 'choice' || cardMode === 'bool' ? 'f2n' : cardMode}
+                  mode={flashMode}
                   targetTexts={cardTexts.target}
                   nativeTexts={cardTexts.native}
                   transcription={card.card.front_transcription}
@@ -1156,12 +1143,11 @@ export default function Learn() {
                   hideTranscription={hideTr}
                   badge={cardBadge}
                   ownHint={card.card.own_hint ?? null}
-                  onSaveHint={(h) => void saveOwnHint(h)}
+                  onSaveHint={(h: string) => void saveOwnHint(h)}
                   onFlip={() => setFlipped((v) => !v)}
-                  onSpeak={(text, lang, key) => speakCard(text, lang, key)}
+                  onSpeak={(text: string, lang: string, key: string) => speakCard(text, lang, key)}
                   onSwipeLeft={() => grade(1)}
                   onSwipeRight={() => grade(4)}
-                  onChecked={(kind, hints) => scheduleAuto(autoQuality(kind, hints), 1500)}
                   onMountAudio={() => speakCard(cardTexts.target[0] ?? '', voiceLangs.target, 'audio-q')}
                 />
               ) : null}
@@ -1215,16 +1201,14 @@ export default function Learn() {
                   </button>
                 ) : answering ? (
                   t('learn.study.grading')
-                ) : cardMode === 'typing' ? (
-                  t('learn.study.typing_hint')
+                ) : cardMode === 'assemble' ? (
+                  t('learn.study.assemble_hint')
                 ) : cardMode === 'choice' ? (
                   t('learn.study.choice_hint')
                 ) : cardMode === 'bool' ? (
                   t('learn.study.bool_hint')
-                ) : cardMode === 'forms' ? (
-                  t('learn.study.forms_hint')
                 ) : (
-                  t('learn.study.anagram_hint')
+                  t('learn.study.assemble_hint')
                 )}
               </div>
             )}
@@ -1232,10 +1216,10 @@ export default function Learn() {
 
           <div className="rounded-2xl bg-white/[0.03] border border-white/[0.05] px-3.5 py-2.5 flex flex-wrap items-center justify-center gap-x-4 gap-y-1.5 text-[11.5px] text-white/55">
             {!flipped ? (
-              cardMode === 'typing' ? (
+              cardMode === 'assemble' ? (
                 <>
                   <span>
-                    <Kbd>Enter</Kbd> {t('learn.hints.typing_check')}
+                    <Kbd>Enter</Kbd> {t('learn.hints.assemble_check')}
                   </span>
                   <span>{t('learn.hints.hint_letter')}</span>
                 </>
@@ -1259,18 +1243,6 @@ export default function Learn() {
                     <Kbd>1</Kbd> {t('learn.hints.bool_yes')} <Kbd>2</Kbd> {t('learn.hints.bool_no')}
                   </span>
                   {blitzActive && <span>{t('learn.hints.blitz_time', { s: BLITZ_SECONDS })}</span>}
-                </>
-              ) : cardMode === 'anagram' ? (
-                <>
-                  <span>{t('learn.hints.anagram_type')} <Kbd>⌫</Kbd> {t('learn.hints.anagram_erase')}</span>
-                  <span>{t('learn.hints.anagram_click')}</span>
-                </>
-              ) : cardMode === 'forms' ? (
-                <>
-                  <span>
-                    <Kbd>Enter</Kbd> {t('learn.hints.forms_check')}
-                  </span>
-                  <span>{t('learn.hints.hint_letter')}</span>
                 </>
               ) : (
                 <>

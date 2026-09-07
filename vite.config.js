@@ -13,14 +13,5 @@ export default defineConfig({
     server: {
         host: '0.0.0.0',
         port: 5173,
-        // dev-only: forward relative /api calls to the backend.
-        // (With VITE_API_URL set, requests bypass the proxy entirely.)
-        // Production uses same-origin /api via nginx.
-        proxy: {
-            '/api': {
-                target: 'http://localhost:8080',
-                changeOrigin: true,
-            },
-        },
     },
 });

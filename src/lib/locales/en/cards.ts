@@ -54,6 +54,18 @@ const en: typeof ruCards = {
     no: 'False',
     keys_hint: 'click or press 1 / 2',
   },
+  assemble: {
+    title: 'Assemble the answer',
+    score: '{ok} of {n} correct',
+    word_aria: 'Word {n}',
+    hint_letter: 'Letter (−1 from grade{tail})',
+    check: 'Check',
+    enter_hint: 'type the answer and press “Check”',
+    bank_title: 'Words — tap to place',
+    bank_tap_hint: 'Place the word into the first empty field',
+    reset: 'Reset',
+    clear_slot: 'Clear field',
+  },
   anagram: {
     title: 'Unscramble the word',
     deny_used: 'all such letters are already placed',
