@@ -152,7 +152,7 @@ function WordQuiz() {
   const [score, setScore] = useState(0)
   const [best, setBest] = useState(() => {
     try {
-      return Number(localStorage.getItem('qwicki:quiz-best') || 0)
+      return Number(localStorage.getItem('lexio:quiz-best') || 0)
     } catch {
       return 0
     }
@@ -184,7 +184,7 @@ function WordQuiz() {
     if (score > best) {
       setBest(score)
       try {
-        localStorage.setItem('qwicki:quiz-best', String(score))
+        localStorage.setItem('lexio:quiz-best', String(score))
       } catch {
         /* ignore */
       }

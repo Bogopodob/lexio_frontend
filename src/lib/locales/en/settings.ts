@@ -69,7 +69,7 @@ const en: typeof ruSettings = {
   about: {
     title: 'About',
     version: 'Version',
-    versionValue: '0.0.1 • qwicki',
+    versionValue: '0.0.1 • lexio',
     build: 'Build',
     buildValue: '5173 • /',
     text: 'Lexio — strict language learning, no games. ⌘K for search.',

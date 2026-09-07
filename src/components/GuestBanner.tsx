@@ -6,7 +6,7 @@ import { faGhost, faXmark, faRightToBracket } from '@fortawesome/free-solid-svg-
 import { useAuth } from '@/context/AuthContext'
 import { useT } from '@/lib/i18n'
 
-const DISMISS_KEY = 'qwicki:guest-banner-dismissed'
+const DISMISS_KEY = 'lexio:guest-banner-dismissed'
 
 export default function GuestBanner() {
   const t = useT()

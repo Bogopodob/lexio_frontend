@@ -67,7 +67,7 @@ export default {
   about: {
     title: 'О приложении',
     version: 'Версия',
-    versionValue: '0.0.1 • qwicki',
+    versionValue: '0.0.1 • lexio',
     build: 'Сборка',
     buildValue: '5173 • /',
     text: 'Lexio — учим язык строго, без игр. ⌘K для поиска.',

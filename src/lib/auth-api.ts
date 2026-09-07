@@ -2,8 +2,8 @@ import { getUiLang, translate } from '@/lib/i18n'
 
 const API_URL = (import.meta.env.VITE_API_URL as string | undefined) ?? '/api'
 
-const TOKEN_KEY = 'qwicki_token'
-const USER_KEY = 'qwicki_user'
+const TOKEN_KEY = 'lexio_token'
+const USER_KEY = 'lexio_user'
 
 export interface AuthUser {
   id: string

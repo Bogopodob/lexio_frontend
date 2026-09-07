@@ -148,7 +148,7 @@ export default function Auth() {
             <span className="auth-brand__mark">
               <GraduationCap size={22} />
             </span>
-            <span className="auth-brand__name">qwicki</span>
+            <span className="auth-brand__name">lexio</span>
             <span className="auth-brand__tag">
               <Sparkles size={12} /> {t('auth.brandTag')}
             </span>
