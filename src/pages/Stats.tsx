@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from 'react'
 import { motion } from 'framer-motion'
 import { useAuth } from '@/context/AuthContext'
+import { Skeleton, SkeletonCard, SkeletonLine } from '@/components/ui/Skeleton'
 import {
   getDueCount,
   getStats,
@@ -130,14 +131,19 @@ export default function Stats() {
   const [statProfileId, setStatProfileId] = useState<string | null>(null)
   const [realStat, setRealStat] = useState<RemoteStat | null>(null)
   const [dueCount, setDueCount] = useState<number | null>(null)
+  const [statsLoading, setStatsLoading] = useState(true)
 
   // Real per-language-profile stats (charts below stay demo until history API lands).
   useEffect(() => {
-    if (!authReady || !user || !token) return
+    if (!authReady || !user || !token) {
+      setStatsLoading(false)
+      return
+    }
     let cancelled = false
     Promise.allSettled([listLanguages(), listLearningProfiles(user.id, token)]).then(
       ([langsRes, profRes]) => {
         if (cancelled) return
+        let pid: string | null = null
         if (langsRes.status === 'fulfilled') {
           const map: Record<string, string> = {}
           langsRes.value.forEach((l) => {
@@ -148,8 +154,11 @@ export default function Stats() {
         if (profRes.status === 'fulfilled' && profRes.value.length > 0) {
           setStatProfiles(profRes.value)
           const active = profRes.value.find((p) => p.is_active) ?? profRes.value[0]
+          pid = active.id
           setStatProfileId(active.id)
         }
+        // No profile to load stats for (or profiles failed) — settle.
+        if (pid === null) setStatsLoading(false)
       },
     )
     return () => {
@@ -160,11 +169,15 @@ export default function Stats() {
   useEffect(() => {
     if (!user || !token || !statProfileId) return
     let cancelled = false
+    setStatsLoading(true)
     getStats(user.id, token, statProfileId)
       .then((s) => {
         if (!cancelled) setRealStat(s)
       })
       .catch(() => undefined)
+      .finally(() => {
+        if (!cancelled) setStatsLoading(false)
+      })
     getDueCount(user.id, token, statProfileId)
       .then((n) => {
         if (!cancelled) setDueCount(n)
@@ -278,6 +291,64 @@ export default function Stats() {
   const statShown = locked ? FAKE_STAT : realStat
   const dueShown = locked ? FAKE_DUE : dueCount
   const showProfileRow = statProfiles.length > 0 || locked
+  const showStatsSkeleton = statsLoading && authReady && !!user && !locked
+
+  if (showStatsSkeleton) {
+    return (
+      <div className="w-full flex flex-col gap-5 animate-in fade-in duration-300">
+        <div className="flex gap-1.5 p-1 rounded-xl border border-white/[0.06] bg-white/[0.03] backdrop-blur w-fit">
+          {PERIODS.map((p) => (
+            <Skeleton key={p.key} className="h-8 w-16 rounded-lg" />
+          ))}
+        </div>
+        <SkeletonCard>
+          <div className="flex flex-col gap-3">
+            <div className="flex gap-2">
+              <Skeleton className="h-8 w-20 rounded-full" />
+              <Skeleton className="h-8 w-20 rounded-full" />
+            </div>
+            <div className="grid grid-cols-2 lg:grid-cols-5 gap-3">
+              {Array.from({ length: 5 }, (_, i) => (
+                <div key={i} className="rounded-xl bg-white/[0.03] border border-white/[0.04] p-3">
+                  <Skeleton className="h-2.5 w-12 rounded-md opacity-40" />
+                  <Skeleton className="h-6 w-16 rounded-lg mt-2" />
+                </div>
+              ))}
+            </div>
+          </div>
+        </SkeletonCard>
+        <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
+          {Array.from({ length: 4 }, (_, i) => (
+            <SkeletonCard key={i} className="p-4 min-h-[100px]">
+              <Skeleton className="h-2.5 w-20 rounded-md opacity-40" />
+              <Skeleton className="h-7 w-24 rounded-lg mt-2" />
+              <Skeleton className="h-3 w-16 rounded-md mt-1 opacity-50" />
+            </SkeletonCard>
+          ))}
+        </div>
+        <div className="grid grid-cols-1 lg:grid-cols-[1.6fr_1fr] gap-4">
+          <SkeletonCard className="min-h-[320px]">
+            <Skeleton className="h-4 w-32 rounded-lg" />
+            <Skeleton className="h-[220px] w-full rounded-xl mt-3" />
+          </SkeletonCard>
+          <SkeletonCard className="min-h-[320px]">
+            <Skeleton className="h-4 w-32 rounded-lg" />
+            <Skeleton className="h-48 w-48 rounded-full mx-auto mt-4" />
+          </SkeletonCard>
+        </div>
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+          <SkeletonCard className="min-h-[200px]">
+            <Skeleton className="h-4 w-40 rounded-lg" />
+            <Skeleton className="h-[140px] w-full rounded-xl mt-3" />
+          </SkeletonCard>
+          <SkeletonCard className="min-h-[200px]">
+            <Skeleton className="h-4 w-28 rounded-lg" />
+            <Skeleton className="h-36 w-36 rounded-full mx-auto mt-3" />
+          </SkeletonCard>
+        </div>
+      </div>
+    )
+  }
 
   return (
     <div className="w-full flex flex-col gap-5">

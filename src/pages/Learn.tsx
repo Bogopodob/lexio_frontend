@@ -62,6 +62,7 @@ import {
 import { formatBinding, matchesShortcut, useShortcuts, type ShortcutId } from '@/lib/shortcuts'
 import { listCategories, listCategoriesWithProgress } from '@/lib/catalog-api'
 import { useT } from '@/lib/i18n'
+import { Skeleton, SkeletonCard, SkeletonLine } from '@/components/ui/Skeleton'
 
 type Phase = 'loading' | 'menu' | 'study' | 'finished'
 
@@ -822,8 +823,30 @@ export default function Learn() {
       </div>
 
       {phase === 'loading' && (
-        <div className="rounded-[20px] border border-white/[0.06] bg-[#171717] p-10 grid place-items-center">
-          <span className="text-sm opacity-50 animate-pulse">{t('learn.loading')}</span>
+        <div className="flex flex-col gap-4 animate-in fade-in duration-300">
+          <SkeletonCard className="min-h-[80px]">
+            <div className="flex items-center gap-3">
+              <Skeleton className="h-10 w-10 rounded-xl shrink-0" />
+              <div className="flex-1">
+                <SkeletonLine width="40%" className="h-4" />
+                <SkeletonLine width="25%" className="h-3 mt-1 opacity-50" />
+              </div>
+            </div>
+          </SkeletonCard>
+          <SkeletonCard>
+            <Skeleton className="h-4 w-40 rounded-lg" />
+            <Skeleton className="h-3 w-56 rounded-md mt-1 opacity-50" />
+            <div className="flex gap-2 mt-4">
+              <Skeleton className="h-9 w-20 rounded-full" />
+              <Skeleton className="h-9 w-20 rounded-full" />
+              <Skeleton className="h-9 w-20 rounded-full" />
+            </div>
+            <div className="flex gap-2 mt-4">
+              <Skeleton className="h-9 w-24 rounded-full" />
+              <Skeleton className="h-9 w-24 rounded-full" />
+            </div>
+            <Skeleton className="h-12 w-full rounded-2xl mt-5" />
+          </SkeletonCard>
         </div>
       )}
 

@@ -1,23 +1,16 @@
-import { useMemo, useRef, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { AnimatePresence, motion } from 'framer-motion'
-import { AtSign, Check, Eye, EyeOff, Loader2, Lock, TriangleAlert, User } from 'lucide-react'
+import { AtSign, Check, ChevronLeft, Loader2, MailCheck, RefreshCw, TriangleAlert } from 'lucide-react'
 import { AuthError } from '@/lib/auth-api'
 import { useAuth } from '@/context/AuthContext'
-import { useList, useT } from '@/lib/i18n'
+import { useT } from '@/lib/i18n'
 import { cn } from '@/shared/lib/cn'
 
 type Mode = 'login' | 'register'
+type Step = 'email' | 'code'
 
-function passwordScore(pw: string): number {
-  let score = 0
-  if (pw.length >= 8) score++
-  if (pw.length >= 12) score++
-  if (/[A-ZА-ЯЁ]/.test(pw) && /[a-zа-яё]/.test(pw)) score++
-  if (/\d/.test(pw) && /[^A-Za-zА-Яа-яЁё0-9]/.test(pw)) score++
-  return Math.min(score, 4)
-}
-
-const STRENGTH_COLORS = ['#f43f5e', '#ff9d5c', '#F5C16A', '#5AD4B5']
+const CODE_LENGTH = 6
+const COOLDOWN_SECONDS = 60
 
 function Field({
   icon: Icon,
@@ -52,19 +45,66 @@ function Field({
   )
 }
 
+function OtpInput({
+  value,
+  onChange,
+  onComplete,
+  label,
+}: {
+  value: string
+  onChange: (v: string) => void
+  onComplete: (digits: string) => void
+  label: string
+}) {
+  const inputRef = useRef<HTMLInputElement>(null)
+  const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const digits = e.target.value.replace(/\D/g, '').slice(0, CODE_LENGTH)
+    onChange(digits)
+    if (digits.length === CODE_LENGTH) onComplete(digits)
+  }
+  return (
+    <div className="auth-otp" onClick={() => inputRef.current?.focus()}>
+      {Array.from({ length: CODE_LENGTH }, (_, i) => (
+        <span
+          key={i}
+          className={cn(
+            'auth-otp__box',
+            value[i] && 'auth-otp__box--filled',
+            i === value.length && 'auth-otp__box--active',
+          )}
+        >
+          {value[i] ?? ''}
+        </span>
+      ))}
+      <input
+        ref={inputRef}
+        className="auth-otp__input"
+        value={value}
+        onChange={handleChange}
+        type="text"
+        inputMode="numeric"
+        pattern="[0-9]*"
+        autoComplete="one-time-code"
+        autoFocus
+        aria-label={label}
+      />
+    </div>
+  )
+}
+
 export default function AuthCard({ onSuccess }: { onSuccess: () => void }) {
-  const { login, register } = useAuth()
+  const { requestCode, verifyCode } = useAuth()
   const t = useT()
-  const strengthLabels = useList('auth.card.strength')
   const [mode, setMode] = useState<Mode>('login')
-  const [name, setName] = useState('')
+  const [step, setStep] = useState<Step>('email')
   const [email, setEmail] = useState('')
-  const [password, setPassword] = useState('')
-  const [showPassword, setShowPassword] = useState(false)
-  const [capsLock, setCapsLock] = useState(false)
+  const [code, setCode] = useState('')
   const [touched, setTouched] = useState(false)
   const [status, setStatus] = useState<'idle' | 'loading' | 'success'>('idle')
   const [formError, setFormError] = useState<string | null>(null)
+  const [debugCode, setDebugCode] = useState<string | null>(null)
+  const [codeMinutes, setCodeMinutes] = useState(5)
+  const [resendIn, setResendIn] = useState(0)
   const [glow, setGlow] = useState({ x: 50, y: 50 })
   const cardRef = useRef<HTMLDivElement>(null)
 
@@ -72,45 +112,103 @@ export default function AuthCard({ onSuccess }: { onSuccess: () => void }) {
     touched && email !== '' && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email.trim())
       ? t('auth.card.emailError')
       : undefined
-  const passwordError =
-    touched && mode === 'register' && password !== '' && password.length < 8
-      ? t('auth.card.passwordError')
-      : undefined
 
-  const strength = useMemo(() => passwordScore(password), [password])
   const canSubmit =
     status !== 'loading' &&
-    /^\S+@\S+\.\S+$/.test(email.trim()) &&
-    (mode === 'login' ? password.length > 0 : password.length >= 8)
+    (step === 'email'
+      ? /^\S+@\S+\.\S+$/.test(email.trim())
+      : code.length === CODE_LENGTH)
 
-  const switchMode = (next: Mode) => {
-    setMode(next)
-    setFormError(null)
-    setTouched(false)
-    setStatus('idle')
+  useEffect(() => {
+    if (resendIn <= 0) return
+    const id = window.setInterval(() => setResendIn((s) => (s > 1 ? s - 1 : 0)), 1000)
+    return () => window.clearInterval(id)
+  }, [resendIn])
+
+  const authErrorText = (err: unknown): string => {
+    if (err instanceof AuthError) {
+      if (err.status === 0) return t('auth.card.serverDown')
+      return err.message
+    }
+    return t('auth.card.genericError')
   }
 
-  const submit = async (e: React.FormEvent) => {
-    e.preventDefault()
+  const switchMode = (next: Mode) => {
+    if (next === mode) return
+    setMode(next)
+    setStep('email')
+    setCode('')
+    setTouched(false)
+    setStatus('idle')
+    setFormError(null)
+    setDebugCode(null)
+    setResendIn(0)
+  }
+
+  const sendCode = async () => {
     setTouched(true)
-    if (status === 'loading' || !canSubmit) return
+    if (status === 'loading' || !/^\S+@\S+\.\S+$/.test(email.trim())) return
     setStatus('loading')
     setFormError(null)
     try {
-      if (mode === 'login') await login(email.trim(), password)
-      else await register(email.trim(), password, name.trim() || undefined)
+      const result = await requestCode(email.trim())
+      setDebugCode(result.debug_code)
+      setCodeMinutes(Math.max(1, Math.round(result.expires_in / 60)))
+      setResendIn(COOLDOWN_SECONDS)
+      setCode('')
+      setStep('code')
+      setStatus('idle')
+    } catch (err) {
+      setStatus('idle')
+      setFormError(authErrorText(err))
+    }
+  }
+
+  const submitCode = async (digits?: string) => {
+    const candidate = (digits ?? code).trim()
+    if (status === 'loading' || status === 'success') return
+    if (candidate.length !== CODE_LENGTH) return
+    setStatus('loading')
+    setFormError(null)
+    try {
+      await verifyCode(email.trim(), candidate)
       setStatus('success')
       window.setTimeout(onSuccess, 950)
     } catch (err) {
       setStatus('idle')
-      setFormError(
-        err instanceof AuthError
-          ? err.status === 0
-            ? t('auth.card.serverDown')
-            : err.message
-          : t('auth.card.genericError'),
-      )
+      setCode('')
+      setFormError(authErrorText(err))
     }
+  }
+
+  const resend = async () => {
+    if (status === 'loading' || resendIn > 0) return
+    setStatus('loading')
+    setFormError(null)
+    try {
+      const result = await requestCode(email.trim())
+      setDebugCode(result.debug_code)
+      setCodeMinutes(Math.max(1, Math.round(result.expires_in / 60)))
+      setResendIn(COOLDOWN_SECONDS)
+      setCode('')
+      setStatus('idle')
+    } catch (err) {
+      setStatus('idle')
+      setFormError(authErrorText(err))
+    }
+  }
+
+  const backToEmail = () => {
+    setStep('email')
+    setCode('')
+    setStatus('idle')
+    setFormError(null)
+  }
+
+  const submit = (e: React.FormEvent) => {
+    e.preventDefault()
+    if (step === 'email') void sendCode()
+    else void submitCode()
   }
 
   return (
@@ -141,122 +239,92 @@ export default function AuthCard({ onSuccess }: { onSuccess: () => void }) {
 
       <AnimatePresence mode="wait">
         <motion.p
-          key={mode}
+          key={`${step}-${mode}`}
           initial={{ opacity: 0, y: 8 }}
           animate={{ opacity: 1, y: 0 }}
           exit={{ opacity: 0, y: -8 }}
           transition={{ duration: 0.22 }}
           className="auth-card__subtitle"
         >
-          {mode === 'login' ? t('auth.card.subLogin') : t('auth.card.subRegister')}
+          {step === 'email'
+            ? mode === 'login'
+              ? t('auth.card.subLogin')
+              : t('auth.card.subRegister')
+            : mode === 'login'
+              ? t('auth.card.codeTitleLogin')
+              : t('auth.card.codeTitleRegister')}
         </motion.p>
       </AnimatePresence>
 
       <form onSubmit={submit} noValidate className="auth-form">
-        <AnimatePresence initial={false}>
-          {mode === 'register' && (
+        <AnimatePresence mode="wait" initial={false}>
+          {step === 'email' ? (
             <motion.div
-              key="name"
+              key="email"
               initial={{ height: 0, opacity: 0 }}
               animate={{ height: 'auto', opacity: 1 }}
               exit={{ height: 0, opacity: 0 }}
               transition={{ duration: 0.28, ease: 'easeInOut' }}
               className="overflow-hidden"
             >
-              <Field icon={User} label={t('auth.card.fieldName')}>
+              <Field icon={AtSign} label={t('auth.card.fieldEmail')} error={emailError}>
                 <input
-                  value={name}
-                  onChange={(e) => setName(e.target.value)}
+                  value={email}
+                  onChange={(e) => setEmail(e.target.value)}
+                  onBlur={() => setTouched(true)}
                   placeholder=" "
-                  autoComplete="name"
-                  maxLength={60}
+                  type="email"
+                  autoComplete="email"
+                  inputMode="email"
                   className="auth-input"
                 />
               </Field>
             </motion.div>
+          ) : (
+            <motion.div
+              key="code"
+              initial={{ height: 0, opacity: 0 }}
+              animate={{ height: 'auto', opacity: 1 }}
+              exit={{ height: 0, opacity: 0 }}
+              transition={{ duration: 0.28, ease: 'easeInOut' }}
+              className="overflow-hidden"
+            >
+              <div className="auth-code">
+                <div className="auth-code__mail">
+                  <MailCheck size={15} />
+                  <span>{t('auth.card.codeSentTo', { email })}</span>
+                  <button type="button" className="auth-code__back" onClick={backToEmail}>
+                    <ChevronLeft size={13} /> {t('auth.card.changeEmail')}
+                  </button>
+                </div>
+
+                <OtpInput
+                  value={code}
+                  onChange={setCode}
+                  onComplete={(digits) => void submitCode(digits)}
+                  label={t('auth.card.codeInputLabel')}
+                />
+
+                <div className="auth-code__row">
+                  <button
+                    type="button"
+                    className="auth-code__action"
+                    disabled={resendIn > 0}
+                    onClick={() => void resend()}
+                  >
+                    <RefreshCw size={13} />
+                    {resendIn > 0
+                      ? t('auth.card.resendIn', { seconds: resendIn })
+                      : t('auth.card.resendCode')}
+                  </button>
+                  <span className="auth-code__ttl">{t('auth.card.codeExpires', { minutes: codeMinutes })}</span>
+                </div>
+
+                {debugCode && <div className="auth-debug">{t('auth.card.debugHint', { code: debugCode })}</div>}
+              </div>
+            </motion.div>
           )}
         </AnimatePresence>
-
-        <Field icon={AtSign} label={t('auth.card.fieldEmail')} error={emailError}>
-          <input
-            value={email}
-            onChange={(e) => setEmail(e.target.value)}
-            onBlur={() => setTouched(true)}
-            placeholder=" "
-            type="email"
-            autoComplete="email"
-            inputMode="email"
-            className="auth-input"
-          />
-        </Field>
-
-        <Field icon={Lock} label={t('auth.card.fieldPassword')} error={passwordError}>
-          <input
-            value={password}
-            onChange={(e) => setPassword(e.target.value)}
-            onBlur={() => setTouched(true)}
-            onKeyDown={(e) => {
-              const caps = e.getModifierState?.('CapsLock')
-              if (typeof caps === 'boolean') setCapsLock(caps)
-            }}
-            placeholder=" "
-            type={showPassword ? 'text' : 'password'}
-            autoComplete={mode === 'login' ? 'current-password' : 'new-password'}
-            className="auth-input auth-input--with-action"
-          />
-          <button
-            type="button"
-            aria-label={showPassword ? t('auth.card.hidePassword') : t('auth.card.showPassword')}
-            onClick={() => setShowPassword((v) => !v)}
-            className="auth-field__action"
-          >
-            {showPassword ? <EyeOff size={16} /> : <Eye size={16} />}
-          </button>
-        </Field>
-
-        <div className="auth-hints">
-          <AnimatePresence>
-            {capsLock && password !== '' && (
-              <motion.span
-                initial={{ opacity: 0, height: 0 }}
-                animate={{ opacity: 1, height: 'auto' }}
-                exit={{ opacity: 0, height: 0 }}
-                className="auth-hints__caps"
-              >
-                <TriangleAlert size={13} /> {t('auth.card.capsLock')}
-              </motion.span>
-            )}
-          </AnimatePresence>
-          <AnimatePresence>
-            {mode === 'register' && password !== '' && (
-              <motion.div
-                initial={{ opacity: 0, height: 0 }}
-                animate={{ opacity: 1, height: 'auto' }}
-                exit={{ opacity: 0, height: 0 }}
-                className="auth-strength"
-              >
-                <div className="auth-strength__bars">
-                  {[0, 1, 2, 3].map((i) => (
-                    <motion.span
-                      key={i}
-                      animate={{
-                        backgroundColor: i < strength ? STRENGTH_COLORS[strength - 1] : 'rgba(255,255,255,0.12)',
-                        boxShadow:
-                          i < strength
-                            ? `0 0 10px ${STRENGTH_COLORS[strength - 1]}66`
-                            : '0 0 0 transparent',
-                      }}
-                      className="auth-strength__bar"
-                    />
-                  ))}
-                </div>
-                <span className="auth-strength__label" style={{ color: STRENGTH_COLORS[strength - 1] }}>
-                  {strengthLabels[strength - 1] ?? ''}
-                </span>
-              </motion.div>
-            )}
-          </AnimatePresence>
-        </div>
 
         <AnimatePresence>
           {formError && (
@@ -324,8 +392,14 @@ export default function AuthCard({ onSuccess }: { onSuccess: () => void }) {
                 exit={{ opacity: 0 }}
                 className="auth-submit__content"
               >
-                {mode === 'login' ? t('auth.card.submitLogin') : t('auth.card.submitRegister')}
-                <span className="auth-submit__arrow">→</span>
+                {step === 'email' ? (
+                  <>
+                    {t('auth.card.getCode')}
+                    <span className="auth-submit__arrow">→</span>
+                  </>
+                ) : (
+                  mode === 'login' ? t('auth.card.submitLogin') : t('auth.card.submitRegister')
+                )}
               </motion.span>
             )}
           </AnimatePresence>

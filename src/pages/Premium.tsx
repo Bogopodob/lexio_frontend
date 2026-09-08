@@ -5,16 +5,69 @@ import { FontAwesomeIcon } from '@fortawesome/react-fontawesome'
 import { faCheck, faCrown, faRotate } from '@fortawesome/free-solid-svg-icons'
 import { useAuth } from '@/context/AuthContext'
 import { useList, useT } from '@/lib/i18n'
+import { Skeleton, SkeletonCard, SkeletonLine } from '@/components/ui/Skeleton'
 
 export default function Premium() {
   const t = useT()
   const navigate = useNavigate()
-  const { user, refresh } = useAuth()
+  const { user, refresh, ready } = useAuth()
   const freeFeatures = useList('premium.page.free_features')
   const premiumFeatures = useList('premium.page.premium_features')
   const [refreshing, setRefreshing] = useState(false)
   const [refreshMsg, setRefreshMsg] = useState<string | null>(null)
   const [checkoutHit, setCheckoutHit] = useState(false)
+
+  if (!ready) {
+    return (
+      <div className="w-full flex flex-col gap-5 animate-in fade-in duration-300">
+        <SkeletonCard className="!p-6 sm:!p-7">
+          <div className="flex flex-wrap items-start justify-between gap-4">
+            <div className="flex items-center gap-3">
+              <Skeleton className="h-9 w-9 rounded-xl" />
+              <SkeletonLine width="180px" className="h-7" />
+              <Skeleton className="h-6 w-16 rounded-full" />
+            </div>
+          </div>
+          <Skeleton className="h-4 w-64 rounded-lg mt-2 opacity-50" />
+          <SkeletonCard className="!bg-white/[0.03] !border-white/[0.04] mt-4">
+            <Skeleton className="h-4 w-40 rounded-lg" />
+            <Skeleton className="h-3 w-56 rounded-md mt-1 opacity-50" />
+            <Skeleton className="h-9 w-28 rounded-full mt-3" />
+          </SkeletonCard>
+        </SkeletonCard>
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+          <SkeletonCard>
+            <Skeleton className="h-4 w-28 rounded-lg" />
+            <Skeleton className="h-8 w-20 rounded-lg mt-2" />
+            <div className="mt-3 space-y-2">
+              {Array.from({ length: 5 }, (_, i) => (
+                <div key={i} className="flex items-center gap-2">
+                  <Skeleton className="h-3 w-3 rounded-full shrink-0" />
+                  <SkeletonLine width={`${60 + (i % 3) * 10}%`} className="h-3 opacity-60" />
+                </div>
+              ))}
+            </div>
+          </SkeletonCard>
+          <SkeletonCard>
+            <div className="flex items-center gap-3">
+              <Skeleton className="h-8 w-8 rounded-xl" />
+              <Skeleton className="h-4 w-32 rounded-lg" />
+            </div>
+            <Skeleton className="h-8 w-20 rounded-lg mt-2" />
+            <div className="mt-3 space-y-2">
+              {Array.from({ length: 5 }, (_, i) => (
+                <div key={i} className="flex items-center gap-2">
+                  <Skeleton className="h-3 w-3 rounded-full shrink-0" />
+                  <SkeletonLine width={`${60 + (i % 3) * 10}%`} className="h-3 opacity-60" />
+                </div>
+              ))}
+            </div>
+            <Skeleton className="h-10 w-full rounded-full mt-4" />
+          </SkeletonCard>
+        </div>
+      </div>
+    )
+  }
 
   const isGuest = !user
   const isPremium = Boolean(user?.is_premium)

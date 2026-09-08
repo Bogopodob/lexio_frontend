@@ -4,20 +4,22 @@ import {
   AuthError,
   clearSession,
   loadSession,
-  loginRequest,
   logoutRequest,
   meRequest,
-  registerRequest,
+  requestEmailCode,
   saveSession,
+  verifyEmailCode,
   type AuthUser,
+  type EmailCodeRequestResult,
 } from '@/lib/auth-api'
+import { getUiLang } from '@/lib/i18n'
 
 interface AuthContextValue {
   user: AuthUser | null
   token: string | null
   ready: boolean
-  login: (email: string, password: string) => Promise<void>
-  register: (email: string, password: string, name?: string) => Promise<void>
+  requestCode: (email: string) => Promise<EmailCodeRequestResult>
+  verifyCode: (email: string, code: string) => Promise<void>
   logout: () => Promise<void>
   refresh: () => Promise<void>
 }
@@ -59,15 +61,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       .finally(() => setReady(true))
   }, [])
 
-  const login = useCallback(async (email: string, password: string) => {
-    const payload = await loginRequest(email, password)
-    saveSession(payload)
-    setUser(payload.user)
-    setToken(payload.token)
+  const requestCode = useCallback(async (email: string) => {
+    return requestEmailCode(email, getUiLang())
   }, [])
 
-  const register = useCallback(async (email: string, password: string, name?: string) => {
-    const payload = await registerRequest(email, password, name)
+  const verifyCode = useCallback(async (email: string, code: string) => {
+    const payload = await verifyEmailCode(email, code)
     saveSession(payload)
     setUser(payload.user)
     setToken(payload.token)
@@ -97,8 +96,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }, [])
 
   const value = useMemo(
-    () => ({ user, token, ready, login, register, logout, refresh }),
-    [user, token, ready, login, register, logout, refresh],
+    () => ({ user, token, ready, requestCode, verifyCode, logout, refresh }),
+    [user, token, ready, requestCode, verifyCode, logout, refresh],
   )
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>

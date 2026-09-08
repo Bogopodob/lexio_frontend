@@ -58,21 +58,29 @@ async function request<T>(path: string, init: RequestInit = {}): Promise<T> {
   return body.data as T
 }
 
-export async function loginRequest(email: string, password: string): Promise<AuthPayload> {
-  return request<AuthPayload>('/login', {
+export interface EmailCodeRequestResult {
+  expires_in: number
+  debug_code: string | null
+  delivery: {
+    channel: string
+    provider: string
+  }
+}
+
+export async function requestEmailCode(
+  email: string,
+  locale?: string,
+): Promise<EmailCodeRequestResult> {
+  return request<EmailCodeRequestResult>('/email/request-code', {
     method: 'POST',
-    body: JSON.stringify({ email, password }),
+    body: JSON.stringify({ email, locale }),
   })
 }
 
-export async function registerRequest(
-  email: string,
-  password: string,
-  name?: string,
-): Promise<AuthPayload> {
-  return request<AuthPayload>('/register', {
+export async function verifyEmailCode(email: string, code: string): Promise<AuthPayload> {
+  return request<AuthPayload>('/email/verify-code', {
     method: 'POST',
-    body: JSON.stringify({ email, password, name: name || undefined }),
+    body: JSON.stringify({ email, code }),
   })
 }
 

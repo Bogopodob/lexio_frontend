@@ -3399,6 +3399,123 @@ button {
   min-height: 2px;
 }
 
+/* email-code (OTP) step */
+.auth-code {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  padding-top: 2px;
+}
+
+.auth-code__mail {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 12.5px;
+  font-weight: 600;
+  color: rgba(255, 255, 255, 0.6);
+}
+
+.auth-code__mail svg { color: #5ad4b5; flex-shrink: 0; }
+
+.auth-code__mail span {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.auth-code__back {
+  margin-left: auto;
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+  flex-shrink: 0;
+  font-size: 12px;
+  font-weight: 800;
+  color: #5ad4b5;
+  transition: color 0.15s;
+}
+
+.auth-code__back:hover { color: #7ef0cd; }
+
+.auth-otp {
+  position: relative;
+  display: flex;
+  gap: 8px;
+}
+
+.auth-otp__box {
+  flex: 1;
+  height: 56px;
+  display: grid;
+  place-items: center;
+  border-radius: 14px;
+  background: rgba(255, 255, 255, 0.045);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  font-size: 22px;
+  font-weight: 800;
+  color: #fff;
+  transition: border-color 0.15s, box-shadow 0.15s, color 0.15s, background 0.15s;
+}
+
+.auth-otp__box--active {
+  border-color: rgba(90, 212, 181, 0.6);
+  background: rgba(90, 212, 181, 0.05);
+  box-shadow: 0 0 0 3px rgba(90, 212, 181, 0.15);
+}
+
+.auth-otp__box--filled { color: #5ad4b5; }
+
+.auth-otp__input {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  opacity: 0;
+  font-size: 22px;
+  text-align: center;
+  caret-color: transparent;
+  cursor: text;
+}
+
+.auth-code__row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+.auth-code__action {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 12px;
+  font-weight: 700;
+  color: #5ad4b5;
+  transition: color 0.15s, opacity 0.15s;
+}
+
+.auth-code__action:disabled {
+  color: rgba(255, 255, 255, 0.35);
+  cursor: default;
+}
+
+.auth-code__action:not(:disabled):hover { color: #7ef0cd; }
+
+.auth-code__ttl {
+  font-size: 11px;
+  font-weight: 600;
+  line-height: 1.35;
+  text-align: right;
+  color: rgba(255, 255, 255, 0.35);
+}
+
+.auth-debug {
+  font-size: 11.5px;
+  font-weight: 700;
+  color: #f5c16a;
+}
+
 .auth-hints__caps {
   display: inline-flex;
   align-items: center;
@@ -3686,6 +3803,20 @@ button {
 }
 
 [data-theme="light"] .auth-input { color: #141414; }
+
+[data-theme="light"] .auth-otp__box {
+  background: rgba(255, 255, 255, 0.7);
+  border-color: rgba(20, 20, 20, 0.1);
+  color: #141414;
+}
+
+[data-theme="light"] .auth-otp__box--filled { color: #0d8a68; }
+
+[data-theme="light"] .auth-code__mail { color: rgba(20, 20, 20, 0.6); }
+
+[data-theme="light"] .auth-code__action:disabled { color: rgba(20, 20, 20, 0.35); }
+
+[data-theme="light"] .auth-code__ttl { color: rgba(20, 20, 20, 0.4); }
 
 [data-theme="light"] .auth-brand__tag {
   color: rgba(20, 20, 20, 0.6);

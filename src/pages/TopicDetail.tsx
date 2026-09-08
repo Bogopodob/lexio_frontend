@@ -12,6 +12,7 @@ import {
 } from '@fortawesome/free-solid-svg-icons'
 import { useAuth } from '@/context/AuthContext'
 import { useT } from '@/lib/i18n'
+import { Skeleton, SkeletonCard, SkeletonLine } from '@/components/ui/Skeleton'
 import {
   deleteCategory,
   listCategories,
@@ -369,8 +370,34 @@ export default function TopicDetail() {
 
   if (!authReady) {
     return (
-      <div className="w-full max-w-[760px] mx-auto rounded-[20px] border border-white/[0.06] bg-[#171717] p-10 grid place-items-center">
-        <span className="text-sm opacity-50 animate-pulse">…</span>
+      <div className="w-full max-w-[760px] mx-auto flex flex-col gap-4 animate-in fade-in duration-300">
+        <div className="flex items-center gap-3">
+          <Skeleton className="h-9 w-9 rounded-full shrink-0" />
+          <div className="flex-1">
+            <SkeletonLine width="60%" className="h-6" />
+            <SkeletonLine width="40%" className="h-3 mt-2 opacity-50" />
+          </div>
+        </div>
+        <div className="flex gap-2">
+          <Skeleton className="h-12 flex-1 min-w-[160px] rounded-2xl" />
+          <Skeleton className="h-12 w-32 rounded-2xl" />
+          <Skeleton className="h-12 w-32 rounded-2xl" />
+        </div>
+        <SkeletonCard className="min-h-[80px]">
+          <SkeletonLine width="50%" className="h-4" />
+        </SkeletonCard>
+        {Array.from({ length: 4 }, (_, i) => (
+          <SkeletonCard key={i} className="!p-4">
+            <div className="flex gap-3">
+              <Skeleton className="w-16 h-16 rounded-2xl shrink-0" />
+              <div className="flex-1 flex flex-col gap-2">
+                <SkeletonLine width="45%" className="h-4" />
+                <SkeletonLine width="30%" className="h-3 opacity-60" />
+                <SkeletonLine width="20%" className="h-3 opacity-40" />
+              </div>
+            </div>
+          </SkeletonCard>
+        ))}
       </div>
     )
   }
@@ -551,8 +578,17 @@ export default function TopicDetail() {
       )}
 
       {loading ? (
-        <div className="rounded-[20px] border border-white/[0.06] bg-[#171717] p-10 grid place-items-center">
-          <span className="text-sm opacity-50 animate-pulse">{t('topics.loading')}</span>
+        <div className="flex flex-col gap-2 animate-in fade-in duration-200">
+          {Array.from({ length: 5 }, (_, i) => (
+            <div key={i} className="rounded-[20px] border border-white/[0.06] bg-[#171717] p-4 flex gap-3">
+              <Skeleton className="w-16 h-16 rounded-2xl shrink-0" />
+              <div className="flex-1 flex flex-col gap-2 py-1">
+                <SkeletonLine width="40%" className="h-4" />
+                <SkeletonLine width="30%" className="h-3 opacity-60" />
+                <SkeletonLine width="20%" className="h-3 opacity-40" />
+              </div>
+            </div>
+          ))}
         </div>
       ) : rows.length === 0 ? (
         <div className="rounded-[20px] border border-white/[0.06] bg-[#171717] p-10 text-center text-sm opacity-50">
