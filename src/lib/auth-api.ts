@@ -21,10 +21,12 @@ export interface AuthPayload {
 
 export class AuthError extends Error {
   status: number
+  retryAfter: number | null
 
-  constructor(message: string, status: number) {
+  constructor(message: string, status: number, retryAfter: number | null = null) {
     super(message)
     this.status = status
+    this.retryAfter = retryAfter
   }
 }
 
@@ -44,14 +46,22 @@ async function request<T>(path: string, init: RequestInit = {}): Promise<T> {
     data?: T
     message?: string
     error?: string
+    retry_after?: number
     errors?: Record<string, string[]>
   } | null
 
   if (!res.ok || !body || body.success === false) {
     const firstValidation = body?.errors ? Object.values(body.errors)[0]?.[0] : undefined
+    const retryAfter =
+      typeof body?.retry_after === 'number'
+        ? body.retry_after
+        : res.headers.get('Retry-After') !== null
+          ? Number(res.headers.get('Retry-After'))
+          : null
     throw new AuthError(
       firstValidation ?? body?.message ?? body?.error ?? translate(getUiLang(), 'lib.auth.something_wrong'),
       res.status,
+      Number.isFinite(retryAfter) && (retryAfter as number) > 0 ? (retryAfter as number) : null,
     )
   }
 
@@ -60,6 +70,7 @@ async function request<T>(path: string, init: RequestInit = {}): Promise<T> {
 
 export interface EmailCodeRequestResult {
   expires_in: number
+  resend_after: number | null
   debug_code: string | null
   delivery: {
     channel: string

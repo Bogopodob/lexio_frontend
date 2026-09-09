@@ -10,7 +10,12 @@ type Mode = 'login' | 'register'
 type Step = 'email' | 'code'
 
 const CODE_LENGTH = 6
-const COOLDOWN_SECONDS = 60
+const FALLBACK_COOLDOWN_SECONDS = 60
+
+function cooldownFromResult(result: { resend_after?: number | null }): number {
+  const v = typeof result.resend_after === 'number' ? result.resend_after : FALLBACK_COOLDOWN_SECONDS
+  return Math.min(300, Math.max(5, Math.round(v)))
+}
 
 function Field({
   icon: Icon,
@@ -145,6 +150,12 @@ export default function AuthCard({ onSuccess }: { onSuccess: () => void }) {
     setResendIn(0)
   }
 
+  const applyRateLimit = (err: unknown) => {
+    if (err instanceof AuthError && err.status === 429 && err.retryAfter) {
+      setResendIn(Math.min(3600, Math.max(1, Math.round(err.retryAfter))))
+    }
+  }
+
   const sendCode = async () => {
     setTouched(true)
     if (status === 'loading' || !/^\S+@\S+\.\S+$/.test(email.trim())) return
@@ -154,12 +165,13 @@ export default function AuthCard({ onSuccess }: { onSuccess: () => void }) {
       const result = await requestCode(email.trim())
       setDebugCode(result.debug_code)
       setCodeMinutes(Math.max(1, Math.round(result.expires_in / 60)))
-      setResendIn(COOLDOWN_SECONDS)
+      setResendIn(cooldownFromResult(result))
       setCode('')
       setStep('code')
       setStatus('idle')
     } catch (err) {
       setStatus('idle')
+      applyRateLimit(err)
       setFormError(authErrorText(err))
     }
   }
@@ -189,11 +201,12 @@ export default function AuthCard({ onSuccess }: { onSuccess: () => void }) {
       const result = await requestCode(email.trim())
       setDebugCode(result.debug_code)
       setCodeMinutes(Math.max(1, Math.round(result.expires_in / 60)))
-      setResendIn(COOLDOWN_SECONDS)
+      setResendIn(cooldownFromResult(result))
       setCode('')
       setStatus('idle')
     } catch (err) {
       setStatus('idle')
+      applyRateLimit(err)
       setFormError(authErrorText(err))
     }
   }
